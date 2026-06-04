@@ -65,40 +65,10 @@ settingsPopoverEl.addEventListener("change", (event) => {
   saveSettings({ ...currentSettings, [control.dataset.setting]: control.value });
 });
 
-async function loadBoardSnapshot() {
-  const embedded = document.getElementById("board-snapshot");
-  if (embedded?.textContent) {
-    try {
-      return JSON.parse(embedded.textContent);
-    } catch {
-      return null;
-    }
-  }
-  try {
-    const response = await fetch("./board-snapshot.json", { cache: "no-store" });
-    if (!response.ok) return null;
-    return await response.json();
-  } catch {
-    return null;
-  }
-}
-
-function boardOfflineMessage() {
-  return "Start the local board server, then open http://127.0.0.1:41737/<goal-slug>/ (or refresh this page after running: node ~/.cursor/skills/goalbuddy/scripts/goalbuddy.mjs board docs/goals/<slug>).";
-}
-
 async function loadBoard() {
-  try {
-    const response = await fetch("./api/board", { cache: "no-store" });
-    if (!response.ok) throw new Error("Board request failed");
-    renderBoard(await response.json());
-    return true;
-  } catch {
-    const snapshot = await loadBoardSnapshot();
-    if (!snapshot) throw new Error(boardOfflineMessage());
-    renderBoard(snapshot);
-    return false;
-  }
+  const response = await fetch("./api/board", { cache: "no-store" });
+  if (!response.ok) throw new Error("Board request failed");
+  renderBoard(await response.json());
 }
 
 async function loadBoardSwitcher() {
@@ -558,20 +528,16 @@ function el(tag, className = "", text = "") {
 
 loadSettings()
   .then(loadBoard)
-  .then((live) => {
-    if (live) {
-      setLiveState("Live", true);
-      rememberCurrentBoard();
-      loadBoardSwitcher();
-      window.setInterval(loadBoardSwitcher, 5000);
-      connectEvents();
-    } else {
-      setLiveState("Snapshot", false);
-    }
+  .then(() => {
+    setLiveState("Live", true);
+    rememberCurrentBoard();
     loadGithubStars();
+    loadBoardSwitcher();
+    window.setInterval(loadBoardSwitcher, 5000);
+    connectEvents();
   })
   .catch((error) => {
     setLiveState("Offline", false);
-    boardEl.replaceChildren(renderBoardError(error.message));
+    boardEl.textContent = error.message;
   });
 

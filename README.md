@@ -2,13 +2,13 @@
 
 Git-installable [GoalBuddy](https://github.com/tolibear/goalbuddy) port for Cursor (`cursorPortVersion` **1.0.0**, `upstreamVersion` **0.3.8**).
 
-Upstream parity matrix: [docs/PARITY.md](docs/PARITY.md).
+Upstream parity matrix: [docs/PARITY.md](docs/PARITY.md). **Wiki:** [GoalBuddy Cursor Port wiki](https://github.com/wstrege-kenosha/GoalBuddy-Cursor-Port/wiki).
 
 ## Install
 
 ```bash
 git clone https://github.com/wstrege-kenosha/GoalBuddy-Cursor-Port.git
-cd goalbuddy-cursor-port
+cd GoalBuddy-Cursor-Port
 node scripts/install-from-repo.mjs
 ```
 
