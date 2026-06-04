@@ -15,17 +15,13 @@ const trees = [
   { name: "goal-prep", src: join(repoRoot, "goal-prep") },
 ];
 
-for (const { name, src } of trees) {
-  if (!existsSync(src)) {
-    console.error(`Missing vendored tree: ${src}`);
-    console.error("Clone the full repo or copy from ~/.cursor/skills before installing.");
-    process.exit(1);
-  }
-}
-
 mkdirSync(skillsDir, { recursive: true });
 
 for (const { name, src } of trees) {
+  if (!existsSync(src)) {
+    console.error(`Missing vendored tree: ${src}`);
+    process.exit(1);
+  }
   const dest = join(skillsDir, name);
   cpSync(src, dest, { recursive: true, force: true });
   console.log(`copied ${name} -> ${dest}`);

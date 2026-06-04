@@ -1,7 +1,5 @@
 # T001 Scout — Publish public GitHub readiness
 
-**Task:** T001 (Scout) · **Board:** `docs/goals/publish-public-github/state.yaml` · **Date:** 2026-06-04
-
 ## Publish checklist
 
 | Step | Status | Notes |
@@ -106,9 +104,3 @@ Recommend **goalbuddy-cursor-port** unless branding prefers shorter **goalbuddy-
 - GitHub **owner** (personal vs org) not specified.
 - Whether to publish root `notes/` at all.
 
-## Commands run
-
-1. `git status` + `git log --oneline -5` + `git remote -v`
-2. `git remote -v`; `git branch -a`; `Test-Path .git`
-3. `where gh` / `gh auth status` (gh unavailable)
-4. ripgrep: machine paths, secret patterns, README placeholders

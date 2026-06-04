@@ -1,7 +1,5 @@
 # GoalBuddy parity — upstream 0.3.8 vs Cursor port 1.0.0
 
-Source map: [T001 Scout notes](goals/goalbuddy-cursor-port/notes/T001-scout.md). Port payload shipped in T003 (`goalbuddy/`, `goal-prep/`, `scripts/install-from-repo.mjs`).
-
 ## Upstream (`tolibear/goalbuddy` @ 0.3.8)
 
 | Path | Role |
@@ -31,8 +29,8 @@ Source map: [T001 Scout notes](goals/goalbuddy-cursor-port/notes/T001-scout.md).
 
 ## Parity matrix
 
-| Feature | Upstream 0.3.8 | Cursor (local `~/.cursor`) | Port repo (T003+) |
-|---------|----------------|------------------------------|-------------------|
+| Feature | Upstream 0.3.8 | Cursor (`~/.cursor`) | Port repo |
+|---------|----------------|------------------------|-----------|
 | Goal Prep | `$goal-prep` / plugin | `/goal-prep` + `goal-prep` skill | `goal-prep/SKILL.md` vendored |
 | PM `/goal` loop | Native + CLI prompt | `/goal` + `goalbuddy.mjs prompt` | `goalbuddy/commands-src`, agents-src |
 | state.yaml v2 | Yes | Yes | Yes; `check-goal-state.mjs` in tree |
@@ -42,17 +40,16 @@ Source map: [T001 Scout notes](goals/goalbuddy-cursor-port/notes/T001-scout.md).
 | install | `npx goalbuddy` | `goalbuddy.mjs install` | `node scripts/install-from-repo.mjs` |
 | check-goal-state / parallel-plan / check-update | Yes | Yes (skill tree) | Yes (vendored scripts) |
 | Codex/Claude plugins | Yes | N/A (by design) | N/A |
-| npm publish | `goalbuddy` | N/A | Git clone install only (no registry) |
-| PARITY doc | N/A | N/A | Yes (this file) |
-| Root LICENSE | MIT in package | N/A | MIT (copied from `goalbuddy/LICENSE`) |
+| npm publish | `goalbuddy` | N/A | Git clone only |
+| Root LICENSE | MIT in package | N/A | MIT (`LICENSE`) |
 | Sample smoke goal | Examples in skill tree | Optional | `docs/goals/sample-cursor-smoke/` |
 
-## Deferred (out of MVP)
+## Deferred
 
-- Codex/Claude plugin paths and `--target codex|claude` in this repo
-- npm publish as `goalbuddy-cursor`
-- Full upstream superpowers / site parity
-- Automated CI (optional)
+- Codex/Claude plugins and `--target codex|claude`
+- npm package `goalbuddy-cursor`
+- Upstream superpowers / site parity
+- CI
 
 ## Verify (port repo)
 

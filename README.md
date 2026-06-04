@@ -12,8 +12,6 @@ cd goalbuddy-cursor-port
 node scripts/install-from-repo.mjs
 ```
 
-Replace `OWNER` with your GitHub username or org after you create the public repository (see [Publishing](#publishing)).
-
 Or after clone:
 
 ```bash
@@ -63,21 +61,10 @@ node ~/.cursor/skills/goalbuddy/scripts/goalbuddy.mjs board docs/goals/<slug>
 
 ## Publishing
 
-Maintainers: after creating the public repo, replace `OWNER` in this README with the real GitHub owner, then push.
+Replace `OWNER` with your GitHub user or org, then push (`gh auth login` first):
 
 ```bash
-# Requires GitHub CLI (gh) authenticated: gh auth login
 gh repo create OWNER/goalbuddy-cursor-port --public --source=. --remote=origin --push
 ```
 
-Fresh-clone verify (from a clean directory):
-
-```bash
-git clone https://github.com/OWNER/goalbuddy-cursor-port.git
-cd goalbuddy-cursor-port
-node scripts/install-from-repo.mjs
-npm run check
-node goalbuddy/scripts/goalbuddy.mjs doctor --goal-ready
-```
-
-This port is not published to npm; install from git only. Upstream: [tolibear/goalbuddy](https://github.com/tolibear/goalbuddy).
+Re-run [Verify](#verify) from a fresh clone. Not on npm; upstream [tolibear/goalbuddy](https://github.com/tolibear/goalbuddy).

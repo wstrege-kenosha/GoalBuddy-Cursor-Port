@@ -63,7 +63,7 @@ visual_board:
     url: "http://goalbuddy.localhost:41737/publish-public-github/"
     command: "node goalbuddy/scripts/goalbuddy.mjs board docs/goals/publish-public-github"
 
-active_task: T004
+active_task: T006
 
 tasks:
   - id: T001
@@ -155,7 +155,7 @@ tasks:
   - id: T004
     type: worker
     assignee: Worker
-    status: active
+    status: done
     reasoning_hint: default
     objective: "Prep public repo metadata: set package.json private false; update README clone URL to github.com/OWNER/goalbuddy-cursor-port placeholder + Publishing section; commit. Stop before gh push without owner/repo."
     allowed_files:
@@ -167,13 +167,35 @@ tasks:
       - git log -1 --oneline
     stop_if:
       - "gh push or remote add without documented owner/repo approval"
-    receipt: null
+    receipt:
+      result: done
+      summary: "README OWNER placeholder + Publishing section; package.json public; commit a22fde8."
+      changed_files:
+        - README.md
+        - package.json
+        - docs/goals/publish-public-github/notes/T004-publish.md
+      commands:
+        - cmd: git commit
+          status: pass
+        - cmd: npm run check
+          status: pass
+      note: docs/goals/publish-public-github/notes/T004-publish.md
   - id: T005
     type: pm
     assignee: PM
-    status: queued
+    status: blocked
     reasoning_hint: default
     objective: "Create public GitHub repo and push when user supplies owner/repo and gh auth; fresh-clone verify; update README with real URL."
+    receipt:
+      result: blocked
+      summary: "gh CLI absent; GitHub OWNER not set; no remote. See notes/T005-pm-blocked.md for operator steps."
+      note: notes/T005-pm-blocked.md
+  - id: T006
+    type: pm
+    assignee: PM
+    status: active
+    reasoning_hint: default
+    objective: "When operator provides GitHub OWNER and gh auth: replace README OWNER, gh repo create --public --push, fresh-clone verify, then queue T999 audit."
     receipt: null
   - id: T999
     type: judge

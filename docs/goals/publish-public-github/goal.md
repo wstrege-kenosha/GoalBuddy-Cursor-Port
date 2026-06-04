@@ -18,15 +18,11 @@ I'd like to publish this port to a public GitHub repo.
 - Goal oracle: A third party (or documented fresh-clone run) can clone the public repo URL, install, and pass doctor/check without private remotes or secrets in tracked files or recent history
 - Likely misfire: Push local-only git with goal boards containing machine-specific paths; publish without replacing README placeholders; push secrets or `.cursor` install manifests with user paths
 - Blind spots considered: repo name/owner choice; whether to include all `docs/goals/*` history boards; relationship to upstream tolibear/goalbuddy attribution; GitHub org vs personal; default branch name
-- Existing plan facts: Port already has root LICENSE (MIT), README, `docs/PARITY.md`, vendored `goalbuddy/` + `goal-prep/`, `git init` from T004; README still has `<this-repo-url>` placeholder
+- Existing plan facts: LICENSE, README, `docs/PARITY.md`, vendored skills, local git commits; README uses `OWNER` placeholder until push
 
 ## Goal Oracle
 
-The oracle for this goal is:
-
-**The repository is public on GitHub at a stable HTTPS clone URL recorded in README; a fresh clone on this machine (or documented CI) runs install + `npm run check` + `doctor --goal-ready` with command output captured in a task receipt; `git log` and tracked files contain no secrets (`.env`, tokens, user-specific credentials).**
-
-The PM must keep comparing task receipts to this oracle. Planning, discovery, a passing tiny slice, or a clean-looking board is not enough. The goal finishes only when a final Judge/PM audit maps receipts and verification back to this oracle and records `full_outcome_complete: true`.
+Public GitHub clone URL in README; fresh clone passes install, `npm run check`, and `doctor --goal-ready` (receipt-backed); no secrets in tracked files or history. Finish when Judge audit records `full_outcome_complete: true`.
 
 ## Goal Kind
 
@@ -45,11 +41,7 @@ Scout publish-readiness → Judge first slice (likely: sanitize + .gitignore + R
 
 ## Stop Rule
 
-Stop only when a final audit proves the full original outcome is complete.
-
-Do not stop after planning, discovery, or Judge selection if a safe Worker task can activate.
-
-Do not stop after a single verified Worker package when public publish and clone-verify still have safe local follow-up work.
+Stop when final audit proves the outcome complete—not after planning or a single slice if publish/clone-verify work remains.
 
 ## Canonical Board
 
@@ -65,4 +57,4 @@ Machine truth lives at:
 
 ## PM Loop
 
-On every `/goal` continuation: read charter and `state.yaml`, work active task only, write receipts, advance board, finish only after Judge audit with `full_outcome_complete: true`.
+Read charter and `state.yaml`; one active task per turn; receipts in `state.yaml`.
