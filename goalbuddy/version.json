@@ -1,0 +1,7 @@
+{
+  "name": "goalbuddy-cursor",
+  "upstream": "goalbuddy",
+  "upstreamVersion": "0.3.8",
+  "upstreamUrl": "https://github.com/tolibear/goalbuddy",
+  "cursorPortVersion": "1.0.0"
+}

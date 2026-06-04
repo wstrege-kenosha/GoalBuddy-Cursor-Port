@@ -1,0 +1,11 @@
+node_modules/
+.DS_Store
+Thumbs.db
+*.log
+.env
+.env.*
+goalbuddy/install.json
+**/.goalbuddy-board/board-snapshot.json
+/notes/
+docs/goals/goal-prep-live-test/
+docs/goals/goalbuddy-cursor-port/

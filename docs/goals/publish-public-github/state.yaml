@@ -1,0 +1,165 @@
+# GoalBuddy v2 state.yaml
+
+version: 2
+
+goal:
+  title: "Publish Cursor Port to Public GitHub"
+  slug: publish-public-github
+  kind: specific
+  tranche: "Publish readiness → sanitize + README remote URL → create/push public repo → fresh-clone verify"
+  status: active
+  oracle:
+    signal: "Public GitHub clone URL in README; fresh clone install + check + doctor --goal-ready pass; no secrets in tracked files or history"
+    cadence: "after each Worker package and at final audit"
+    final_proof: "Receipt with public repo URL, clone path, verify command output, secret-scan note"
+  intake:
+    original_request: "I'd like to publish this port to a public GitHub repo"
+    interpreted_outcome: "Public GitHub repo with working clone/install verify and no leaked secrets"
+    input_shape: specific
+    audience: "Public Cursor users and contributors"
+    authority: requested
+    proof_type: artifact
+    completion_proof: "Live public repo URL + fresh-clone verify per README"
+    likely_misfire: "Push without sanitizing docs/goals or README placeholders; leak paths/secrets"
+    blind_spots_considered:
+      - "owner/repo naming"
+      - "include vs exclude docs/goals boards"
+      - "upstream attribution wording"
+      - "push requires user gh auth"
+    existing_plan_facts:
+      - "Port complete at docs/goals/goalbuddy-cursor-port (done)"
+      - "LICENSE, README, PARITY.md, git init exist"
+      - "README uses <this-repo-url> placeholder"
+
+rules:
+  pm_owns_state: true
+  one_active_task: true
+  max_write_workers: 1
+  no_implementation_without_worker_or_pm_task: true
+  no_completion_without_judge_or_pm_audit: true
+  planning_is_not_completion: true
+  queued_required_worker_blocks_completion: true
+  continuous_until_full_outcome: true
+  missing_input_or_credentials_do_not_stop_goal: true
+  preserve_and_validate_existing_plan: true
+  intake_misfire_must_be_audited: true
+  goal_pressure_requires_oracle: true
+  no_completion_on_weak_proof: true
+  slice_policy:
+    max_consecutive_tiny_tasks: 2
+    prefer_vertical_slices: true
+    judge_picks_largest_safe_slice: true
+    worker_completes_whole_slice: true
+
+agents:
+  scout: installed
+  worker: installed
+  judge: installed
+
+visual_board:
+  selected: local
+  local:
+    status: live
+    url: "http://goalbuddy.localhost:41737/publish-public-github/"
+    command: "node goalbuddy/scripts/goalbuddy.mjs board docs/goals/publish-public-github"
+
+active_task: T003
+
+tasks:
+  - id: T001
+    type: scout
+    assignee: Scout
+    status: done
+    reasoning_hint: default
+    objective: "Map GitHub publish readiness: git status/remotes/branches, .gitignore gaps, README placeholder URLs, LICENSE, tracked secret candidates, docs/goals/* suitability for public repo, and gh prerequisites."
+    inputs:
+      - README.md
+      - .gitignore
+      - LICENSE
+      - package.json
+      - docs/
+      - git log and git status
+    constraints:
+      - "Read-only."
+      - "Do not push or create remotes."
+      - "Prefer concrete file-path and command evidence."
+    expected_output:
+      - "Publish readiness checklist"
+      - "Secret/path hygiene findings"
+      - "Recommended repo name options"
+      - "Ranked Worker slices for Judge"
+    receipt:
+      result: done
+      summary: "No commits/remotes; gh absent; README placeholder; install.json and board snapshots leak local paths. Slices: sanitize→commit→URL→push→clone verify."
+      evidence:
+        - notes/T001-scout.md
+        - goalbuddy/install.json
+        - README.md
+      note: notes/T001-scout.md
+  - id: T002
+    type: judge
+    assignee: Judge
+    status: done
+    reasoning_hint: default
+    objective: "Review Scout findings and choose first safe slice toward public publish (sanitize, README URL, initial commit, gh repo create/push)."
+    inputs:
+      - "T001 receipt"
+      - "goal.md oracle"
+    constraints:
+      - "Do not implement."
+      - "Pick largest safe useful slice with allowed_files, verify, stop_if."
+      - "Block push slice if user has not supplied owner/repo or gh auth."
+    expected_output:
+      - "Decision"
+      - "Worker objective"
+      - "allowed_files"
+      - "verify"
+      - "stop_if"
+    receipt:
+      result: done
+      decision: approved
+      summary: "Approved sanitize + initial commit only; push/README URL deferred until owner/repo + gh."
+  - id: T003
+    type: worker
+    assignee: Worker
+    status: active
+    reasoning_hint: default
+    objective: "Sanitize path leaks; extend .gitignore; redact machine-specific notes; initial git commit. No remotes, push, gh, or README URL changes."
+    allowed_files:
+      - .gitignore
+      - goalbuddy/install.json
+      - notes/T004-worker.md
+      - docs/goals/publish-public-github/notes/T001-scout.md
+    verify:
+      - git log -1 --oneline
+      - npm run check
+    stop_if:
+      - "git ls-files matches wstrege or w:\\Experimental paths"
+      - "Push or gh attempted"
+      - "README.md edited"
+      - "npm run check fails"
+    receipt: null
+  - id: T999
+    type: judge
+    assignee: Judge
+    status: queued
+    reasoning_hint: default
+    objective: "Audit whether public GitHub publish satisfies the oracle and original request."
+    inputs:
+      - "All task receipts"
+      - "Public repo URL"
+      - "Fresh-clone verification"
+    constraints:
+      - "Do not implement."
+      - "Reject completion without public URL and clone-verify evidence."
+    expected_output:
+      - "complete | not_complete"
+      - "full_outcome_complete: true | false"
+    receipt: null
+
+checks:
+  dirty_fingerprint: unknown
+  last_verification:
+    result: unknown
+    task: null
+    commands: []
