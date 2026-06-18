@@ -65,10 +65,40 @@ settingsPopoverEl.addEventListener("change", (event) => {
   saveSettings({ ...currentSettings, [control.dataset.setting]: control.value });
 });
 
+async function loadBoardSnapshot() {
+  const embedded = document.getElementById("board-snapshot");
+  if (embedded?.textContent) {
+    try {
+      return JSON.parse(embedded.textContent);
+    } catch {
+      return null;
+    }
+  }
+  try {
+    const response = await fetch("./board-snapshot.json", { cache: "no-store" });
+    if (!response.ok) return null;
+    return await response.json();
+  } catch {
+    return null;
+  }
+}
+
+function boardOfflineMessage() {
+  return "Start the local board server, then open http://127.0.0.1:41737/<goal-slug>/ (or refresh this page after running: node ~/.cursor/skills/goalbuddy/scripts/goalbuddy.mjs board docs/goals/<slug>).";
+}
+
 async function loadBoard() {
-  const response = await fetch("./api/board", { cache: "no-store" });
-  if (!response.ok) throw new Error("Board request failed");
-  renderBoard(await response.json());
+  try {
+    const response = await fetch("./api/board", { cache: "no-store" });
+    if (!response.ok) throw new Error("Board request failed");
+    renderBoard(await response.json());
+    return true;
+  } catch {
+    const snapshot = await loadBoardSnapshot();
+    if (!snapshot) throw new Error(boardOfflineMessage());
+    renderBoard(snapshot);
+    return false;
+  }
 }
 
 async function loadBoardSwitcher() {
@@ -213,6 +243,8 @@ function renderBoard(board) {
   document.getElementById("goal-status").textContent = board.goal.status;
   document.getElementById("goal-active").textContent = board.goal.activeTask || "None";
   document.getElementById("goal-updated").textContent = new Date(board.generatedAt).toLocaleTimeString();
+  renderOracleStrip(board);
+  renderSessionStrip(board);
 
   if (board.error) {
     boardEl.replaceChildren(renderBoardError(board.error));
@@ -233,6 +265,41 @@ function renderBoardError(message) {
     el("p", "", message),
   );
   return node;
+}
+
+function renderOracleStrip(board) {
+  const signalEl = document.getElementById("oracle-signal");
+  const finalProofEl = document.getElementById("oracle-final-proof");
+  const healthEl = document.getElementById("oracle-health");
+  const auditEl = document.getElementById("oracle-audit");
+  if (!signalEl || !healthEl) return;
+
+  const signal = board.goal?.oracle?.signal || "";
+  const finalProof = board.goal?.oracle?.final_proof || "";
+  signalEl.textContent = signal || "No oracle signal recorded.";
+  finalProofEl.textContent = finalProof ? `Final proof: ${finalProof}` : "";
+  const weak = isWeakOracle(signal) || isWeakOracle(finalProof);
+  healthEl.textContent = weak ? "weak oracle" : "oracle ready";
+  healthEl.className = `badge ${weak ? "status-blocked" : "status-done"}`;
+  const doneWorkers = (board.tasks || []).filter((task) => task.type === "worker" && task.status === "done").length;
+  auditEl.textContent = `${doneWorkers} worker receipt(s); final audit maps proof to oracle.`;
+}
+
+function renderSessionStrip(board) {
+  const strip = document.getElementById("session-strip");
+  const log = document.getElementById("session-log");
+  if (!strip || !log) return;
+  if (!board.sessionLog) {
+    strip.hidden = true;
+    return;
+  }
+  strip.hidden = false;
+  log.textContent = board.sessionLog;
+}
+
+function isWeakOracle(value) {
+  const normalized = String(value || "").trim().toLowerCase();
+  return !normalized || normalized === "tbd" || normalized === "unknown" || normalized === "todo" || /^<.*>$/.test(normalized);
 }
 
 function renderBoardSwitcher(boards) {
@@ -410,7 +477,18 @@ function renderTaskDetail(task) {
   if (task.receipt?.decision) root.append(detailText("Decision", task.receipt.decision));
   if (task.receipt?.changedFiles?.length) root.append(detailList("Changed Files", task.receipt.changedFiles));
   if (task.receipt?.commands?.length) {
-    root.append(detailList("Commands", task.receipt.commands.map((command) => command.status ? `${command.status}: ${command.cmd}` : command.cmd)));
+    const section = el("section", "detail-section");
+    section.append(el("h3", "", "Commands"));
+    const list = el("ul", "command-list");
+    for (const command of task.receipt.commands) {
+      const item = el("li", "command-item");
+      const status = command.status ? el("span", `badge ${command.status === "pass" ? "status-done" : "status-blocked"}`, command.status) : null;
+      const label = el("span", "", command.cmd || String(command));
+      item.append(status || el("span", "badge", "cmd"), label);
+      list.append(item);
+    }
+    section.append(list);
+    root.append(section);
   }
   if (task.note?.content) {
     const section = el("section", "detail-section");
@@ -528,16 +606,20 @@ function el(tag, className = "", text = "") {
 
 loadSettings()
   .then(loadBoard)
-  .then(() => {
-    setLiveState("Live", true);
-    rememberCurrentBoard();
+  .then((live) => {
+    if (live) {
+      setLiveState("Live", true);
+      rememberCurrentBoard();
+      loadBoardSwitcher();
+      window.setInterval(loadBoardSwitcher, 5000);
+      connectEvents();
+    } else {
+      setLiveState("Snapshot", false);
+    }
     loadGithubStars();
-    loadBoardSwitcher();
-    window.setInterval(loadBoardSwitcher, 5000);
-    connectEvents();
   })
   .catch((error) => {
     setLiveState("Offline", false);
-    boardEl.textContent = error.message;
+    boardEl.replaceChildren(renderBoardError(error.message));
   });
 

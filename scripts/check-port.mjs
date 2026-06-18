@@ -101,6 +101,12 @@ if (!runNodeTests(boardTestFile, "local-goal-board tests")) failed = true;
 const validatorTestFile = join(repoRoot, "goalbuddy", "scripts", "test", "check-goal-state.test.mjs");
 if (!runNodeTests(validatorTestFile, "check-goal-state tests")) failed = true;
 
+const phaseATestFile = join(repoRoot, "goalbuddy", "scripts", "test", "phase-a-cli.test.mjs");
+if (!runNodeTests(phaseATestFile, "phase-a cli tests")) failed = true;
+
+const phaseBTestFile = join(repoRoot, "goalbuddy", "scripts", "test", "phase-b-mcp.test.mjs");
+if (!runNodeTests(phaseBTestFile, "phase-b mcp tests")) failed = true;
+
 const doctor = spawnSync(
   process.execPath,
   [join(repoRoot, "goalbuddy", "scripts", "goalbuddy.mjs"), "doctor"],

@@ -197,8 +197,24 @@ export async function startBoardServer(options = {}) {
         sendJson(response, addBoard(payload.goalDir || ""));
         return;
       }
-      if (url.pathname === "/" || url.pathname === "/boards") {
+      if (url.pathname === "/open") {
         redirectToFirstBoard(response, boards, baseUrl, readBoardSettings());
+        return;
+      }
+      if (url.pathname === "/" || url.pathname === "/hub") {
+        await sendHubPage(response, baseUrl, boards);
+        return;
+      }
+      if (url.pathname === "/api/hub") {
+        const hub = await loadHubModule();
+        sendJson(response, hub.buildHubPayloadForServer([...boards.values()].map((board) => board.root), {
+          roots: [process.cwd()],
+          baseUrl,
+        }));
+        return;
+      }
+      if (url.pathname === "/boards") {
+        await sendHubPage(response, baseUrl, boards);
         return;
       }
       if (url.pathname === "/api/boards") {
@@ -295,6 +311,30 @@ async function registerWithBoardHub({ goalDir, host, port }) {
     throw new Error(`GoalBuddy local board hub rejected ${goalDir}: ${message}`);
   }
   return { ...(await response.json()), registered: true };
+}
+
+function sendHubPage(response, baseUrl, boards) {
+  return loadHubModule().then((hub) => {
+    const payload = hub.buildHubPayloadForServer([...boards.values()].map((board) => board.root), {
+      roots: [process.cwd()],
+      baseUrl,
+    });
+    response.writeHead(200, {
+      "Content-Type": "text/html; charset=utf-8",
+      "Cache-Control": "no-store",
+    });
+    response.end(hub.hubPageHtml(payload));
+  });
+}
+
+async function loadHubModule() {
+  const localPath = new URL("./lib/goal-hub.mjs", import.meta.url);
+  try {
+    return await import(localPath);
+  } catch {
+    const skillPath = new URL("../../../scripts/lib/goal-hub.mjs", import.meta.url);
+    return import(skillPath);
+  }
 }
 
 function redirectToFirstBoard(response, boards, baseUrl, settings = {}) {

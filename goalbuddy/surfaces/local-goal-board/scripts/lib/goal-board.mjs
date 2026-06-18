@@ -58,6 +58,8 @@ export function createBoardPayload(goalDir, options = {}) {
       status: board.status,
       tranche: board.tranche,
       activeTask: board.activeTask,
+      oracle: document.goal?.oracle || null,
+      intake: document.goal?.intake || null,
     },
     counts: {
       total: tasks.length,
@@ -69,6 +71,7 @@ export function createBoardPayload(goalDir, options = {}) {
     columns,
     tasks,
     notes: Object.values(noteIndex).map(({ path, title, mtimeMs }) => ({ path, title, mtimeMs })),
+    sessionLog: noteIndex["notes/SESSION.md"]?.content || noteIndex["notes/session.md"]?.content || null,
   };
 }
 
@@ -767,7 +770,7 @@ function boardHtml(snapshot) {
             <path d="M12.2 2.75h-.4a1.6 1.6 0 0 0-1.58 1.36l-.18 1.18c-.46.16-.9.34-1.31.56l-1.02-.64a1.6 1.6 0 0 0-2.08.31l-.28.28a1.6 1.6 0 0 0-.31 2.08l.64 1.02c-.22.42-.4.86-.56 1.31l-1.18.18A1.6 1.6 0 0 0 2.58 12v.4A1.6 1.6 0 0 0 3.94 14l1.18.18c.16.46.34.9.56 1.31l-.64 1.02a1.6 1.6 0 0 0 .31 2.08l.28.28a1.6 1.6 0 0 0 2.08.31l1.02-.64c.42.22.86.4 1.31.56l.18 1.18a1.6 1.6 0 0 0 1.58 1.36h.4a1.6 1.6 0 0 0 1.58-1.36l.18-1.18c.46-.16.9-.34 1.31-.56l1.02.64a1.6 1.6 0 0 0 2.08-.31l.28-.28a1.6 1.6 0 0 0 .31-2.08l-.64-1.02c.22-.42.4-.86.56-1.31l1.18-.18a1.6 1.6 0 0 0 1.36-1.58V12a1.6 1.6 0 0 0-1.36-1.58l-1.18-.18a7.2 7.2 0 0 0-.56-1.31l.64-1.02a1.6 1.6 0 0 0-.31-2.08l-.28-.28a1.6 1.6 0 0 0-2.08-.31l-1.02.64c-.42-.22-.86-.4-1.31-.56l-.18-1.18a1.6 1.6 0 0 0-1.58-1.39Z"></path>
             <circle cx="12" cy="12.2" r="3.15"></circle>
           </svg>
-          <span class="visually-hidden" id="live-state">Connecting</span>
+          <span class="visually-hidden" id="live-state" aria-live="polite">Connecting</span>
         </button>
         <section class="settings-popover" id="settings-popover" aria-label="Local board settings" hidden>
           <div class="settings-heading">
@@ -827,6 +830,23 @@ function boardHtml(snapshot) {
         <div><dt>Active</dt><dd id="goal-active">None</dd></div>
         <div><dt>Updated</dt><dd id="goal-updated">Waiting</dd></div>
       </dl>
+    </section>
+    <section class="oracle-strip" id="oracle-strip" aria-label="Goal oracle">
+      <div>
+        <p class="eyebrow">Oracle</p>
+        <p id="oracle-signal" class="oracle-signal">Waiting for board data…</p>
+        <p id="oracle-final-proof" class="oracle-meta"></p>
+      </div>
+      <div class="oracle-status-wrap">
+        <span class="badge" id="oracle-health">unknown</span>
+        <p id="oracle-audit" class="oracle-meta"></p>
+      </div>
+    </section>
+    <section class="session-strip" id="session-strip" hidden>
+      <div>
+        <p class="eyebrow">Session log</p>
+        <pre id="session-log" class="session-log"></pre>
+      </div>
     </section>
     <section class="board" id="board" aria-label="Goal task board"></section>
   </main>
@@ -1260,6 +1280,42 @@ button {
   align-items: end;
   padding: 8px 0 24px;
   border-bottom: 1px solid var(--line);
+}
+
+.oracle-strip,
+.session-strip {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 16px;
+  align-items: start;
+  padding: 16px 0 20px;
+  border-bottom: 1px solid var(--line);
+}
+
+.oracle-signal {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.45;
+  max-width: 900px;
+}
+
+.oracle-meta {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.oracle-status-wrap {
+  text-align: right;
+}
+
+.session-log {
+  margin: 0;
+  max-height: 180px;
+  overflow: auto;
+  white-space: pre-wrap;
+  font-size: 12px;
+  color: var(--muted);
 }
 
 .eyebrow {
@@ -2094,6 +2150,8 @@ function renderBoard(board) {
   document.getElementById("goal-status").textContent = board.goal.status;
   document.getElementById("goal-active").textContent = board.goal.activeTask || "None";
   document.getElementById("goal-updated").textContent = new Date(board.generatedAt).toLocaleTimeString();
+  renderOracleStrip(board);
+  renderSessionStrip(board);
 
   if (board.error) {
     boardEl.replaceChildren(renderBoardError(board.error));
@@ -2114,6 +2172,41 @@ function renderBoardError(message) {
     el("p", "", message),
   );
   return node;
+}
+
+function renderOracleStrip(board) {
+  const signalEl = document.getElementById("oracle-signal");
+  const finalProofEl = document.getElementById("oracle-final-proof");
+  const healthEl = document.getElementById("oracle-health");
+  const auditEl = document.getElementById("oracle-audit");
+  if (!signalEl || !healthEl) return;
+
+  const signal = board.goal?.oracle?.signal || "";
+  const finalProof = board.goal?.oracle?.final_proof || "";
+  signalEl.textContent = signal || "No oracle signal recorded.";
+  finalProofEl.textContent = finalProof ? \`Final proof: \${finalProof}\` : "";
+  const weak = isWeakOracle(signal) || isWeakOracle(finalProof);
+  healthEl.textContent = weak ? "weak oracle" : "oracle ready";
+  healthEl.className = \`badge \${weak ? "status-blocked" : "status-done"}\`;
+  const doneWorkers = (board.tasks || []).filter((task) => task.type === "worker" && task.status === "done").length;
+  auditEl.textContent = \`\${doneWorkers} worker receipt(s); final audit maps proof to oracle.\`;
+}
+
+function renderSessionStrip(board) {
+  const strip = document.getElementById("session-strip");
+  const log = document.getElementById("session-log");
+  if (!strip || !log) return;
+  if (!board.sessionLog) {
+    strip.hidden = true;
+    return;
+  }
+  strip.hidden = false;
+  log.textContent = board.sessionLog;
+}
+
+function isWeakOracle(value) {
+  const normalized = String(value || "").trim().toLowerCase();
+  return !normalized || normalized === "tbd" || normalized === "unknown" || normalized === "todo" || /^<.*>$/.test(normalized);
 }
 
 function renderBoardSwitcher(boards) {
@@ -2291,7 +2384,18 @@ function renderTaskDetail(task) {
   if (task.receipt?.decision) root.append(detailText("Decision", task.receipt.decision));
   if (task.receipt?.changedFiles?.length) root.append(detailList("Changed Files", task.receipt.changedFiles));
   if (task.receipt?.commands?.length) {
-    root.append(detailList("Commands", task.receipt.commands.map((command) => command.status ? \`\${command.status}: \${command.cmd}\` : command.cmd)));
+    const section = el("section", "detail-section");
+    section.append(el("h3", "", "Commands"));
+    const list = el("ul", "command-list");
+    for (const command of task.receipt.commands) {
+      const item = el("li", "command-item");
+      const status = command.status ? el("span", \`badge \${command.status === "pass" ? "status-done" : "status-blocked"}\`, command.status) : null;
+      const label = el("span", "", command.cmd || String(command));
+      item.append(status || el("span", "badge", "cmd"), label);
+      list.append(item);
+    }
+    section.append(list);
+    root.append(section);
   }
   if (task.note?.content) {
     const section = el("section", "detail-section");

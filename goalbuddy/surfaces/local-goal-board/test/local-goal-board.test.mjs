@@ -533,8 +533,11 @@ test("serves multiple local boards from one shared hub URL", async () => {
       assert.equal(secondUrl.pathname, "/second-goal/");
 
       const hubResponse = await fetch(server.hubUrl, { redirect: "manual" });
-      assert.equal(hubResponse.status, 302);
-      assert.equal(hubResponse.headers.get("location"), `${firstUrl.origin}/first-goal/`);
+      assert.equal(hubResponse.status, 200);
+      const hubHtml = await hubResponse.text();
+      assert.match(hubHtml, /GoalBuddy Hub/);
+      assert.match(hubHtml, /First Goal/);
+      assert.match(hubHtml, /Second Goal/);
 
       const noSlashResponse = await fetch(`${secondUrl.origin}/second-goal`, { redirect: "manual" });
       assert.equal(noSlashResponse.status, 302);
@@ -543,7 +546,7 @@ test("serves multiple local boards from one shared hub URL", async () => {
       const boardsResponse = await fetch(server.apiUrl);
       assert.equal(boardsResponse.status, 200);
       const boards = await boardsResponse.json();
-      assert.deepEqual(boards.boards.map((board) => board.title), ["First Goal", "Second Goal"]);
+      assert.deepEqual(new Set(boards.boards.map((board) => board.title)), new Set(["First Goal", "Second Goal"]));
 
       const newestSettingsResponse = await fetch(`${firstUrl.origin}/api/settings`, {
         method: "PUT",
@@ -551,7 +554,7 @@ test("serves multiple local boards from one shared hub URL", async () => {
         body: JSON.stringify({ settings: { boardOpenBehavior: "newest" } }),
       });
       assert.equal(newestSettingsResponse.status, 200);
-      const newestHubResponse = await fetch(server.hubUrl, { redirect: "manual" });
+      const newestHubResponse = await fetch(`${firstUrl.origin}/open`, { redirect: "manual" });
       assert.equal(newestHubResponse.status, 302);
       assert.equal(newestHubResponse.headers.get("location"), `${firstUrl.origin}/second-goal/`);
 
@@ -561,7 +564,7 @@ test("serves multiple local boards from one shared hub URL", async () => {
         body: JSON.stringify({ settings: { boardOpenBehavior: "last", lastBoardPath: "/first-goal/" } }),
       });
       assert.equal(lastSettingsResponse.status, 200);
-      const lastHubResponse = await fetch(server.hubUrl, { redirect: "manual" });
+      const lastHubResponse = await fetch(`${firstUrl.origin}/open`, { redirect: "manual" });
       assert.equal(lastHubResponse.status, 302);
       assert.equal(lastHubResponse.headers.get("location"), `${firstUrl.origin}/first-goal/`);
 

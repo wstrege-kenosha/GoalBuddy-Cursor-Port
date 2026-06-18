@@ -1,13 +1,23 @@
 #!/usr/bin/env node
 import { existsSync, readFileSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
+import { dirname, join, resolve, basename } from "node:path";
 import { homedir } from "node:os";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import dns from "node:dns/promises";
 import net from "node:net";
 import { installCursorSurfaces, resetCursorSurfaces } from "./install-agents.mjs";
+import {
+  checkMcpConfig,
+  defaultProjectRootsFromSkill,
+  installMcpConfig,
+} from "./install-mcp.mjs";
+import { runMcpSmokeTest } from "../mcp/tools.mjs";
 import { renderTaskPrompt } from "./render-task-prompt.mjs";
+import { checkCompletionReadiness } from "./lib/goal-completion.mjs";
+import { buildHubPayload } from "./lib/goal-hub.mjs";
+import { validateReceipt } from "./lib/goal-receipt.mjs";
+import { findStaleGoals } from "./lib/goal-stale.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const skillRoot = resolve(__dirname, "..");
@@ -30,6 +40,13 @@ const REQUIRED_SCRIPTS = [
   "local-goal-board.mjs",
   "lib/goal-board.mjs",
   "lib/goal-state.mjs",
+  "lib/goal-receipt.mjs",
+  "lib/goal-completion.mjs",
+  "lib/goal-stale.mjs",
+  "lib/goal-hub.mjs",
+  "lib/goal-session.mjs",
+  "../mcp/server.mjs",
+  "../mcp/tools.mjs",
 ];
 
 const args = process.argv.slice(2);
@@ -68,6 +85,18 @@ async function main() {
     case "board":
       await runBoard();
       break;
+    case "receipt":
+      runReceiptValidate();
+      break;
+    case "completion-check":
+      runCompletionCheck();
+      break;
+    case "stale":
+      runStale();
+      break;
+    case "hub":
+      runHub();
+      break;
     case "help":
     case "--help":
     case "-h":
@@ -91,6 +120,10 @@ Usage:
   node goalbuddy.mjs check-update [--json]
   node goalbuddy.mjs prompt <docs/goals/slug> [--task T###] [--json]
   node goalbuddy.mjs parallel-plan <docs/goals/slug> [--json]
+  node goalbuddy.mjs receipt <file|json> [--role scout|judge|worker] [--task T###] [--json]
+  node goalbuddy.mjs completion-check <docs/goals/slug> [--json]
+  node goalbuddy.mjs stale [--days 7] [--json]
+  node goalbuddy.mjs hub [--json]
   node goalbuddy.mjs board <docs/goals/slug> [--host <host>] [--port <port>] [--once] [--json]
 
 Skill root: ${skillRoot}
@@ -104,11 +137,25 @@ function runInstall() {
     console.error(result.errors.join("\n"));
     process.exit(1);
   }
+
+  const mcpResult = installMcpConfig({
+    skillRoot,
+    projectRoots: defaultProjectRootsFromSkill(skillRoot),
+    cursorHome,
+  });
+  if (mcpResult.errors.length) {
+    console.error(mcpResult.errors.join("\n"));
+    process.exit(1);
+  }
+
   console.log(`GoalBuddy Cursor install complete.`);
   console.log(`Skills: ${join(cursorHome, "skills", "goalbuddy")}`);
   console.log(`Agents: ${join(cursorHome, "agents")}`);
   console.log(`Commands: ${join(cursorHome, "commands")}`);
-  console.log(`Next: /goal-prep in any workspace, then /goal Follow docs/goals/<slug>/goal.md.`);
+  for (const entry of mcpResult.installed) {
+    console.log(`MCP: ${entry.configPath}`);
+  }
+  console.log(`Next: enable the goalbuddy MCP server in Cursor, then /goal-prep and /goal.`);
 }
 
 function runReset() {
@@ -124,6 +171,8 @@ async function runDoctor() {
   checks.push(nodeVersionCheck());
   checks.push(...requiredFilesCheck());
   checks.push(...installSurfacesCheck());
+  checks.push(...mcpConfigCheck());
+  checks.push(mcpSmokeCheck());
   if (goalReady) {
     checks.push(...agentFrontmatterCheck());
     checks.push(await dnsCheck());
@@ -176,6 +225,32 @@ function installSurfacesCheck() {
     results.push({ name: `command:${file}`, ok: existsSync(path), detail: path });
   }
   return results;
+}
+
+function mcpConfigCheck() {
+  const configPath = join(process.cwd(), ".cursor", "mcp.json");
+  const check = checkMcpConfig(configPath, skillRoot);
+  if (check.ok) return [check];
+  const skillConfig = checkMcpConfig(join(skillRoot, "..", ".cursor", "mcp.json"), skillRoot);
+  return [skillConfig.ok ? skillConfig : check];
+}
+
+function mcpSmokeCheck() {
+  try {
+    const smoke = runMcpSmokeTest({
+      workspaceRoot: process.cwd(),
+      goal: "sample-cursor-smoke",
+    });
+    return {
+      name: "mcp:smoke",
+      ok: smoke.ok,
+      detail: smoke.validation_ok
+        ? `validate_state ok on ${smoke.state_path}`
+        : `validation failed on ${smoke.state_path}`,
+    };
+  } catch (error) {
+    return { name: "mcp:smoke", ok: false, detail: error.message };
+  }
 }
 
 function agentFrontmatterCheck() {
@@ -355,6 +430,93 @@ async function runBoard() {
   const boardArgs = [boardScript, "--goal", goal, ...args.slice(2).filter((a) => a !== "board")];
   const child = spawnSync(process.execPath, boardArgs, { stdio: "inherit", cwd: process.cwd() });
   process.exit(child.status ?? 0);
+}
+
+function runReceiptValidate() {
+  const json = hasFlag("--json");
+  const role = flagValue("--role");
+  const expectedTaskId = flagValue("--task");
+  const positional = args.slice(1).filter((arg) => !arg.startsWith("-") && arg !== "receipt");
+  const target = positional[0];
+  if (!target) {
+    console.error("Usage: goalbuddy receipt <file|json> [--role scout|judge|worker] [--task T###] [--json]");
+    process.exit(2);
+  }
+
+  let input = target;
+  if (existsSync(resolve(target))) {
+    input = readFileSync(resolve(target), "utf8");
+  }
+
+  const result = validateReceipt(input, { role, expectedTaskId });
+  if (json) {
+    console.log(JSON.stringify(result, null, 2));
+  } else if (result.ok) {
+    console.log(`Receipt valid for ${result.role} task ${result.receipt.task_id}.`);
+    for (const warning of result.warnings) console.log(`warning: ${warning}`);
+  } else {
+    for (const error of result.errors) console.error(error);
+    for (const warning of result.warnings) console.log(`warning: ${warning}`);
+  }
+  process.exit(result.ok ? 0 : 1);
+}
+
+function runCompletionCheck() {
+  const json = hasFlag("--json");
+  const statePath = resolveBoardStatePath();
+  const result = checkCompletionReadiness(statePath);
+  if (json) {
+    console.log(JSON.stringify(result, null, 2));
+  } else if (result.ready) {
+    console.log(`Completion ready: ${statePath}`);
+  } else {
+    console.error(`Completion not ready: ${statePath}`);
+    for (const blocker of result.blockers) console.error(`- ${blocker}`);
+    for (const warning of result.warnings) console.log(`warning: ${warning}`);
+  }
+  process.exit(result.ready ? 0 : 1);
+}
+
+function runStale() {
+  const json = hasFlag("--json");
+  const days = Number(flagValue("--days") || "7");
+  const result = findStaleGoals({ days, roots: [process.cwd()] });
+  if (json) {
+    console.log(JSON.stringify(result, null, 2));
+  } else if (result.goals.length === 0) {
+    console.log(`No stale goals found (threshold: ${result.stale_days} days).`);
+  } else {
+    console.log(`Stale goals (threshold: ${result.stale_days} days):`);
+    for (const goal of result.goals) {
+      console.log(`- ${goal.slug}: ${goal.reasons.join("; ")}`);
+      for (const suggestion of goal.suggestions) console.log(`  → ${suggestion}`);
+    }
+  }
+  process.exit(0);
+}
+
+function runHub() {
+  const json = hasFlag("--json");
+  const payload = buildHubPayload({ roots: [process.cwd()] });
+  if (json) {
+    console.log(JSON.stringify(payload, null, 2));
+  } else {
+    for (const goal of payload.goals) {
+      console.log(`${goal.title} [${goal.status}] active=${goal.active_task || "none"} oracle=${goal.oracle_health}`);
+    }
+  }
+}
+
+function resolveBoardStatePath() {
+  const goal = positionalGoalPath();
+  return basename(resolve(goal)) === "state.yaml" ? resolve(goal) : resolve(goal, "state.yaml");
+}
+
+function flagValue(name) {
+  const index = args.indexOf(name);
+  if (index === -1) return "";
+  const inline = args[index].includes("=") ? args[index].split("=")[1] : "";
+  return inline || args[index + 1] || "";
 }
 
 function positionalGoalPath() {

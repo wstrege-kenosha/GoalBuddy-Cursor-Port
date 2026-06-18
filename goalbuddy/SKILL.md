@@ -43,6 +43,39 @@ node ~/.cursor/skills/goalbuddy/scripts/goalbuddy.mjs install
 node ~/.cursor/skills/goalbuddy/scripts/goalbuddy.mjs doctor --goal-ready
 ```
 
+Enable the **goalbuddy** MCP server (merged into `.cursor/mcp.json` on install). `/goal` and subagents require MCP tools in Phase B.
+
+## MCP tools (Phase B)
+
+| Tool | Purpose |
+|------|---------|
+| `list_goals` | Hub summary without opening the browser |
+| `get_goal_state` | Parsed `state.yaml` as JSON |
+| `get_active_task` | Active task row + validation |
+| `validate_state` | Gate before advancing state |
+| `render_task_prompt` | Canonical Task handoff prompt |
+| `parallel_plan` | Safe parallel Worker hints |
+| `validate_receipt` | Gate before writing receipts |
+| `completion_check` | Readiness for `goal.status: done` |
+| `append_session_note` | Append to `notes/SESSION.md` |
+
+Server entry: `goalbuddy/mcp/server.mjs` (stdio). No write tools — PM still owns `state.yaml`.
+
+Project config (committed in this port):
+
+```json
+{
+  "mcpServers": {
+    "goalbuddy": {
+      "command": "node",
+      "args": ["goalbuddy/mcp/server.mjs"]
+    }
+  }
+}
+```
+
+After `install`, the same entry is merged with an absolute path to `~/.cursor/skills/goalbuddy/mcp/server.mjs`.
+
 ## What it creates
 
 ```
@@ -83,24 +116,20 @@ Upstream prompt scripts emit `goal_scout` (underscore). Map to hyphenated Cursor
 
 ## PM loop (each /goal turn)
 
-1. Read `docs/goals/<slug>/state.yaml` and `goal.md`.
-2. Identify `active_task` and its `type`.
-3. Render handoff prompt:
+**Use goalbuddy MCP tools** — see [commands-src/goal.md](commands-src/goal.md). Mandatory sequence:
 
-   ```bash
-   node ~/.cursor/skills/goalbuddy/scripts/goalbuddy.mjs prompt docs/goals/<slug> --task <T###> --json
-   ```
+1. `get_active_task` → `validate_state` (stop if errors)
+2. `render_task_prompt` → spawn Task subagent (scout/judge/worker)
+3. `validate_receipt` before writing state
+4. PM updates `state.yaml`
+5. `validate_state` again → `append_session_note`
 
-4. Spawn the matching subagent with the rendered prompt in `Task` `prompt`.
-5. Parse `goalbuddy_receipt_v1` from the subagent result; write `notes/T###-<role>.md` if needed.
-6. Update `state.yaml` (task receipt, status, advance `active_task` when done).
-7. Optionally validate:
+CLI equivalents (fallback only):
 
-   ```bash
-   node ~/.cursor/skills/goalbuddy/scripts/check-goal-state.mjs docs/goals/<slug>
-   ```
-
-8. Repeat until Judge/PM audit maps receipts to the oracle and records full outcome complete.
+```bash
+node ~/.cursor/skills/goalbuddy/scripts/goalbuddy.mjs prompt docs/goals/<slug> --task <T###> --json
+node ~/.cursor/skills/goalbuddy/scripts/check-goal-state.mjs docs/goals/<slug>
+```
 
 ## Parallel work (read-only recommendations)
 
@@ -122,12 +151,16 @@ Default hub: `http://goalbuddy.localhost:41737/<slug>/`. Share as a Markdown lin
 
 | Command | Purpose |
 |---------|---------|
-| `install` | Copy agents + slash commands into `~/.cursor/` |
-| `doctor [--goal-ready]` | Node, files, agents, DNS, port checks |
+| `install` | Copy agents + slash commands + merge MCP config |
+| `doctor [--goal-ready]` | Node, files, agents, MCP config, MCP smoke, DNS, port |
 | `reset` | Remove installer-managed agents/commands only |
 | `update` | Check npm `goalbuddy` version; refresh vendored scripts |
 | `prompt <slug>` | Compact task handoff (Cursor agent names) |
 | `parallel-plan <slug>` | Parallel safety report |
+| `receipt <file\|json>` | Validate `goalbuddy_receipt_v1` JSON |
+| `completion-check <slug>` | Check readiness for `goal.status: done` |
+| `stale [--days 7]` | List stale goals under `docs/goals/` |
+| `hub [--json]` | Multi-goal hub summary |
 | `board <slug>` | Start local board server |
 
 Skill root: `~/.cursor/skills/goalbuddy/`. Never install skills under `~/.cursor/skills-cursor/` (reserved).

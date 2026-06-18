@@ -2,7 +2,7 @@
 import { existsSync } from "node:fs";
 import { relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { childBoardPaths, loadBoard, parseArgs, resolveBoardPath, selectTask } from "./render-task-prompt.mjs";
+import { childBoardPaths, loadBoard, parseArgs, resolveBoardPath, renderTaskPrompt, selectTask } from "./render-task-prompt.mjs";
 
 if (isDirectRun()) {
   try {
@@ -28,16 +28,45 @@ export function createParallelPlan(options) {
 
   const candidates = boards.map((board) => candidateForBoard(board));
   const workerCandidates = candidates.filter((candidate) => candidate.role === "worker");
+  const enriched = candidates.map((candidate) => ({
+    ...candidate,
+    safe_to_parallelize: isSafeCandidate(candidate, workerCandidates),
+    reason: safetyReason(candidate, workerCandidates),
+    render_prompt_command: promptCommand(candidate),
+  }));
+
   return {
     root_board_path: rootBoardPath,
     mutated: false,
     spawned_agents: false,
-    candidates: candidates.map((candidate) => ({
-      ...candidate,
-      safe_to_parallelize: isSafeCandidate(candidate, workerCandidates),
-      reason: safetyReason(candidate, workerCandidates),
-      render_prompt_command: promptCommand(candidate),
-    })),
+    candidates: enriched,
+    spawn_plan: enriched
+      .filter((candidate) => candidate.safe_to_parallelize)
+      .map((candidate) => buildSpawnPlanEntry(candidate, options)),
+  };
+}
+
+function buildSpawnPlanEntry(candidate, options) {
+  const prompt = renderTaskPrompt({
+    boardPath: candidate.board_path,
+    taskId: candidate.task_id,
+    json: true,
+  });
+  const agent = candidate.recommended_agent;
+  const cursorAgent = agent === "goal_scout" ? "goal-scout"
+    : agent === "goal_judge" ? "goal-judge"
+    : agent === "goal_worker" ? "goal-worker"
+    : null;
+
+  return {
+    board_path: candidate.board_path,
+    task_id: candidate.task_id,
+    role: candidate.role,
+    cursor_task_subagent_type: cursorAgent,
+    reasoning_hint: candidate.reasoning_hint,
+    allowed_files: candidate.allowed_files,
+    render_prompt_command: promptCommand(candidate),
+    task_prompt: prompt.payload,
   };
 }
 
@@ -182,6 +211,17 @@ function formatPlan(plan) {
       `- render_prompt_command: ${candidate.render_prompt_command}`,
       "",
     );
+  }
+  if (plan.spawn_plan?.length) {
+    lines.push("Spawn plan (safe parallel handoffs):", "");
+    for (const entry of plan.spawn_plan) {
+      lines.push(
+        `${entry.board_path}:${entry.task_id}`,
+        `- cursor_task_subagent_type: ${entry.cursor_task_subagent_type || "PM"}`,
+        `- allowed_files: ${entry.allowed_files.join(", ") || "(read-only)"}`,
+        "",
+      );
+    }
   }
   return lines.join("\n").trimEnd();
 }

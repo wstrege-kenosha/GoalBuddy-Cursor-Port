@@ -41,12 +41,15 @@ export function renderTaskPrompt(options) {
         recommended_agent: defaults.agent,
         required_spawn_agent_type: defaults.agent === "PM" ? null : defaults.agent,
         recommended_reasoning: reasoning,
+        recommended_cursor_model: recommendedCursorModel(reasoning, role),
         sandbox: defaults.sandbox,
         fork_context_allowed: role !== "worker",
         board_path: board.path,
         child_board_paths: childBoardPaths(board),
         goal_oracle: board.goal.oracle || null,
         slice_policy: board.document.rules?.slice_policy || null,
+        dirty_fingerprint: board.document.checks?.dirty_fingerprint ?? null,
+        recent_receipts: recentReceipts(board),
         warnings,
       },
       task: {
@@ -233,6 +236,27 @@ function stringList(value) {
   return Array.isArray(value) ? value.filter((item) => item !== null && item !== undefined).map(String) : [];
 }
 
+function recentReceipts(board) {
+  return board.tasks
+    .filter((task) => task?.status === "done" && task?.receipt)
+    .slice(-2)
+    .map((task) => ({
+      task_id: task.id,
+      type: task.type,
+      summary: task.receipt?.summary || null,
+      result: task.receipt?.result || null,
+      decision: task.receipt?.decision || null,
+    }));
+}
+
+function recommendedCursorModel(reasoning, role) {
+  const hint = String(reasoning || "").toLowerCase();
+  if (hint === "xhigh") return "claude-opus-4-8-thinking-high";
+  if (hint === "high" || role === "judge") return "claude-4.6-sonnet-medium-thinking";
+  if (hint === "low" || role === "scout") return "composer-2.5-fast";
+  return "gpt-5.4-medium";
+}
+
 function receiptSchema(role) {
   if (role === "worker") {
     return {
@@ -302,6 +326,18 @@ function formatPrompt(payload) {
   if (payload.metadata.warnings.length) {
     lines.push("- warnings:");
     for (const warning of payload.metadata.warnings) lines.push(`  - ${warning}`);
+  }
+  if (payload.metadata.recent_receipts?.length) {
+    lines.push("- recent_receipts:");
+    for (const receipt of payload.metadata.recent_receipts) {
+      lines.push(`  - ${receipt.task_id}: ${receipt.summary || receipt.decision || receipt.result || "done"}`);
+    }
+  }
+  if (payload.metadata.dirty_fingerprint) {
+    lines.push(`- dirty_fingerprint: ${payload.metadata.dirty_fingerprint}`);
+  }
+  if (payload.metadata.recommended_cursor_model) {
+    lines.push(`- recommended_cursor_model: ${payload.metadata.recommended_cursor_model}`);
   }
 
   lines.push(
