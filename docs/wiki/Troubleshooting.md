@@ -32,7 +32,7 @@ Global `~/.cursor/mcp.json` used to launch GoalBuddy with `cwd` at your user hom
 
 If `/goal` still fails:
 
-1. Open the **project that contains the goal** (e.g. `W:\Experimental\HTMX` for `html-mudblazor-component-library`).
+1. Open the **project that contains the goal** (e.g. `W:\Experimental\GoalBuddyCursorPort` for `goalbuddy-cursor-port`).
 2. Add a project `.cursor/mcp.json` in that repo so Cursor scopes MCP to that workspace:
 
    ```json

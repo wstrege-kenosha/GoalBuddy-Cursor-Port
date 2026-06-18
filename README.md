@@ -48,6 +48,8 @@ node goalbuddy/scripts/check-goal-state.mjs docs/goals/sample-cursor-smoke/state
 node goalbuddy/scripts/goalbuddy.mjs board docs/goals/sample-cursor-smoke
 ```
 
+**Canonical port board:** `docs/goals/goalbuddy-cursor-port/` (ported from [tolibear/goalbuddy](https://github.com/tolibear/goalbuddy)).
+
 Open the hub: http://goalbuddy.localhost:41737/ — see `docs/goals/sample-cursor-smoke/goal.md`.
 
 ## Usage

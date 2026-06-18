@@ -17,6 +17,5 @@ goalbuddy/known-workspaces.json
 
 # Ephemeral goal workspaces from manual testing
 docs/goals/goal-prep-live-test/
-docs/goals/goalbuddy-cursor-port/
 
 /notes/

@@ -7,7 +7,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { TOOL_HANDLERS } from "./tools.mjs";
 
-const workspaceRootSchema = z.string().optional().describe("Open workspace root when known (e.g. W:\\\\Experimental\\\\HTMX). Usually omitted; GoalBuddy resolves from goal slug.");
+const workspaceRootSchema = z.string().optional().describe("Open workspace root when known (e.g. W:\\\\Experimental\\\\GoalBuddyCursorPort). Usually omitted; GoalBuddy resolves from goal slug.");
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const versionInfo = JSON.parse(readFileSync(join(__dirname, "..", "version.json"), "utf8"));
