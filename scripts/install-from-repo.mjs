@@ -35,7 +35,7 @@ if (!existsSync(goalbuddyCli)) {
 
 const install = spawnSync(process.execPath, [goalbuddyCli, "install"], {
   stdio: "inherit",
-  env: { ...process.env, CURSOR_HOME: cursorHome },
+  env: { ...process.env, CURSOR_HOME: cursorHome, GOALBUDDY_REPO_ROOT: repoRoot },
 });
 
 if (install.status !== 0) {

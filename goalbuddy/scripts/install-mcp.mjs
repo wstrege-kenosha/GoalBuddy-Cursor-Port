@@ -4,6 +4,8 @@ import { fileURLToPath } from "node:url";
 
 const SERVER_NAME = "goalbuddy";
 const VENDORED_SERVER_REL = "goalbuddy/mcp/server.mjs";
+export const PORT_CONFIG_FILE = ".goalbuddy-port.json";
+export const MCP_LAUNCHER_NAME = "run-mcp-server.mjs";
 
 function toPosixPath(path) {
   return path.replace(/\\/g, "/");
@@ -13,10 +15,95 @@ function resolveServerPath(skillRoot) {
   return join(resolve(skillRoot), "mcp", "server.mjs");
 }
 
+export function resolveMcpLauncherPath(skillRoot) {
+  return join(resolve(skillRoot), "scripts", MCP_LAUNCHER_NAME);
+}
+
+export function hasMcpDeps(repoRoot) {
+  return existsSync(join(resolve(repoRoot), "node_modules", "@modelcontextprotocol", "sdk"));
+}
+
+export function readPortConfig(skillRoot) {
+  const configPath = join(resolve(skillRoot), PORT_CONFIG_FILE);
+  if (!existsSync(configPath)) return null;
+  try {
+    return JSON.parse(readFileSync(configPath, "utf8"));
+  } catch {
+    return null;
+  }
+}
+
+export function writePortConfig(skillRoot, repoRoot) {
+  const resolvedRepoRoot = resolve(repoRoot);
+  if (!hasMcpDeps(resolvedRepoRoot)) {
+    return {
+      ok: false,
+      error: `missing node_modules/@modelcontextprotocol/sdk under ${resolvedRepoRoot}`,
+    };
+  }
+
+  const portConfigPath = join(resolve(skillRoot), PORT_CONFIG_FILE);
+  writeFileSync(
+    portConfigPath,
+    `${JSON.stringify({ repoRoot: resolvedRepoRoot }, null, 2)}\n`,
+    "utf8",
+  );
+  return { ok: true, portConfigPath, repoRoot: resolvedRepoRoot };
+}
+
+export function resolveMcpRepoRoot(skillRoot) {
+  const config = readPortConfig(skillRoot);
+  if (config?.repoRoot && hasMcpDeps(config.repoRoot)) {
+    return resolve(config.repoRoot);
+  }
+
+  const parentRepo = resolve(skillRoot, "..");
+  if (
+    existsSync(join(parentRepo, "goalbuddy", "mcp", "server.mjs"))
+    && hasMcpDeps(parentRepo)
+  ) {
+    return parentRepo;
+  }
+
+  if (process.env.GOALBUDDY_REPO_ROOT && hasMcpDeps(process.env.GOALBUDDY_REPO_ROOT)) {
+    return resolve(process.env.GOALBUDDY_REPO_ROOT);
+  }
+
+  console.error("GoalBuddy MCP: missing npm dependencies.");
+  console.error("From your GoalBuddy-Cursor-Port clone run: npm install && npm run install:cursor");
+  process.exit(1);
+}
+
+export function resolveInstallRepoRoot(skillRoot, projectRoots = []) {
+  if (process.env.GOALBUDDY_REPO_ROOT && hasMcpDeps(process.env.GOALBUDDY_REPO_ROOT)) {
+    return resolve(process.env.GOALBUDDY_REPO_ROOT);
+  }
+
+  for (const root of projectRoots) {
+    const resolved = resolve(root);
+    if (hasMcpDeps(resolved)) return resolved;
+  }
+
+  const parentRepo = resolve(skillRoot, "..");
+  if (hasMcpDeps(parentRepo)) return parentRepo;
+
+  return null;
+}
+
+function skillRootFromLauncherArg(args) {
+  for (const arg of args) {
+    const text = String(arg);
+    if (text.includes(MCP_LAUNCHER_NAME)) {
+      return resolve(dirname(resolve(text)), "..");
+    }
+  }
+  return null;
+}
+
 export function buildMcpServerEntry(skillRoot) {
   return {
-    command: process.execPath,
-    args: [resolveServerPath(skillRoot)],
+    command: "node",
+    args: [resolveMcpLauncherPath(skillRoot)],
   };
 }
 
@@ -79,11 +166,21 @@ export function removeMcpServerEntry(configPath, serverName = SERVER_NAME) {
   return { removed: true, configPath, merged };
 }
 
-export function installMcpConfig({ skillRoot, projectRoots = [], cursorHome }) {
+export function installMcpConfig({ skillRoot, projectRoots = [], cursorHome, repoRoot }) {
   const installed = [];
   const removed = [];
   const errors = [];
   const roots = [...new Set(projectRoots.map((root) => resolve(root)).filter(Boolean))];
+  const resolvedRepoRoot = repoRoot || resolveInstallRepoRoot(skillRoot, roots);
+
+  if (resolvedRepoRoot) {
+    const portResult = writePortConfig(skillRoot, resolvedRepoRoot);
+    if (!portResult.ok) {
+      errors.push(portResult.error);
+    }
+  } else {
+    errors.push("Could not locate GoalBuddy-Cursor-Port clone with npm install (run npm install, then reinstall)");
+  }
 
   for (const projectRoot of roots) {
     try {
@@ -96,7 +193,7 @@ export function installMcpConfig({ skillRoot, projectRoots = [], cursorHome }) {
     }
   }
 
-  // User-level config uses absolute skill paths so goalbuddy MCP works in any workspace.
+  // User-level config uses the launcher so MCP deps resolve from the cloned repo.
   if (cursorHome) {
     const userConfigPath = join(resolve(cursorHome), "mcp.json");
     try {
@@ -107,7 +204,7 @@ export function installMcpConfig({ skillRoot, projectRoots = [], cursorHome }) {
     }
   }
 
-  return { installed, removed, errors, server_name: SERVER_NAME };
+  return { installed, removed, errors, server_name: SERVER_NAME, repoRoot: resolvedRepoRoot };
 }
 
 export function checkMcpConfig(configPath, skillRoot) {
@@ -125,18 +222,31 @@ export function checkMcpConfig(configPath, skillRoot) {
   const projectRoot = projectRootFromMcpConfigPath(configPath);
   const args = Array.isArray(entry.args) ? entry.args : [];
   const resolvedArgs = args.map((arg) => resolve(projectRoot, String(arg)));
+  const launcherSkillRoot = skillRootFromLauncherArg(resolvedArgs) || resolve(skillRoot);
+  const launcherPath = resolveMcpLauncherPath(launcherSkillRoot);
+  const pointsAtLauncher = resolvedArgs.some((arg) => resolve(arg) === resolve(launcherPath))
+    || args.some((arg) => String(arg).includes(MCP_LAUNCHER_NAME));
   const pointsAtSkill = resolvedArgs.some((arg) => resolve(arg) === resolve(expectedServer));
   const pointsAtVendored = resolvedArgs.some((arg) => resolve(arg) === resolve(projectRoot, ...VENDORED_SERVER_REL.split("/")));
-  const serverExists = existsSync(expectedServer) || existsSync(resolve(projectRoot, ...VENDORED_SERVER_REL.split("/")));
+  const repoRoot = readPortConfig(launcherSkillRoot)?.repoRoot || resolveInstallRepoRoot(launcherSkillRoot, [projectRoot]);
+  const serverExists = existsSync(expectedServer)
+    || existsSync(resolve(projectRoot, ...VENDORED_SERVER_REL.split("/")))
+    || (pointsAtLauncher && existsSync(launcherPath) && Boolean(repoRoot) && hasMcpDeps(repoRoot));
 
   return {
-    ok: serverExists && (pointsAtSkill || pointsAtVendored || args.some((arg) => String(arg).includes(VENDORED_SERVER_REL))),
+    ok: serverExists && (pointsAtLauncher || pointsAtSkill || pointsAtVendored || args.some((arg) => String(arg).includes(VENDORED_SERVER_REL))),
     name: `mcp:${SERVER_NAME}`,
-    detail: pointsAtSkill || pointsAtVendored ? expectedServer : args.join(" "),
+    detail: pointsAtLauncher
+      ? `${launcherPath} -> ${repoRoot || "missing repoRoot"}`
+      : pointsAtSkill || pointsAtVendored
+        ? expectedServer
+        : args.join(" "),
     config_path: configPath,
-    server_path: existsSync(resolve(projectRoot, ...VENDORED_SERVER_REL.split("/")))
-      ? resolve(projectRoot, ...VENDORED_SERVER_REL.split("/"))
-      : expectedServer,
+    server_path: pointsAtLauncher && repoRoot
+      ? join(resolve(repoRoot), ...VENDORED_SERVER_REL.split("/"))
+      : existsSync(resolve(projectRoot, ...VENDORED_SERVER_REL.split("/")))
+        ? resolve(projectRoot, ...VENDORED_SERVER_REL.split("/"))
+        : expectedServer,
   };
 }
 
@@ -155,10 +265,12 @@ export function repoMcpConfigPathFromSkill(skillRoot) {
 if (import.meta.url === `file://${process.argv[1]?.replace(/\\/g, "/")}`) {
   const skillRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
   const { homedir } = await import("node:os");
+  const projectRoots = defaultProjectRootsFromSkill(skillRoot);
   const result = installMcpConfig({
     skillRoot,
-    projectRoots: defaultProjectRootsFromSkill(skillRoot),
+    projectRoots,
     cursorHome: join(homedir(), ".cursor"),
+    repoRoot: resolveInstallRepoRoot(skillRoot, projectRoots),
   });
   console.log(JSON.stringify(result, null, 2));
 }

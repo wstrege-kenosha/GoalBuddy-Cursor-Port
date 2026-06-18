@@ -48,6 +48,8 @@ const REQUIRED_SCRIPTS = [
   "lib/goal-state-write.mjs",
   "lib/goal-runner-loop.mjs",
   "run-goal.mjs",
+  "run-mcp-server.mjs",
+  "install-mcp.mjs",
   "../mcp/server.mjs",
   "../mcp/tools.mjs",
 ];
@@ -145,10 +147,12 @@ function runInstall() {
     process.exit(1);
   }
 
+  const projectRoots = defaultProjectRootsFromSkill(skillRoot);
   const mcpResult = installMcpConfig({
     skillRoot,
-    projectRoots: defaultProjectRootsFromSkill(skillRoot),
+    projectRoots,
     cursorHome,
+    repoRoot: process.env.GOALBUDDY_REPO_ROOT || projectRoots[0],
   });
   if (mcpResult.errors.length) {
     console.error(mcpResult.errors.join("\n"));

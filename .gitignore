@@ -8,6 +8,7 @@ Thumbs.db
 # Install-generated local state (machine-specific paths)
 goalbuddy/install.json
 goalbuddy/.goalbuddy-install.json
+**/.goalbuddy-port.json
 
 # Generated goal board artifacts
 **/.goalbuddy-board/

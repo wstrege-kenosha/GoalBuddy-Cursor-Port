@@ -20,16 +20,11 @@ Restart Cursor after changes.
 Re-run install (restores user-level `~/.cursor/mcp.json`):
 
 ```bash
+npm install
 npm run install:cursor
 ```
 
-Or:
-
-```bash
-node ~/.cursor/skills/goalbuddy/scripts/goalbuddy.mjs install
-```
-
-Confirm `~/.cursor/mcp.json` contains a `goalbuddy` entry. Enable the server in **Cursor Settings → MCP**. Restart Cursor.
+User-level MCP uses a launcher script that loads the server from your cloned repo (where `npm install` put `@modelcontextprotocol/sdk`). If MCP fails to start, confirm you ran `npm install` in GoalBuddy-Cursor-Port and that `~/.cursor/skills/goalbuddy/.goalbuddy-port.json` points at that clone.
 
 ## Board URL does not open
 

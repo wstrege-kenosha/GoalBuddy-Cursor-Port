@@ -21,7 +21,9 @@ The installer:
 
 1. Copies `goalbuddy/` and `goal-prep/` into `~/.cursor/skills` (macOS/Linux) or `%USERPROFILE%\.cursor\skills` (Windows)
 2. Runs `goalbuddy.mjs install` to register agents (`goal-scout`, `goal-judge`, `goal-worker`) and slash commands (`/goal-prep`, `/goal`, `/goal-board`)
-3. Merges the **goalbuddy** MCP server into `~/.cursor/mcp.json` (works in every workspace) and, when run from this repo, also into the project `.cursor/mcp.json` (portable paths for contributors).
+3. Merges the **goalbuddy** MCP server into `~/.cursor/mcp.json` (launcher script + repo path for npm deps) and, when run from this repo, also into the project `.cursor/mcp.json` (portable paths for contributors).
+
+Requires `npm install` in the cloned repo first so MCP dependencies exist under `node_modules/`.
 
 ## Enable MCP
 

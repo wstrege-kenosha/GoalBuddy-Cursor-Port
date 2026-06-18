@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { test } from "node:test";
-import { buildMcpServerEntry, buildMcpServerEntryForProject, checkMcpConfig, installMcpConfig, mergeMcpConfig } from "../install-mcp.mjs";
+import { buildMcpServerEntry, buildMcpServerEntryForProject, checkMcpConfig, installMcpConfig, mergeMcpConfig, readPortConfig, resolveMcpRepoRoot } from "../install-mcp.mjs";
 import { resolveGoalStatePath } from "../../mcp/path-utils.mjs";
 import {
   runMcpSmokeTest,
@@ -78,6 +78,15 @@ test("mergeMcpConfig preserves other servers", () => {
   assert.ok(merged.mcpServers.goalbuddy);
 });
 
+test("buildMcpServerEntry points at launcher script", () => {
+  const entry = buildMcpServerEntry(skillRoot);
+  assert.equal(entry.command, "node");
+  assert.equal(
+    resolve(String(entry.args[0])),
+    resolve(skillRoot, "scripts", "run-mcp-server.mjs"),
+  );
+});
+
 test("buildMcpServerEntryForProject uses portable repo-relative paths", () => {
   const entry = buildMcpServerEntryForProject(repoRoot, skillRoot);
   assert.equal(entry.command, "node");
@@ -98,6 +107,7 @@ test("installMcpConfig writes user-level and project configs", () => {
     skillRoot,
     projectRoots: [repoRoot],
     cursorHome: tempHome,
+    repoRoot,
   });
 
   assert.equal(result.installed.length, 2);
@@ -106,8 +116,18 @@ test("installMcpConfig writes user-level and project configs", () => {
   assert.ok(userConfig.mcpServers.goalbuddy);
   assert.equal(
     resolve(String(userConfig.mcpServers.goalbuddy.args[0])),
-    resolve(skillRoot, "mcp", "server.mjs"),
+    resolve(skillRoot, "scripts", "run-mcp-server.mjs"),
   );
+  assert.equal(readPortConfig(skillRoot)?.repoRoot, repoRoot);
+});
+
+test("resolveMcpRepoRoot finds repo deps from port config", () => {
+  installMcpConfig({
+    skillRoot,
+    projectRoots: [repoRoot],
+    repoRoot,
+  });
+  assert.equal(resolveMcpRepoRoot(skillRoot), repoRoot);
 });
 
 test("checkMcpConfig accepts repo project config", () => {
