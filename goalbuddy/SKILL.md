@@ -133,26 +133,6 @@ node ~/.cursor/skills/goalbuddy/scripts/goalbuddy.mjs prompt docs/goals/<slug> -
 node ~/.cursor/skills/goalbuddy/scripts/check-goal-state.mjs docs/goals/<slug>
 ```
 
-## Auto-loop (SDK runner)
-
-Requires `CURSOR_API_KEY` from [Cursor Dashboard → Integrations](https://cursor.com/dashboard/integrations).
-
-```bash
-export CURSOR_API_KEY="cursor_..."
-node ~/.cursor/skills/goalbuddy/scripts/goalbuddy.mjs run docs/goals/<slug> --auto 3
-```
-
-| Flag | Purpose |
-|------|---------|
-| `--auto N` | Run up to N PM turns via `@cursor/sdk` |
-| `--parallel` | Use `parallel_plan` spawn hints for disjoint Workers |
-| `--dry-run` | Offline loop test with `GOALBUDDY_MOCK_AGENT_TEXT` |
-| `--json` | Machine-readable run report |
-
-The runner uses the same validators as MCP (`validate_state`, `validate_receipt`) and writes `notes/SESSION.md` each turn. `/goal` remains for manual single-turn control.
-
-Package: `packages/goal-runner` (`@goalbuddy/runner`).
-
 ## Parallel work (read-only recommendations)
 
 ```bash
@@ -183,7 +163,6 @@ Default hub: `http://goalbuddy.localhost:41737/` (all goals) or `http://goalbudd
 | `completion-check <slug>` | Check readiness for `goal.status: done` |
 | `stale [--days 7]` | List stale goals under `docs/goals/` |
 | `hub [--json]` | Multi-goal hub summary |
-| `run <slug> --auto N` | SDK auto-loop runner |
 | `board <slug>` | Start local board server |
 
 Skill root: `~/.cursor/skills/goalbuddy/`. Never install skills under `~/.cursor/skills-cursor/` (reserved).

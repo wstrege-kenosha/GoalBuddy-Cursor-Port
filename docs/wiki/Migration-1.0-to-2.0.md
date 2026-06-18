@@ -4,6 +4,8 @@ Upgrade guide for existing GoalBuddy Cursor Port installs.
 
 **Full doc in repo:** `docs/MIGRATION-1.0-to-2.0.md`
 
+> **Upgrading from 2.0.0?** SDK auto-loop was removed in **2.1.0**. See [Migration 2.0 → 2.1](Migration-2.0-to-2.1).
+
 ## Quick steps
 
 ```bash
@@ -23,22 +25,15 @@ npm run install:cursor
 |-------|-------|
 | `/goal` + CLI prompts | `/goal` + **MCP tools** (`validate_state`, `render_task_prompt`, `validate_receipt`) |
 | Install skills only | Install skills **and** MCP config |
-| Manual turns only | Optional `run --auto N` with `CURSOR_API_KEY` |
+| Manual turns only | Manual `/goal` each turn (same in 2.1.0) |
 
 **No `state.yaml` migration** — existing goals work as-is.
 
 ## Verify version
 
 ```bash
-node -e "console.log(require('./goalbuddy/version.json').cursorPortVersion)"
-# 2.0.0
+node -e "console.log(JSON.parse(require('fs').readFileSync('goalbuddy/version.json','utf8')).cursorPortVersion)"
+# 2.1.0
 ```
 
-## Optional: SDK auto-loop
-
-```bash
-export CURSOR_API_KEY="cursor_..."
-node goalbuddy/scripts/goalbuddy.mjs run docs/goals/<slug> --auto 3
-```
-
-See [Usage](Usage) and [Troubleshooting](Troubleshooting) for MCP and `run` issues.
+See [Usage](Usage) and [Troubleshooting](Troubleshooting) for MCP issues.

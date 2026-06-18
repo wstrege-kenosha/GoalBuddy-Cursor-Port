@@ -82,11 +82,19 @@ Restart Cursor.
 - Worker receipts need `changed_files`, `commands` with `status: pass`.
 - `active_task` must point to the one task with `status: active`.
 
-## `run --auto N` fails immediately
+## `goalbuddy` command not found
 
-- Set `CURSOR_API_KEY` from [Cursor Dashboard → Integrations](https://cursor.com/dashboard/integrations).
-- Run `npm install` and `npm run build` so `@goalbuddy/runner` is compiled.
-- Use `--dry-run` with `GOALBUDDY_MOCK_AGENT_TEXT` to test the loop without the API.
+Re-run install from GoalBuddy-Cursor-Port:
+
+```bash
+npm run install:cursor
+```
+
+Add `%USERPROFILE%\.cursor\bin` (Windows) or `~/.cursor/bin` (macOS/Linux) to PATH, then open a **new** terminal. Or invoke directly:
+
+```powershell
+& "$env:USERPROFILE\.cursor\bin\goalbuddy.cmd" doctor
+```
 
 ## Publish this wiki from the repo
 

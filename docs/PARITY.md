@@ -1,6 +1,8 @@
-# GoalBuddy parity — upstream 0.3.8 vs Cursor port 2.0.0
+# GoalBuddy parity — upstream 0.3.8 vs Cursor port 2.1.0
 
 **Migration from port 1.0.0:** [MIGRATION-1.0-to-2.0.md](MIGRATION-1.0-to-2.0.md)
+
+**Migration from port 2.0.0:** [MIGRATION-2.0-to-2.1.md](MIGRATION-2.0-to-2.1.md)
 
 ## Upstream (`tolibear/goalbuddy` @ 0.3.8)
 
@@ -16,21 +18,22 @@
 
 **Verification:** `npm run check`; `npx goalbuddy doctor [--target codex|claude] [--goal-ready]`; `node goalbuddy/scripts/check-goal-state.mjs <state.yaml>`; board via CLI.
 
-## Cursor port repo (`GoalBuddyCursorPort` @ 2.0.0)
+## Cursor port repo (`GoalBuddyCursorPort` @ 2.1.0)
 
 | Path | Role |
 |------|------|
-| `package.json` | `npm run build`, `npm run check`, `install:cursor` |
+| `package.json` | `npm run check`, `install:cursor` |
 | `goalbuddy/` | Vendored Cursor skill (from upstream 0.3.8 lineage) |
 | `goalbuddy/mcp/` | stdio MCP server wrapping shared validators |
-| `packages/goal-runner/` | `@goalbuddy/runner` — `@cursor/sdk` auto-loop |
 | `goal-prep/` | `/goal-prep` skill |
 | `scripts/install-from-repo.mjs` | Copy skills → `~/.cursor/skills`, run `goalbuddy.mjs install`, merge MCP config |
 | `docs/goals/` | Goal boards (e.g. `sample-cursor-smoke/`) |
 | `.cursor/mcp.json` | Project MCP server entry |
 | `docs/PARITY.md` | This matrix |
 
-**Cursor CLI:** `node goalbuddy/scripts/goalbuddy.mjs` — `install`, `doctor [--goal-ready]`, `board`, `prompt`, `parallel-plan`, `receipt`, `completion-check`, `stale`, `hub`, `run --auto N`, `check-update`, `reset`.
+**Cursor CLI:** `node goalbuddy/scripts/goalbuddy.mjs` — `install`, `doctor [--goal-ready]`, `board`, `prompt`, `parallel-plan`, `receipt`, `completion-check`, `stale`, `hub`, `check-update`, `reset`, `workspace register`.
+
+Global **`goalbuddy`** command (after install + PATH): same subcommands from any repo with `docs/goals/`.
 
 ## Parity matrix
 
@@ -38,7 +41,6 @@
 |---------|----------------|------------------------|-----------|
 | Goal Prep | `$goal-prep` / plugin | `/goal-prep` + `goal-prep` skill | `goal-prep/SKILL.md` vendored |
 | PM `/goal` loop | Native + CLI prompt | `/goal` + MCP tool gates | `goalbuddy/commands-src`, `goalbuddy/mcp/` |
-| SDK auto-loop | No | `run --auto N` via `@cursor/sdk` | `packages/goal-runner/` |
 | MCP tools | No | `goalbuddy` stdio server | `goalbuddy/mcp/server.mjs` |
 | state.yaml v2 | Yes | Yes | Yes; shared `goal-state.mjs` lib |
 | Scout/Judge/Worker | Codex toml + Claude md | `goal-*.md` agents | `goalbuddy/agents-src` + install script |
@@ -59,20 +61,27 @@
 | Extension | Purpose |
 |-----------|---------|
 | MCP server | Deterministic `validate_state`, `render_task_prompt`, `validate_receipt`, etc. |
-| `@goalbuddy/runner` | Batch PM turns with `CURSOR_API_KEY` |
 | Multi-goal hub | Discover all `docs/goals/*` at board root |
 | Session timeline | `notes/SESSION.md` convention + `append_session_note` |
+| Global `goalbuddy` CLI | `doctor`, `board`, `hub`, gates from any project repo |
+
+## Removed in 2.1.0
+
+| Feature | Notes |
+|---------|-------|
+| SDK auto-loop (`run --auto N`) | Removed; use `/goal` in Cursor chat |
+| `@goalbuddy/runner` / `@cursor/sdk` | Package and deps removed |
+| `CURSOR_API_KEY` | No longer required for GoalBuddy |
 
 ## Deferred
 
 - Codex/Claude plugins and `--target codex|claude`
 - npm package `goalbuddy-cursor`
 - Upstream superpowers / site parity
-- Cloud SDK runtime (local `cwd` only for now)
 
 ## CI
 
-GitHub Actions workflow `.github/workflows/check.yml` runs `npm run check` (build + tests + doctor) on push/PR.
+GitHub Actions workflow `.github/workflows/check.yml` runs `npm run check` (tests + doctor) on push/PR.
 
 ## Verify (port repo)
 

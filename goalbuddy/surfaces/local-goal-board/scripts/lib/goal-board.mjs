@@ -2,48 +2,20 @@ import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, statSyn
 import { readFile } from "node:fs/promises";
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
+import { themeFontLinksHtml, themeSurfaceCss, themeTokensCss } from "./board-theme.mjs";
+import {
+  DEFAULT_REPO_LINKS,
+  githubSlugFromUrl,
+  readBoardRepoLinks,
+} from "./port-metadata.mjs";
+
+export { readBoardRepoLinks };
 
 const VALID_STATUSES = new Set(["queued", "active", "blocked", "done"]);
 const COLUMN_ORDER = ["todo", "in-progress", "blocked", "completed"];
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const surfaceRoot = resolve(__dirname, "../..");
 const logoAssetPath = join(surfaceRoot, "assets", "goalbuddy-mark.png");
-const versionPath = join(__dirname, "../../../../version.json");
-
-const DEFAULT_REPO_LINKS = {
-  portUrl: "https://github.com/wstrege-kenosha/GoalBuddy-Cursor-Port",
-  upstreamUrl: "https://github.com/tolibear/goalbuddy",
-  upstreamLabel: "tolibear/goalbuddy",
-};
-
-function githubSlugFromUrl(url) {
-  try {
-    const parts = new URL(String(url)).pathname.split("/").filter(Boolean);
-    if (parts.length >= 2) return `${parts[0]}/${parts[1]}`;
-  } catch {
-    /* ignore invalid URL */
-  }
-  return DEFAULT_REPO_LINKS.portUrl.replace("https://github.com/", "");
-}
-
-export function readBoardRepoLinks() {
-  try {
-    const version = JSON.parse(readFileSync(versionPath, "utf8"));
-    const portUrl = version.portUrl || DEFAULT_REPO_LINKS.portUrl;
-    const upstreamUrl = version.upstreamUrl || DEFAULT_REPO_LINKS.upstreamUrl;
-    return {
-      portUrl,
-      portApiSlug: githubSlugFromUrl(portUrl),
-      upstreamUrl,
-      upstreamLabel: githubSlugFromUrl(upstreamUrl),
-    };
-  } catch {
-    return {
-      ...DEFAULT_REPO_LINKS,
-      portApiSlug: githubSlugFromUrl(DEFAULT_REPO_LINKS.portUrl),
-    };
-  }
-}
 
 export class GoalBoardError extends Error {
   constructor(message) {
@@ -78,9 +50,11 @@ export function createBoardPayload(goalDir, options = {}) {
     .map((task) => includeSubgoals ? attachTaskSubgoal(task, root) : task);
   const columns = buildColumns(tasks);
   const stateStat = statSync(statePath);
+  const repo = readBoardRepoLinks();
 
   return {
     generatedAt: new Date().toISOString(),
+    repo,
     source: {
       goalDir: root,
       statePath,
@@ -774,6 +748,19 @@ function embedBoardSnapshot(snapshot) {
   return `  <script id="board-snapshot" type="application/json">${json}</script>`;
 }
 
+function boardProvenanceHtml(repoLinks = DEFAULT_REPO_LINKS) {
+  const portVersion = repoLinks.cursorPortVersion ? ` · Cursor port ${repoLinks.cursorPortVersion}` : "";
+  const upstreamVersion = repoLinks.upstreamVersion ? ` (${repoLinks.upstreamVersion})` : "";
+  return `  <footer class="board-provenance" aria-label="GoalBuddy port provenance">
+    <p>
+      Board UI from
+      <a href="${repoLinks.portUrl}" target="_blank" rel="noreferrer">${repoLinks.portLabel}</a>${portVersion}
+      · ported from upstream
+      <a href="${repoLinks.upstreamUrl}" target="_blank" rel="noreferrer">${repoLinks.upstreamLabel}</a>${upstreamVersion}
+    </p>
+  </footer>`;
+}
+
 function boardHtml(snapshot, repoLinks = DEFAULT_REPO_LINKS) {
   return `<!doctype html>
 <html lang="en">
@@ -781,9 +768,10 @@ function boardHtml(snapshot, repoLinks = DEFAULT_REPO_LINKS) {
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>GoalBuddy Board</title>
+  ${themeFontLinksHtml()}
   <link rel="stylesheet" href="./styles.css">
 </head>
-<body>
+<body class="theme-board">
   <header class="topbar">
     <div class="topbar-primary">
       <div class="brand" aria-label="Goal Buddy">
@@ -798,11 +786,11 @@ function boardHtml(snapshot, repoLinks = DEFAULT_REPO_LINKS) {
     </div>
     <div class="header-tools">
       <div class="repo-links">
-        <a class="github-stars" href="${repoLinks.portUrl}" target="_blank" rel="noreferrer" aria-label="Open GoalBuddy Cursor Port on GitHub">
+        <a class="github-stars" href="${repoLinks.portUrl}" target="_blank" rel="noreferrer" aria-label="Open ${repoLinks.portLabel} on GitHub">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 2.8 2.84 5.76 6.36.92-4.6 4.48 1.08 6.34L12 17.32 6.32 20.3l1.08-6.34-4.6-4.48 6.36-.92L12 2.8Z"></path></svg>
-          <span id="github-stars">Stars</span>
+          <span id="github-stars">${repoLinks.portLabel}</span>
         </a>
-        <a class="github-upstream" href="${repoLinks.upstreamUrl}" target="_blank" rel="noreferrer" aria-label="Open upstream GoalBuddy on GitHub">Ported from ${repoLinks.upstreamLabel}</a>
+        <a class="github-upstream" href="${repoLinks.upstreamUrl}" target="_blank" rel="noreferrer" aria-label="Open upstream GoalBuddy on GitHub">Upstream: ${repoLinks.upstreamLabel}${repoLinks.upstreamVersion ? ` @ ${repoLinks.upstreamVersion}` : ""}</a>
       </div>
       <div class="settings-wrap">
         <button class="settings-button" id="settings-button" type="button" aria-expanded="false" aria-controls="settings-popover">
@@ -890,6 +878,7 @@ function boardHtml(snapshot, repoLinks = DEFAULT_REPO_LINKS) {
     </section>
     <section class="board" id="board" aria-label="Goal task board"></section>
   </main>
+${boardProvenanceHtml(repoLinks)}
   <div class="modal" id="task-modal" hidden>
     <button class="modal-scrim" type="button" data-close-modal aria-label="Close task detail"></button>
     <article class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="modal-title">
@@ -910,119 +899,8 @@ ${embedBoardSnapshot(snapshot)}
 }
 
 function boardCss() {
-  return `:root {
-  color-scheme: light;
-  --canvas: #f7f6f3;
-  --surface: #ffffff;
-  --surface-muted: #fbfbfa;
-  --ink: #111111;
-  --muted: #787774;
-  --line: #eaeaea;
-  --blue-bg: #e1f3fe;
-  --blue-text: #1f6c9f;
-  --green-bg: #edf3ec;
-  --green-text: #346538;
-  --red-bg: #fdebec;
-  --red-text: #9f2f2d;
-  --yellow-bg: #fbf3db;
-  --yellow-text: #956400;
-  --active-surface: #fbfdfe;
-  font-family: "SF Pro Display", "Geist Sans", "Helvetica Neue", Arial, sans-serif;
-}
-
-:root[data-theme="dark"] {
-  color-scheme: dark;
-  --canvas: #07101f;
-  --surface: #101a2d;
-  --surface-muted: #0c1525;
-  --ink: #f7f9fc;
-  --muted: #9aa7bf;
-  --line: #26334a;
-  --blue-bg: #173653;
-  --blue-text: #9ed8ff;
-  --green-bg: #143929;
-  --green-text: #a6e8bf;
-  --red-bg: #3a1d22;
-  --red-text: #ffb2b9;
-  --yellow-bg: #3a3014;
-  --yellow-text: #f6d878;
-  --active-surface: #0f2031;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root[data-theme="system"] {
-    color-scheme: dark;
-    --canvas: #07101f;
-    --surface: #101a2d;
-    --surface-muted: #0c1525;
-    --ink: #f7f9fc;
-    --muted: #9aa7bf;
-    --line: #26334a;
-    --blue-bg: #173653;
-    --blue-text: #9ed8ff;
-    --green-bg: #143929;
-    --green-text: #a6e8bf;
-    --red-bg: #3a1d22;
-    --red-text: #ffb2b9;
-    --yellow-bg: #3a3014;
-    --yellow-text: #f6d878;
-    --active-surface: #0f2031;
-  }
-
-  :root[data-theme="system"] .topbar {
-    border-color: rgba(61, 76, 108, 0.86);
-    background: rgba(13, 23, 41, 0.84);
-    box-shadow: 0 18px 48px rgba(0, 0, 0, 0.28);
-  }
-
-  :root[data-theme="system"] .brand {
-    color: var(--ink);
-  }
-
-  :root[data-theme="system"] .board-switcher select,
-  :root[data-theme="system"] .github-stars,
-  :root[data-theme="system"] .github-upstream,
-  :root[data-theme="system"] .settings-button {
-    border-color: rgba(61, 76, 108, 0.9);
-    background: rgba(16, 26, 45, 0.78);
-    color: var(--ink);
-  }
-
-  :root[data-theme="system"] .settings-popover {
-    border-color: rgba(61, 76, 108, 0.96);
-    background: rgba(16, 26, 45, 0.96);
-    box-shadow: 0 24px 64px rgba(0, 0, 0, 0.28);
-  }
-
-  :root[data-theme="system"] .setting-row select {
-    background: var(--surface);
-    color: var(--ink);
-  }
-
-  :root[data-theme="system"] .goal-tranche,
-  :root[data-theme="system"] .task-title,
-  :root[data-theme="system"] .setting-row select {
-    color: var(--ink);
-  }
-
-  :root[data-theme="system"] .task-card.is-active {
-    background: linear-gradient(var(--active-surface), var(--active-surface)) padding-box,
-      linear-gradient(110deg, #78d7ff, #6c63ff, #78f2b9, #78d7ff) border-box;
-  }
-
-  :root[data-theme="system"] .task-card.is-active::after {
-    background: var(--active-surface);
-  }
-}
-
-* { box-sizing: border-box; }
-
-body {
-  margin: 0;
-  min-height: 100vh;
-  background: var(--canvas);
-  color: var(--ink);
-}
+  return `${themeTokensCss()}
+${themeSurfaceCss()}
 
 button,
 input,
@@ -1052,17 +930,10 @@ button {
   min-height: 64px;
   margin: 0 auto;
   padding: 10px 12px 10px 18px;
-  border: 1px solid rgba(219, 226, 240, 0.86);
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.78);
-  box-shadow: 0 18px 48px rgba(30, 40, 72, 0.1);
-  backdrop-filter: blur(22px);
-}
-
-:root[data-theme="dark"] .topbar {
-  border-color: rgba(61, 76, 108, 0.86);
-  background: rgba(13, 23, 41, 0.84);
-  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.28);
+  border: 1px solid var(--topbar-border);
+  border-radius: var(--radius-shell);
+  background: var(--topbar-bg);
+  box-shadow: var(--shadow-soft);
 }
 
 .topbar-primary {
@@ -1076,7 +947,7 @@ button {
   display: inline-flex;
   align-items: center;
   gap: 10px;
-  color: #071236;
+  color: var(--brand-color);
   font-weight: 800;
   min-width: fit-content;
 }
@@ -1089,7 +960,7 @@ button {
   display: block;
   width: 38px;
   height: 38px;
-  filter: drop-shadow(0 8px 13px rgba(87, 76, 210, 0.18));
+  filter: drop-shadow(0 2px 6px var(--accent-glow));
 }
 
 .brand-name {
@@ -1117,12 +988,12 @@ button {
   width: min(280px, 100%);
   min-width: 0;
   min-height: 38px;
-  border: 1px solid rgba(219, 226, 240, 0.9);
-  border-radius: 999px;
-  padding: 0 34px 0 14px;
-  background: rgba(255, 255, 255, 0.72);
-  color: #2f3c59;
-  font-weight: 700;
+  border: 1px solid var(--control-border);
+  border-radius: var(--radius-control);
+  padding: 0 34px 0 12px;
+  background: var(--control-bg);
+  color: var(--control-text);
+  font-weight: 600;
   font-size: 14px;
 }
 
@@ -1130,9 +1001,9 @@ button {
 :root[data-theme="dark"] .github-stars,
 :root[data-theme="dark"] .github-upstream,
 :root[data-theme="dark"] .settings-button {
-  border-color: rgba(61, 76, 108, 0.9);
-  background: rgba(16, 26, 45, 0.78);
-  color: var(--ink);
+  border-color: var(--control-border);
+  background: var(--control-bg);
+  color: var(--control-text);
 }
 
 .board-switcher.is-empty {
@@ -1154,11 +1025,11 @@ button {
   align-items: center;
   justify-content: center;
   min-height: 44px;
-  border: 1px solid rgba(219, 226, 240, 0.9);
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.72);
-  color: #2f3c59;
-  font-weight: 800;
+  border: 1px solid var(--control-border);
+  border-radius: var(--radius-control);
+  background: var(--control-bg);
+  color: var(--control-text);
+  font-weight: 600;
   transition: transform 180ms ease, color 180ms ease, border-color 180ms ease, background 180ms ease;
 }
 
@@ -1180,8 +1051,8 @@ button {
 .github-upstream {
   padding: 0 14px;
   font-size: 13px;
-  font-weight: 700;
-  color: #5a6680;
+  font-weight: 600;
+  color: var(--muted);
   white-space: nowrap;
   text-decoration: none;
 }
@@ -1190,15 +1061,15 @@ button {
 .github-upstream:hover,
 .settings-button:hover {
   transform: translateY(-2px);
-  color: #071236;
-  border-color: rgba(79, 70, 216, 0.26);
-  background: #fff;
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 30%, var(--control-border));
+  background: var(--surface);
 }
 
 .github-stars svg {
   width: 16px;
   height: 16px;
-  color: #4f46d8;
+  color: var(--accent);
   fill: currentColor;
 }
 
@@ -1226,15 +1097,15 @@ button {
 .live-dot {
   width: 8px;
   height: 8px;
-  border: 2px solid #fff;
-  border-radius: 999px;
-  background: #1f9d69;
-  box-shadow: 0 0 0 4px rgba(31, 157, 105, 0.12);
+  border: 2px solid var(--surface);
+  border-radius: var(--radius-pill);
+  background: var(--live-online);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--live-online) 18%, transparent);
 }
 
 .live-dot.offline {
-  background: var(--yellow-text);
-  box-shadow: 0 0 0 4px rgba(149, 100, 0, 0.12);
+  background: var(--live-offline);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--live-offline) 18%, transparent);
 }
 
 .settings-popover {
@@ -1243,17 +1114,16 @@ button {
   right: 0;
   width: min(320px, calc(100vw - 32px));
   padding: 16px;
-  border: 1px solid rgba(219, 226, 240, 0.96);
-  border-radius: 18px;
-  background: rgba(255, 255, 255, 0.96);
-  box-shadow: 0 24px 64px rgba(30, 40, 72, 0.16);
-  backdrop-filter: blur(20px);
+  border: 1px solid var(--control-border);
+  border-radius: var(--radius-panel);
+  background: var(--surface-elevated);
+  box-shadow: var(--shadow-lift);
 }
 
 :root[data-theme="dark"] .settings-popover {
-  border-color: rgba(61, 76, 108, 0.96);
-  background: rgba(16, 26, 45, 0.96);
-  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.28);
+  border-color: var(--control-border);
+  background: var(--surface-elevated);
+  box-shadow: var(--shadow-lift);
 }
 
 .settings-popover[hidden] {
@@ -1289,10 +1159,10 @@ button {
 .setting-row select {
   min-height: 38px;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: var(--radius-card);
   padding: 0 10px;
-  background: #fff;
-  color: #2f3437;
+  background: var(--surface);
+  color: var(--ink);
 }
 
 :root[data-theme="dark"] .setting-row select {
@@ -1313,11 +1183,11 @@ button {
   display: inline-flex;
   align-items: center;
   width: fit-content;
-  border-radius: 999px;
-  padding: 4px 8px;
+  border-radius: 6px;
+  padding: 3px 8px;
   font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.05em;
+  font-weight: 600;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
   background: var(--blue-bg);
   color: var(--blue-text);
@@ -1396,17 +1266,18 @@ p {
 }
 
 h1 {
-  margin-bottom: 10px;
+  margin-bottom: 8px;
   max-width: 900px;
-  font-size: clamp(34px, 5vw, 68px);
-  line-height: 0.95;
-  letter-spacing: 0;
+  font-size: clamp(1.5rem, 2.8vw, 2rem);
+  line-height: 1.15;
+  font-weight: 600;
+  letter-spacing: -0.02em;
 }
 
 .goal-tranche {
   max-width: 860px;
   margin-bottom: 0;
-  color: #2f3437;
+  color: var(--ink);
   line-height: 1.55;
 }
 
@@ -1423,7 +1294,7 @@ h1 {
   overflow: hidden;
   margin: 0;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: var(--radius-card);
   background: var(--line);
 }
 
@@ -1460,8 +1331,10 @@ h1 {
 .column {
   min-width: 0;
   border: 1px solid var(--line);
-  border-radius: 8px;
-  background: var(--surface-muted);
+  border-radius: 0 0 var(--radius-panel) var(--radius-panel);
+  background: var(--surface);
+  box-shadow: var(--shadow-soft);
+  overflow: hidden;
 }
 
 .column-header {
@@ -1469,14 +1342,19 @@ h1 {
   align-items: start;
   justify-content: space-between;
   gap: 12px;
-  padding: 16px;
+  padding: 14px 16px;
   border-bottom: 1px solid var(--line);
+  background: var(--surface-muted);
+  border-radius: 0;
 }
 
 .column-header h2 {
   margin: 0 0 4px;
-  font-size: 16px;
+  font-size: 13px;
   line-height: 1.2;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
 }
 
 .column-header p {
@@ -1488,7 +1366,7 @@ h1 {
 
 .column-count {
   color: var(--muted);
-  font-family: "Geist Mono", "SF Mono", monospace;
+  font-family: var(--font-mono);
   font-size: 13px;
 }
 
@@ -1507,7 +1385,7 @@ h1 {
   gap: 12px;
   padding: 14px;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: var(--radius-card);
   background: var(--surface);
   color: inherit;
   text-align: left;
@@ -1523,21 +1401,21 @@ h1 {
 }
 
 .task-card:hover {
-  border-color: #d1d0cc;
+  border-color: var(--line-strong);
   transform: translateY(-1px);
 }
 
 .task-card:focus-visible,
 .icon-button:focus-visible {
-  outline: 2px solid #2f3437;
+  outline: 2px solid var(--ink);
   outline-offset: 2px;
 }
 
 .task-card.is-active {
   border-color: transparent;
-  background: linear-gradient(#fbfdfe, #fbfdfe) padding-box,
-    linear-gradient(110deg, #78d7ff, #4f46d8, #78f2b9, #78d7ff) border-box;
-  box-shadow: 0 14px 38px rgba(31, 108, 159, 0.12);
+  background: linear-gradient(var(--active-surface), var(--active-surface)) padding-box,
+    var(--active-border-gradient) border-box;
+  box-shadow: 0 14px 38px var(--accent-glow);
 }
 
 .task-card.is-active::before {
@@ -1545,7 +1423,7 @@ h1 {
   inset: -2px;
   z-index: 0;
   content: "";
-  background: conic-gradient(from 0deg, transparent 0 58%, rgba(79, 70, 216, 0.28), rgba(120, 215, 255, 0.44), transparent 78% 100%);
+  background: conic-gradient(from 0deg, transparent 0 58%, rgba(59, 130, 246, 0.34), rgba(6, 182, 212, 0.38), transparent 78% 100%);
   opacity: 0.86;
   animation: active-card-orbit 2.8s linear infinite;
 }
@@ -1555,13 +1433,13 @@ h1 {
   inset: 2px;
   z-index: 0;
   content: "";
-  border-radius: 6px;
-  background: #fbfdfe;
+  border-radius: calc(var(--radius-card) - 2px);
+  background: var(--active-surface);
 }
 
 :root[data-theme="dark"] .task-card.is-active {
   background: linear-gradient(var(--active-surface), var(--active-surface)) padding-box,
-    linear-gradient(110deg, #78d7ff, #6c63ff, #78f2b9, #78d7ff) border-box;
+    var(--active-border-gradient) border-box;
 }
 
 :root[data-theme="dark"] .task-card.is-active::after {
@@ -1604,12 +1482,8 @@ h1 {
   overflow: hidden;
 }
 
-@keyframes active-card-orbit {
-  to { transform: rotate(360deg); }
-}
-
 .task-card.is-moving {
-  border-color: #c2b8ff;
+  border-color: color-mix(in srgb, var(--accent-secondary) 40%, var(--line));
 }
 
 .card-topline {
@@ -1621,13 +1495,13 @@ h1 {
 
 .task-id {
   color: var(--muted);
-  font-family: "Geist Mono", "SF Mono", monospace;
+  font-family: var(--font-mono);
   font-size: 12px;
 }
 
 .task-title {
   margin: 0;
-  color: #2f3437;
+  color: var(--ink);
   display: -webkit-box;
   font-size: 15px;
   line-height: 1.35;
@@ -1649,13 +1523,13 @@ h1 {
 .badge.status-done { background: var(--green-bg); color: var(--green-text); }
 .badge.status-blocked { background: var(--red-bg); color: var(--red-text); }
 .badge.role { background: var(--yellow-bg); color: var(--yellow-text); }
-.badge.subgoal { background: #ece8ff; color: #5c43c6; }
+.badge.subgoal { background: var(--accent-secondary-soft); color: var(--accent-secondary-text); }
 .badge.subgoal.status-blocked { background: var(--red-bg); color: var(--red-text); }
 .badge.subgoal.status-done { background: var(--green-bg); color: var(--green-text); }
 
 :root[data-theme="dark"] .badge.subgoal {
-  background: #263052;
-  color: #c7d2ff;
+  background: var(--accent-secondary-soft);
+  color: var(--accent-secondary-text);
 }
 
 .empty {
@@ -1668,7 +1542,7 @@ h1 {
   grid-column: 1 / -1;
   padding: 18px;
   border: 1px solid var(--red-border);
-  border-radius: 8px;
+  border-radius: var(--radius-card);
   background: var(--red-bg);
   color: var(--text);
 }
@@ -1681,6 +1555,30 @@ h1 {
 .board-error p {
   margin: 0;
   color: var(--muted);
+}
+
+.board-provenance {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 0 24px 28px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.board-provenance p {
+  margin: 0;
+}
+
+.board-provenance a {
+  color: inherit;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.board-provenance a:hover {
+  color: var(--ink);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -1735,7 +1633,7 @@ h1 {
   max-height: min(760px, calc(100vh - 48px));
   overflow: auto;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: var(--radius-card);
   background: var(--surface);
 }
 
@@ -1764,7 +1662,7 @@ h1 {
   border: 1px solid var(--line);
   border-radius: 6px;
   background: var(--surface);
-  color: #2f3437;
+  color: var(--ink);
   cursor: pointer;
 }
 
@@ -1780,7 +1678,7 @@ h1 {
   gap: 1px;
   overflow: hidden;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: var(--radius-card);
   background: var(--line);
 }
 
@@ -1826,7 +1724,7 @@ h1 {
 
 .subgoal-section {
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: var(--radius-card);
   padding: 14px;
   background: var(--surface-muted);
 }
@@ -1860,8 +1758,9 @@ h1 {
 .subgoal-column {
   min-width: 0;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: 0 0 var(--radius-card) var(--radius-card);
   background: var(--surface);
+  overflow: hidden;
 }
 
 .subgoal-column-header {
@@ -1893,7 +1792,7 @@ h1 {
 }
 
 .subgoal-task-card.is-active {
-  border-color: #8e9cff;
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--line));
   background: var(--active-surface);
 }
 
@@ -1909,10 +1808,10 @@ pre.note {
   margin: 0;
   padding: 14px;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: var(--radius-card);
   background: var(--canvas);
   color: var(--ink);
-  font-family: "Geist Mono", "SF Mono", monospace;
+  font-family: var(--font-mono);
   font-size: 12px;
   line-height: 1.55;
   white-space: pre-wrap;
@@ -1962,7 +1861,7 @@ pre.note {
   }
 
   h1 {
-    font-size: 38px;
+    font-size: 1.35rem;
   }
 }`;
 }
@@ -2184,7 +2083,7 @@ async function loadGithubStars() {
     const repo = await response.json();
     githubStarsEl.textContent = \`\${formatStars(repo.stargazers_count)} stars\`;
   } catch {
-    githubStarsEl.textContent = "GitHub";
+    githubStarsEl.textContent = ${JSON.stringify(repoLinks.portLabel)};
   }
 }
 
@@ -2356,9 +2255,9 @@ function highlightMovingCards(taskIds) {
     if (!taskIds.has(card.dataset.taskId)) continue;
     card.classList.add("is-moving");
     card.animate([
-      { transform: "scale(1)", borderColor: "#eaeaea" },
-      { transform: "scale(1.025)", borderColor: "#9d8cff" },
-      { transform: "scale(1)", borderColor: "#c2b8ff" },
+      { transform: "scale(1)", borderColor: "#e2e8f0" },
+      { transform: "scale(1.02)", borderColor: "#2563eb" },
+      { transform: "scale(1)", borderColor: "#93c5fd" },
     ], {
       duration: 240,
       easing: "cubic-bezier(0.16, 1, 0.3, 1)",
@@ -2395,12 +2294,12 @@ function animateCardMoves(previousPositions, movingTaskIds = new Set()) {
       {
         transform: \`translate(\${dx}px, \${dy}px) scale(\${changedColumn ? "1.015" : "1"})\`,
         opacity: changedColumn ? 0.9 : 1,
-        borderColor: wasSelected ? "#9d8cff" : "#eaeaea",
+        borderColor: wasSelected ? "#2563eb" : "#e2e8f0",
       },
       {
         transform: "translate(0, 0) scale(1)",
         opacity: 1,
-        borderColor: "#eaeaea",
+        borderColor: "#e2e8f0",
       },
     ], {
       duration: changedColumn ? 980 : 520,

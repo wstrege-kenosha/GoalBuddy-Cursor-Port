@@ -206,14 +206,14 @@ function formatStars(count) {
 async function loadGithubStars() {
   if (!githubStarsEl) return;
   try {
-    const response = await fetch("https://api.github.com/repos/tolibear/goalbuddy", {
+    const response = await fetch("https://api.github.com/repos/wstrege-kenosha/GoalBuddy-Cursor-Port", {
       headers: { Accept: "application/vnd.github+json" },
     });
     if (!response.ok) throw new Error("GitHub API unavailable");
     const repo = await response.json();
     githubStarsEl.textContent = `${formatStars(repo.stargazers_count)} stars`;
   } catch {
-    githubStarsEl.textContent = "GitHub";
+    githubStarsEl.textContent = "wstrege-kenosha/GoalBuddy-Cursor-Port";
   }
 }
 
@@ -385,9 +385,9 @@ function highlightMovingCards(taskIds) {
     if (!taskIds.has(card.dataset.taskId)) continue;
     card.classList.add("is-moving");
     card.animate([
-      { transform: "scale(1)", borderColor: "#eaeaea" },
-      { transform: "scale(1.025)", borderColor: "#9d8cff" },
-      { transform: "scale(1)", borderColor: "#c2b8ff" },
+      { transform: "scale(1)", borderColor: "#e2e8f0" },
+      { transform: "scale(1.02)", borderColor: "#2563eb" },
+      { transform: "scale(1)", borderColor: "#93c5fd" },
     ], {
       duration: 240,
       easing: "cubic-bezier(0.16, 1, 0.3, 1)",
@@ -424,12 +424,12 @@ function animateCardMoves(previousPositions, movingTaskIds = new Set()) {
       {
         transform: `translate(${dx}px, ${dy}px) scale(${changedColumn ? "1.015" : "1"})`,
         opacity: changedColumn ? 0.9 : 1,
-        borderColor: wasSelected ? "#9d8cff" : "#eaeaea",
+        borderColor: wasSelected ? "#2563eb" : "#e2e8f0",
       },
       {
         transform: "translate(0, 0) scale(1)",
         opacity: 1,
-        borderColor: "#eaeaea",
+        borderColor: "#e2e8f0",
       },
     ], {
       duration: changedColumn ? 980 : 520,

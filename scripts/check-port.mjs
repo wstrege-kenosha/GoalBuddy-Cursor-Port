@@ -107,9 +107,6 @@ if (!runNodeTests(phaseATestFile, "phase-a cli tests")) failed = true;
 const phaseBTestFile = join(repoRoot, "goalbuddy", "scripts", "test", "phase-b-mcp.test.mjs");
 if (!runNodeTests(phaseBTestFile, "phase-b mcp tests")) failed = true;
 
-const phaseCTestFile = join(repoRoot, "goalbuddy", "scripts", "test", "phase-c-runner.test.mjs");
-if (!runNodeTests(phaseCTestFile, "phase-c runner tests")) failed = true;
-
 const doctor = spawnSync(
   process.execPath,
   [join(repoRoot, "goalbuddy", "scripts", "goalbuddy.mjs"), "doctor"],

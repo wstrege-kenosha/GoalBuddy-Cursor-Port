@@ -2,6 +2,13 @@ import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { basename, join, resolve } from "node:path";
 import { isWeakProof, validateGoalState } from "./goal-state.mjs";
 import { discoverGoalStatePaths } from "./goal-stale.mjs";
+import { readBoardRepoLinks } from "../../surfaces/local-goal-board/scripts/lib/port-metadata.mjs";
+import {
+  hubPageCss,
+  themeFontLinksHtml,
+  themeSurfaceCss,
+  themeTokensCss,
+} from "../../surfaces/local-goal-board/scripts/lib/board-theme.mjs";
 
 export function discoverGoalDirs(roots = [process.cwd()]) {
   return discoverGoalStatePaths(roots).map((statePath) => resolve(statePath, ".."));
@@ -54,6 +61,7 @@ export function buildHubPayload(options = {}) {
   return {
     generated_at: new Date().toISOString(),
     base_url: baseUrl,
+    repo: readBoardRepoLinks(),
     goal_count: goals.length,
     goals,
   };
@@ -81,6 +89,7 @@ export function buildHubPayloadForServer(registeredGoalDirs, options = {}) {
   return {
     generated_at: new Date().toISOString(),
     base_url: baseUrl,
+    repo: readBoardRepoLinks(),
     goal_count: goals.length,
     goals,
   };
@@ -88,44 +97,33 @@ export function buildHubPayloadForServer(registeredGoalDirs, options = {}) {
 
 export function hubPageHtml(payload) {
   const json = JSON.stringify(payload).replace(/</g, "\\u003c");
+  const repo = payload.repo || {};
+  const portVersion = repo.cursorPortVersion ? ` · Cursor port ${repo.cursorPortVersion}` : "";
+  const upstreamVersion = repo.upstreamVersion ? ` (${repo.upstreamVersion})` : "";
+  const provenance = repo.portUrl && repo.upstreamUrl
+    ? `<p class="hub-provenance">Hub UI from <a href="${repo.portUrl}" target="_blank" rel="noreferrer">${repo.portLabel || "GoalBuddy Cursor Port"}</a>${portVersion} · ported from upstream <a href="${repo.upstreamUrl}" target="_blank" rel="noreferrer">${repo.upstreamLabel || "tolibear/goalbuddy"}</a>${upstreamVersion}</p>`
+    : "";
   return `<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>GoalBuddy Hub</title>
+  ${themeFontLinksHtml()}
   <style>
-    :root { color-scheme: light dark; font-family: ui-sans-serif, system-ui, sans-serif; }
-    body { margin: 0; background: #f6f6f8; color: #111; }
-    .wrap { max-width: 1100px; margin: 0 auto; padding: 24px; }
-    h1 { margin: 0 0 8px; font-size: 1.6rem; }
-    .meta { color: #555; margin-bottom: 20px; }
-    table { width: 100%; border-collapse: collapse; background: #fff; border: 1px solid #ddd; border-radius: 12px; overflow: hidden; }
-    th, td { text-align: left; padding: 12px 14px; border-bottom: 1px solid #ececec; vertical-align: top; }
-    th { background: #fafafa; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.04em; }
-    tr:last-child td { border-bottom: 0; }
-    a { color: #4f46e5; text-decoration: none; }
-    a:hover { text-decoration: underline; }
-    .badge { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 0.75rem; font-weight: 600; }
-    .badge.active { background: #e0e7ff; color: #312e81; }
-    .badge.blocked { background: #fee2e2; color: #991b1b; }
-    .badge.done { background: #dcfce7; color: #166534; }
-    .badge.weak { background: #fef3c7; color: #92400e; }
-    .badge.strong { background: #dcfce7; color: #166534; }
-    .empty { padding: 32px; text-align: center; color: #666; }
-    @media (prefers-color-scheme: dark) {
-      body { background: #111; color: #f5f5f5; }
-      table { background: #1a1a1a; border-color: #333; }
-      th { background: #202020; }
-      th, td { border-color: #2d2d2d; }
-      .meta { color: #aaa; }
-    }
+${themeTokensCss()}
+${themeSurfaceCss()}
+${hubPageCss()}
   </style>
 </head>
-<body>
-  <div class="wrap">
-    <h1>GoalBuddy Hub</h1>
-    <p class="meta" id="hub-meta">Loading goals…</p>
+<body class="theme-hub">
+  <div class="hub-wrap">
+    <header class="hub-hero">
+      <p class="eyebrow">Workspace</p>
+      <h1>GoalBuddy Hub</h1>
+      <p class="meta" id="hub-meta">Loading goals…</p>
+    </header>
+    ${provenance}
     <div id="hub-root"></div>
   </div>
   <script id="hub-payload" type="application/json">${json}</script>
@@ -135,18 +133,37 @@ export function hubPageHtml(payload) {
     const meta = document.getElementById("hub-meta");
     meta.textContent = payload.goal_count + " goal(s) · updated " + new Date(payload.generated_at).toLocaleString();
     if (!payload.goals.length) {
-      root.innerHTML = '<div class="empty">No goals found under docs/goals/. Run /goal-prep to create one.</div>';
+      root.innerHTML = '<div class="hub-empty">No goals found under docs/goals/. Run /goal-prep to create one.</div>';
     } else {
-      const rows = payload.goals.map((goal) => \`
-        <tr>
-          <td><a href="\${goal.url}">\${goal.title}</a><div style="color:#666;font-size:0.85rem">\${goal.slug}</div></td>
-          <td><span class="badge \${goal.status}">\${goal.status}</span></td>
-          <td>\${goal.active_task || "—"}\${goal.active_task_type ? " · " + goal.active_task_type : ""}</td>
-          <td><span class="badge \${goal.oracle_health}">\${goal.oracle_health}</span><div style="font-size:0.85rem;margin-top:4px">\${goal.oracle_signal || "—"}</div></td>
-          <td>\${goal.warning_count} warn · \${goal.error_count} err</td>
-          <td>\${goal.updated_at ? new Date(goal.updated_at).toLocaleString() : "—"}</td>
-        </tr>\`).join("");
-      root.innerHTML = '<table><thead><tr><th>Goal</th><th>Status</th><th>Active</th><th>Oracle</th><th>Validation</th><th>Updated</th></tr></thead><tbody>' + rows + '</tbody></table>';
+      root.innerHTML = '<div class="hub-grid">' + payload.goals.map((goal, index) => \`
+        <article class="hub-card" style="--i:\${index}">
+          <div class="hub-card-head">
+            <a href="\${goal.url}">\${goal.title}</a>
+            <div class="hub-slug">\${goal.slug}</div>
+          </div>
+          <div class="hub-card-badges">
+            <span class="badge \${goal.status}">\${goal.status}</span>
+            <span class="badge \${goal.oracle_health}">\${goal.oracle_health}</span>
+          </div>
+          <dl>
+            <div>
+              <dt>Active</dt>
+              <dd>\${goal.active_task || "—"}\${goal.active_task_type ? " · " + goal.active_task_type : ""}</dd>
+            </div>
+            <div>
+              <dt>Validation</dt>
+              <dd>\${goal.warning_count} warn · \${goal.error_count} err</dd>
+            </div>
+            <div>
+              <dt>Oracle</dt>
+              <dd><span class="hub-oracle">\${goal.oracle_signal || "—"}</span></dd>
+            </div>
+            <div>
+              <dt>Updated</dt>
+              <dd>\${goal.updated_at ? new Date(goal.updated_at).toLocaleString() : "—"}</dd>
+            </div>
+          </dl>
+        </article>\`).join("") + '</div>';
     }
   </script>
 </body>

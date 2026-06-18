@@ -69,6 +69,7 @@
 
   :root[data-theme="system"] .board-switcher select,
   :root[data-theme="system"] .github-stars,
+  :root[data-theme="system"] .github-upstream,
   :root[data-theme="system"] .settings-button {
     border-color: rgba(61, 76, 108, 0.9);
     background: rgba(16, 26, 45, 0.78);
@@ -215,6 +216,7 @@ button {
 
 :root[data-theme="dark"] .board-switcher select,
 :root[data-theme="dark"] .github-stars,
+:root[data-theme="dark"] .github-upstream,
 :root[data-theme="dark"] .settings-button {
   border-color: rgba(61, 76, 108, 0.9);
   background: rgba(16, 26, 45, 0.78);
@@ -234,6 +236,7 @@ button {
 }
 
 .github-stars,
+.github-upstream,
 .settings-button {
   display: inline-flex;
   align-items: center;
@@ -247,14 +250,32 @@ button {
   transition: transform 180ms ease, color 180ms ease, border-color 180ms ease, background 180ms ease;
 }
 
+.repo-links {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
 .github-stars {
   gap: 7px;
   padding: 0 15px;
   font-size: 14px;
   white-space: nowrap;
+  text-decoration: none;
+}
+
+.github-upstream {
+  padding: 0 14px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #5a6680;
+  white-space: nowrap;
+  text-decoration: none;
 }
 
 .github-stars:hover,
+.github-upstream:hover,
 .settings-button:hover {
   transform: translateY(-2px);
   color: #071236;
@@ -750,8 +771,33 @@ h1 {
   color: var(--muted);
 }
 
+.board-provenance {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 0 24px 28px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.board-provenance p {
+  margin: 0;
+}
+
+.board-provenance a {
+  color: inherit;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.board-provenance a:hover {
+  color: var(--ink);
+}
+
 @media (prefers-reduced-motion: reduce) {
   .github-stars,
+  .github-upstream,
   .settings-button,
   .task-card {
     transition: none;
@@ -764,6 +810,7 @@ h1 {
 }
 
 :root[data-motion="reduce"] .github-stars,
+:root[data-motion="reduce"] .github-upstream,
 :root[data-motion="reduce"] .settings-button,
 :root[data-motion="reduce"] .task-card {
   transition: none;

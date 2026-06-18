@@ -13,6 +13,7 @@ import {
   ensureProjectMcpConfig,
   installMcpConfig,
 } from "./install-mcp.mjs";
+import { installCliBin } from "./install-cli-bin.mjs";
 import { getWorkspaceRoot, registerKnownWorkspace } from "../mcp/path-utils.mjs";
 import { runMcpSmokeTest } from "../mcp/tools.mjs";
 import { renderTaskPrompt } from "./render-task-prompt.mjs";
@@ -48,10 +49,9 @@ const REQUIRED_SCRIPTS = [
   "lib/goal-hub.mjs",
   "lib/goal-session.mjs",
   "lib/goal-state-write.mjs",
-  "lib/goal-runner-loop.mjs",
-  "run-goal.mjs",
   "run-mcp-server.mjs",
   "install-mcp.mjs",
+  "install-cli-bin.mjs",
   "../mcp/server.mjs",
   "../mcp/tools.mjs",
 ];
@@ -104,9 +104,6 @@ async function main() {
     case "hub":
       runHub();
       break;
-    case "run":
-      await runGoal();
-      break;
     case "workspace":
       runWorkspace(args[1] || "register");
       break;
@@ -137,7 +134,6 @@ Usage:
   node goalbuddy.mjs completion-check <docs/goals/slug> [--json]
   node goalbuddy.mjs stale [--days 7] [--json]
   node goalbuddy.mjs hub [--json]
-  node goalbuddy.mjs run <docs/goals/slug> --auto N [--parallel] [--dry-run] [--json]
   node goalbuddy.mjs board <docs/goals/slug> [--host <host>] [--port <port>] [--once] [--json]
   node goalbuddy.mjs workspace register [--json]
 
@@ -165,13 +161,21 @@ function runInstall() {
     process.exit(1);
   }
 
+  const cliResult = installCliBin({ cursorHome, skillRoot });
+  if (!cliResult.ok) {
+    console.error(cliResult.error);
+    process.exit(1);
+  }
+
   console.log(`GoalBuddy Cursor install complete.`);
   console.log(`Skills: ${join(cursorHome, "skills", "goalbuddy")}`);
+  console.log(`CLI: ${cliResult.cmdPath}`);
   console.log(`Agents: ${join(cursorHome, "agents")}`);
   console.log(`Commands: ${join(cursorHome, "commands")}`);
   for (const entry of mcpResult.installed) {
     console.log(`MCP: ${entry.configPath}`);
   }
+  console.log(cliResult.pathHint);
   console.log(`Next: enable the goalbuddy MCP server in Cursor Settings → MCP, then /goal-prep and /goal.`);
   console.log(`User-level MCP (~/.cursor/mcp.json) works in every workspace; project .cursor/mcp.json is written for repos with docs/goals/.`);
 }
@@ -492,17 +496,6 @@ async function runBoard() {
   const boardScript = join(__dirname, "local-goal-board.mjs");
   const boardArgs = [boardScript, "--goal", goal, ...args.slice(2).filter((a) => a !== "board")];
   const child = spawnSync(process.execPath, boardArgs, { stdio: "inherit", cwd: process.cwd() });
-  process.exit(child.status ?? 0);
-}
-
-async function runGoal() {
-  const runScript = join(__dirname, "run-goal.mjs");
-  const runArgs = [runScript, ...args.slice(1)];
-  const child = spawnSync(process.execPath, runArgs, {
-    stdio: "inherit",
-    cwd: process.cwd(),
-    env: process.env,
-  });
   process.exit(child.status ?? 0);
 }
 

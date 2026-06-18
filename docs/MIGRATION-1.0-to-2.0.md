@@ -1,5 +1,7 @@
 # Migrate GoalBuddy Cursor Port 1.0.0 → 2.0.0
 
+> **Note (2.1.0):** SDK auto-loop (`run --auto N`) described in this guide was **removed** in port 2.1.0. See [MIGRATION-2.0-to-2.1.md](MIGRATION-2.0-to-2.1.md).
+
 Use this guide if you installed the port at **1.0.0** and are upgrading to **2.0.0**. Your existing `docs/goals/*/state.yaml` boards are compatible — no schema migration is required.
 
 ## What changed (summary)

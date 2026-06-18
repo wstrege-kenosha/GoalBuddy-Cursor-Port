@@ -206,14 +206,14 @@ function formatStars(count) {
 async function loadGithubStars() {
   if (!githubStarsEl) return;
   try {
-    const response = await fetch("https://api.github.com/repos/tolibear/goalbuddy", {
+    const response = await fetch("https://api.github.com/repos/wstrege-kenosha/GoalBuddy-Cursor-Port", {
       headers: { Accept: "application/vnd.github+json" },
     });
     if (!response.ok) throw new Error("GitHub API unavailable");
     const repo = await response.json();
     githubStarsEl.textContent = `${formatStars(repo.stargazers_count)} stars`;
   } catch {
-    githubStarsEl.textContent = "GitHub";
+    githubStarsEl.textContent = "wstrege-kenosha/GoalBuddy-Cursor-Port";
   }
 }
 

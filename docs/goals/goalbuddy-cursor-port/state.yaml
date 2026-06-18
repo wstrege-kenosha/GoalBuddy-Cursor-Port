@@ -7,7 +7,7 @@ goal:
   title: "GoalBuddy Cursor Port"
   slug: goalbuddy-cursor-port
   kind: specific
-  tranche: "Cursor port of tolibear/goalbuddy — install, MCP, hub, SDK auto-loop (2.0.0); parity vs upstream 0.3.8"
+  tranche: "Cursor port of tolibear/goalbuddy — install, MCP, hub (2.1.0); parity vs upstream 0.3.8"
   status: done
   oracle:
     signal: "Cursor operator installs from this repo, runs Goal Prep + one Scout/Judge/Worker cycle with live board and passing doctor/scripts"

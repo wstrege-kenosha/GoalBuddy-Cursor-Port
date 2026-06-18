@@ -24,6 +24,23 @@ export function hasMcpDeps(repoRoot) {
   return existsSync(join(resolve(repoRoot), "node_modules", "@modelcontextprotocol", "sdk"));
 }
 
+function listPortRepoCandidates(skillRoot) {
+  const candidates = [];
+  const config = readPortConfig(skillRoot);
+  if (config?.repoRoot) candidates.push(resolve(config.repoRoot));
+
+  const parentRepo = resolve(skillRoot, "..");
+  if (existsSync(join(parentRepo, "goalbuddy", "mcp", "server.mjs"))) {
+    candidates.push(parentRepo);
+  }
+
+  if (process.env.GOALBUDDY_REPO_ROOT) {
+    candidates.push(resolve(process.env.GOALBUDDY_REPO_ROOT));
+  }
+
+  return [...new Set(candidates)];
+}
+
 export function readPortConfig(skillRoot) {
   const configPath = join(resolve(skillRoot), PORT_CONFIG_FILE);
   if (!existsSync(configPath)) return null;
@@ -53,21 +70,8 @@ export function writePortConfig(skillRoot, repoRoot) {
 }
 
 export function resolveMcpRepoRoot(skillRoot) {
-  const config = readPortConfig(skillRoot);
-  if (config?.repoRoot && hasMcpDeps(config.repoRoot)) {
-    return resolve(config.repoRoot);
-  }
-
-  const parentRepo = resolve(skillRoot, "..");
-  if (
-    existsSync(join(parentRepo, "goalbuddy", "mcp", "server.mjs"))
-    && hasMcpDeps(parentRepo)
-  ) {
-    return parentRepo;
-  }
-
-  if (process.env.GOALBUDDY_REPO_ROOT && hasMcpDeps(process.env.GOALBUDDY_REPO_ROOT)) {
-    return resolve(process.env.GOALBUDDY_REPO_ROOT);
+  for (const candidate of listPortRepoCandidates(skillRoot)) {
+    if (hasMcpDeps(candidate)) return candidate;
   }
 
   console.error("GoalBuddy MCP: missing npm dependencies.");

@@ -36,6 +36,9 @@ test("buildHubPayload discovers repo goals", () => {
   const payload = buildHubPayload({ roots: [repoRoot] });
   assert.ok(payload.goal_count >= 2);
   assert.ok(payload.goals.some((goal) => goal.slug === "sample-cursor-smoke"));
+  assert.equal(payload.repo?.portLabel, "wstrege-kenosha/GoalBuddy-Cursor-Port");
+  assert.equal(payload.repo?.upstreamLabel, "tolibear/goalbuddy");
+  assert.equal(payload.repo?.cursorPortVersion, "2.1.0");
 });
 
 test("findStaleGoals returns structured report", () => {

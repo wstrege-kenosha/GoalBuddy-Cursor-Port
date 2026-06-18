@@ -35,7 +35,6 @@ After install:
 | `/goal-board` | Open local board |
 | `goal-scout` / `goal-judge` / `goal-worker` | Task subagents |
 | **goalbuddy MCP** | Validation, prompts, receipts, completion gates |
-| `goalbuddy run --auto N` | SDK auto-loop (optional) |
 
 ## MCP tools
 

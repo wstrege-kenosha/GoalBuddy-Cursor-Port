@@ -259,15 +259,21 @@ test("writes a minimal GoalBuddy web app into the goal directory", () => {
   const logo = readFileSync(join(appDir, "goalbuddy-mark.png"));
 
   assert.match(html, /goalbuddy-mark\.png/);
+  assert.match(html, /class="theme-board"/);
+  assert.match(html, /fonts\.googleapis\.com/);
   assert.match(html, /class="topbar-primary"/);
   assert.match(html, /class="board-switcher is-empty"/);
   assert.match(html, /class="github-stars"/);
   assert.match(html, /class="github-upstream"/);
   assert.match(html, /wstrege-kenosha\/GoalBuddy-Cursor-Port/);
-  assert.match(html, /Ported from tolibear\/goalbuddy/);
+  assert.match(html, /Upstream: tolibear\/goalbuddy @ 0\.3\.8/);
+  assert.match(html, /class="board-provenance"/);
+  assert.match(html, /Board UI from/);
+  assert.match(html, /ported from upstream/);
   assert.match(html, /id="settings-button"/);
   assert.match(html, /id="settings-popover"/);
-  assert.match(css, /--canvas: #f7f6f3/);
+  assert.match(css, /--canvas: #f4f6f9/);
+  assert.match(css, /--font-display: "IBM Plex Sans"/);
   assert.match(css, /\.topbar-primary/);
   assert.match(css, /\.board-switcher\.is-empty \{\n  display: none;/);
   assert.match(css, /active-card-orbit/);
