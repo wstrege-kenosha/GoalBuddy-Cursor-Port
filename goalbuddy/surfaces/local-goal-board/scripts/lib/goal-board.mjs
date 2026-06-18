@@ -8,6 +8,42 @@ const COLUMN_ORDER = ["todo", "in-progress", "blocked", "completed"];
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const surfaceRoot = resolve(__dirname, "../..");
 const logoAssetPath = join(surfaceRoot, "assets", "goalbuddy-mark.png");
+const versionPath = join(__dirname, "../../../../version.json");
+
+const DEFAULT_REPO_LINKS = {
+  portUrl: "https://github.com/wstrege-kenosha/GoalBuddy-Cursor-Port",
+  upstreamUrl: "https://github.com/tolibear/goalbuddy",
+  upstreamLabel: "tolibear/goalbuddy",
+};
+
+function githubSlugFromUrl(url) {
+  try {
+    const parts = new URL(String(url)).pathname.split("/").filter(Boolean);
+    if (parts.length >= 2) return `${parts[0]}/${parts[1]}`;
+  } catch {
+    /* ignore invalid URL */
+  }
+  return DEFAULT_REPO_LINKS.portUrl.replace("https://github.com/", "");
+}
+
+export function readBoardRepoLinks() {
+  try {
+    const version = JSON.parse(readFileSync(versionPath, "utf8"));
+    const portUrl = version.portUrl || DEFAULT_REPO_LINKS.portUrl;
+    const upstreamUrl = version.upstreamUrl || DEFAULT_REPO_LINKS.upstreamUrl;
+    return {
+      portUrl,
+      portApiSlug: githubSlugFromUrl(portUrl),
+      upstreamUrl,
+      upstreamLabel: githubSlugFromUrl(upstreamUrl),
+    };
+  } catch {
+    return {
+      ...DEFAULT_REPO_LINKS,
+      portApiSlug: githubSlugFromUrl(DEFAULT_REPO_LINKS.portUrl),
+    };
+  }
+}
 
 export class GoalBoardError extends Error {
   constructor(message) {
@@ -162,9 +198,10 @@ export function writeBoardApp(goalDir) {
   const appDir = join(root, ".goalbuddy-board");
   mkdirSync(appDir, { recursive: true });
   const boardPayload = createBoardPayload(root);
-  writeFileSync(join(appDir, "index.html"), `${boardHtml(boardPayload)}\n`);
+  const repoLinks = readBoardRepoLinks();
+  writeFileSync(join(appDir, "index.html"), `${boardHtml(boardPayload, repoLinks)}\n`);
   writeFileSync(join(appDir, "styles.css"), `${boardCss()}\n`);
-  writeFileSync(join(appDir, "app.js"), `${boardJs()}\n`);
+  writeFileSync(join(appDir, "app.js"), `${boardJs(repoLinks)}\n`);
   writeFileSync(join(appDir, "board-snapshot.json"), `${JSON.stringify(boardPayload, null, 2)}\n`);
   copyFileSync(logoAssetPath, join(appDir, "goalbuddy-mark.png"));
   return appDir;
@@ -737,7 +774,7 @@ function embedBoardSnapshot(snapshot) {
   return `  <script id="board-snapshot" type="application/json">${json}</script>`;
 }
 
-function boardHtml(snapshot) {
+function boardHtml(snapshot, repoLinks = DEFAULT_REPO_LINKS) {
   return `<!doctype html>
 <html lang="en">
 <head>
@@ -760,10 +797,13 @@ function boardHtml(snapshot) {
       </nav>
     </div>
     <div class="header-tools">
-      <a class="github-stars" href="https://github.com/tolibear/goalbuddy" target="_blank" rel="noreferrer" aria-label="Open GoalBuddy on GitHub">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 2.8 2.84 5.76 6.36.92-4.6 4.48 1.08 6.34L12 17.32 6.32 20.3l1.08-6.34-4.6-4.48 6.36-.92L12 2.8Z"></path></svg>
-        <span id="github-stars">Stars</span>
-      </a>
+      <div class="repo-links">
+        <a class="github-stars" href="${repoLinks.portUrl}" target="_blank" rel="noreferrer" aria-label="Open GoalBuddy Cursor Port on GitHub">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 2.8 2.84 5.76 6.36.92-4.6 4.48 1.08 6.34L12 17.32 6.32 20.3l1.08-6.34-4.6-4.48 6.36-.92L12 2.8Z"></path></svg>
+          <span id="github-stars">Stars</span>
+        </a>
+        <a class="github-upstream" href="${repoLinks.upstreamUrl}" target="_blank" rel="noreferrer" aria-label="Open upstream GoalBuddy on GitHub">Ported from ${repoLinks.upstreamLabel}</a>
+      </div>
       <div class="settings-wrap">
         <button class="settings-button" id="settings-button" type="button" aria-expanded="false" aria-controls="settings-popover">
           <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -941,6 +981,7 @@ function boardCss() {
 
   :root[data-theme="system"] .board-switcher select,
   :root[data-theme="system"] .github-stars,
+  :root[data-theme="system"] .github-upstream,
   :root[data-theme="system"] .settings-button {
     border-color: rgba(61, 76, 108, 0.9);
     background: rgba(16, 26, 45, 0.78);
@@ -1087,6 +1128,7 @@ button {
 
 :root[data-theme="dark"] .board-switcher select,
 :root[data-theme="dark"] .github-stars,
+:root[data-theme="dark"] .github-upstream,
 :root[data-theme="dark"] .settings-button {
   border-color: rgba(61, 76, 108, 0.9);
   background: rgba(16, 26, 45, 0.78);
@@ -1106,6 +1148,7 @@ button {
 }
 
 .github-stars,
+.github-upstream,
 .settings-button {
   display: inline-flex;
   align-items: center;
@@ -1119,14 +1162,32 @@ button {
   transition: transform 180ms ease, color 180ms ease, border-color 180ms ease, background 180ms ease;
 }
 
+.repo-links {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
 .github-stars {
   gap: 7px;
   padding: 0 15px;
   font-size: 14px;
   white-space: nowrap;
+  text-decoration: none;
+}
+
+.github-upstream {
+  padding: 0 14px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #5a6680;
+  white-space: nowrap;
+  text-decoration: none;
 }
 
 .github-stars:hover,
+.github-upstream:hover,
 .settings-button:hover {
   transform: translateY(-2px);
   color: #071236;
@@ -1624,6 +1685,7 @@ h1 {
 
 @media (prefers-reduced-motion: reduce) {
   .github-stars,
+  .github-upstream,
   .settings-button,
   .task-card {
     transition: none;
@@ -1636,6 +1698,7 @@ h1 {
 }
 
 :root[data-motion="reduce"] .github-stars,
+:root[data-motion="reduce"] .github-upstream,
 :root[data-motion="reduce"] .settings-button,
 :root[data-motion="reduce"] .task-card {
   transition: none;
@@ -1904,7 +1967,8 @@ pre.note {
 }`;
 }
 
-function boardJs() {
+function boardJs(repoLinks = DEFAULT_REPO_LINKS) {
+  const portRepoApiUrl = `https://api.github.com/repos/${repoLinks.portApiSlug || githubSlugFromUrl(repoLinks.portUrl)}`;
   return `let currentBoard = null;
 let eventSource = null;
 let currentSettings = null;
@@ -2113,7 +2177,7 @@ function formatStars(count) {
 async function loadGithubStars() {
   if (!githubStarsEl) return;
   try {
-    const response = await fetch("https://api.github.com/repos/tolibear/goalbuddy", {
+    const response = await fetch(${JSON.stringify(portRepoApiUrl)}, {
       headers: { Accept: "application/vnd.github+json" },
     });
     if (!response.ok) throw new Error("GitHub API unavailable");

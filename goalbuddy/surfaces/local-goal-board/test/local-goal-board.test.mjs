@@ -262,6 +262,9 @@ test("writes a minimal GoalBuddy web app into the goal directory", () => {
   assert.match(html, /class="topbar-primary"/);
   assert.match(html, /class="board-switcher is-empty"/);
   assert.match(html, /class="github-stars"/);
+  assert.match(html, /class="github-upstream"/);
+  assert.match(html, /wstrege-kenosha\/GoalBuddy-Cursor-Port/);
+  assert.match(html, /Ported from tolibear\/goalbuddy/);
   assert.match(html, /id="settings-button"/);
   assert.match(html, /id="settings-popover"/);
   assert.match(css, /--canvas: #f7f6f3/);
@@ -278,7 +281,7 @@ test("writes a minimal GoalBuddy web app into the goal directory", () => {
   assert.match(js, /new EventSource\("\.\/events"\)/);
   assert.match(js, /fetch\("\.\.\/api\/boards"/);
   assert.match(js, /fetch\("\.\.\/api\/settings"/);
-  assert.match(js, /fetch\("https:\/\/api\.github\.com\/repos\/tolibear\/goalbuddy"/);
+  assert.match(js, /fetch\("https:\/\/api\.github\.com\/repos\/wstrege-kenosha\/GoalBuddy-Cursor-Port"/);
   assert.match(js, /goalbuddy\.localBoardSettings\.v1/);
   assert.match(js, /document\.documentElement\.dataset\.theme/);
   assert.match(js, /rememberCurrentBoard/);
@@ -434,6 +437,21 @@ test("runs when installed under a symlinked temp path", () => {
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
+});
+
+test("goalbuddy board wrapper invokes main when executed directly", () => {
+  const wrapper = resolve("goalbuddy/scripts/local-goal-board.mjs");
+  const result = spawnSync(process.execPath, [
+    wrapper,
+    "--goal",
+    resolve("goalbuddy/surfaces/local-goal-board/examples/sample-goal"),
+    "--once",
+    "--json",
+  ], { encoding: "utf8", cwd: resolve(".") });
+
+  assert.equal(result.status, 0, result.stderr || result.stdout);
+  const report = JSON.parse(result.stdout);
+  assert.equal(report.board.goal.title, "Local Goal Board Surface");
 });
 
 test("serves board JSON and streams live state changes over SSE", async () => {
