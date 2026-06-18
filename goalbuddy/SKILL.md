@@ -34,7 +34,7 @@ Intent -> Oracle -> Surface -> Loop -> Proof
 1. Run `/goal-prep` with your outcome (or load the goal-prep skill).
 2. Confirm `docs/goals/<slug>/{goal.md,state.yaml,notes/}` exist.
 3. Run `/goal` with the printed goal path.
-4. Optional: `/goal-board` or open [Open GoalBuddy board](http://goalbuddy.localhost:41737/<slug>/).
+4. Optional: `/goal-board` or open the [multi-goal hub](http://goalbuddy.localhost:41737/) or [goal board](http://goalbuddy.localhost:41737/<slug>/).
 
 Install or verify Cursor surfaces:
 
@@ -43,9 +43,9 @@ node ~/.cursor/skills/goalbuddy/scripts/goalbuddy.mjs install
 node ~/.cursor/skills/goalbuddy/scripts/goalbuddy.mjs doctor --goal-ready
 ```
 
-Enable the **goalbuddy** MCP server (merged into `.cursor/mcp.json` on install). `/goal` and subagents require MCP tools in Phase B.
+Enable the **goalbuddy** MCP server in Cursor settings after install. `/goal` and subagents use MCP tools for validation and prompts.
 
-## MCP tools (Phase B)
+## MCP tools
 
 | Tool | Purpose |
 |------|---------|
@@ -131,7 +131,7 @@ node ~/.cursor/skills/goalbuddy/scripts/goalbuddy.mjs prompt docs/goals/<slug> -
 node ~/.cursor/skills/goalbuddy/scripts/check-goal-state.mjs docs/goals/<slug>
 ```
 
-## Auto-loop (Phase C)
+## Auto-loop (SDK runner)
 
 Requires `CURSOR_API_KEY` from [Cursor Dashboard → Integrations](https://cursor.com/dashboard/integrations).
 
@@ -165,7 +165,7 @@ Reports safe parallel Scout or disjoint Worker scopes; does not mutate state or 
 node ~/.cursor/skills/goalbuddy/scripts/goalbuddy.mjs board docs/goals/<slug>
 ```
 
-Default hub: `http://goalbuddy.localhost:41737/<slug>/`. Share as a Markdown link so it is clickable.
+Default hub: `http://goalbuddy.localhost:41737/` (all goals) or `http://goalbuddy.localhost:41737/<slug>/` (single board). Share as a Markdown link so it is clickable.
 
 ## CLI reference
 
@@ -181,7 +181,7 @@ Default hub: `http://goalbuddy.localhost:41737/<slug>/`. Share as a Markdown lin
 | `completion-check <slug>` | Check readiness for `goal.status: done` |
 | `stale [--days 7]` | List stale goals under `docs/goals/` |
 | `hub [--json]` | Multi-goal hub summary |
-| `run <slug> --auto N` | SDK auto-loop runner (Phase C) |
+| `run <slug> --auto N` | SDK auto-loop runner |
 | `board <slug>` | Start local board server |
 
 Skill root: `~/.cursor/skills/goalbuddy/`. Never install skills under `~/.cursor/skills-cursor/` (reserved).
@@ -196,6 +196,7 @@ Copy from `templates/` when scaffolding manually:
 
 1. **Wrong skill directory** — use `~/.cursor/skills/goalbuddy/`, not `skills-cursor/`.
 2. **Subagent lag** — new `~/.cursor/agents/goal-*.md` files may require a Cursor restart before `Task` recognizes them.
+3. **MCP disabled** — `/goal` stops without `validate_state`; run `goalbuddy install` and enable MCP in Cursor settings.
 
 ## License
 
