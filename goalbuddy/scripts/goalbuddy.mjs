@@ -45,6 +45,9 @@ const REQUIRED_SCRIPTS = [
   "lib/goal-stale.mjs",
   "lib/goal-hub.mjs",
   "lib/goal-session.mjs",
+  "lib/goal-state-write.mjs",
+  "lib/goal-runner-loop.mjs",
+  "run-goal.mjs",
   "../mcp/server.mjs",
   "../mcp/tools.mjs",
 ];
@@ -97,6 +100,9 @@ async function main() {
     case "hub":
       runHub();
       break;
+    case "run":
+      await runGoal();
+      break;
     case "help":
     case "--help":
     case "-h":
@@ -124,6 +130,7 @@ Usage:
   node goalbuddy.mjs completion-check <docs/goals/slug> [--json]
   node goalbuddy.mjs stale [--days 7] [--json]
   node goalbuddy.mjs hub [--json]
+  node goalbuddy.mjs run <docs/goals/slug> --auto N [--parallel] [--dry-run] [--json]
   node goalbuddy.mjs board <docs/goals/slug> [--host <host>] [--port <port>] [--once] [--json]
 
 Skill root: ${skillRoot}
@@ -429,6 +436,17 @@ async function runBoard() {
   const boardScript = join(__dirname, "local-goal-board.mjs");
   const boardArgs = [boardScript, "--goal", goal, ...args.slice(2).filter((a) => a !== "board")];
   const child = spawnSync(process.execPath, boardArgs, { stdio: "inherit", cwd: process.cwd() });
+  process.exit(child.status ?? 0);
+}
+
+async function runGoal() {
+  const runScript = join(__dirname, "run-goal.mjs");
+  const runArgs = [runScript, ...args.slice(1)];
+  const child = spawnSync(process.execPath, runArgs, {
+    stdio: "inherit",
+    cwd: process.cwd(),
+    env: process.env,
+  });
   process.exit(child.status ?? 0);
 }
 

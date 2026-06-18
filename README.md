@@ -1,24 +1,35 @@
 # GoalBuddy Cursor Port
 
-Git-installable [GoalBuddy](https://github.com/tolibear/goalbuddy) port for Cursor (`cursorPortVersion` **1.0.0**, `upstreamVersion` **0.3.8**).
+Git-installable [GoalBuddy](https://github.com/tolibear/goalbuddy) port for Cursor (`cursorPortVersion` **2.0.0**, `upstreamVersion` **0.3.8**).
 
 Upstream parity matrix: [docs/PARITY.md](docs/PARITY.md). **Wiki:** [GoalBuddy Cursor Port wiki](https://github.com/wstrege-kenosha/GoalBuddy-Cursor-Port/wiki).
+
+## What's new in 2.0.0
+
+- **Multi-goal hub** at `http://goalbuddy.localhost:41737/` with goal discovery
+- **MCP server** (`goalbuddy`) — validate state, render prompts, validate receipts, completion gates
+- **SDK auto-loop** — `goalbuddy run <slug> --auto N` via `@cursor/sdk` and `@goalbuddy/runner`
+- **CLI gates** — `receipt`, `completion-check`, `stale`, `hub`
+- **CI** — GitHub Actions runs `npm run check` and doctor smoke tests on push/PR
 
 ## Install
 
 ```bash
 git clone https://github.com/wstrege-kenosha/GoalBuddy-Cursor-Port.git
 cd GoalBuddy-Cursor-Port
+npm install
 node scripts/install-from-repo.mjs
 ```
 
-Or after clone:
+Or:
 
 ```bash
 npm run install:cursor
 ```
 
-The installer copies `goalbuddy/` and `goal-prep/` into your Cursor skills directory (`~/.cursor/skills` on macOS/Linux, `%USERPROFILE%\.cursor\skills` on Windows), then runs `goalbuddy.mjs install` to register agents and slash commands.
+The installer copies `goalbuddy/` and `goal-prep/` into your Cursor skills directory (`~/.cursor/skills` on macOS/Linux, `%USERPROFILE%\.cursor\skills` on Windows), runs `goalbuddy.mjs install` to register agents and slash commands, and merges the **goalbuddy** MCP entry into `.cursor/mcp.json`.
+
+Enable the `goalbuddy` MCP server in Cursor settings after install.
 
 ## Verify
 
@@ -30,33 +41,48 @@ node goalbuddy/scripts/goalbuddy.mjs doctor --goal-ready
 
 ## Smoke goal
 
-After install, validate a minimal completed Scout/Judge/Worker board:
-
 ```bash
 node goalbuddy/scripts/check-goal-state.mjs docs/goals/sample-cursor-smoke/state.yaml
 node goalbuddy/scripts/goalbuddy.mjs board docs/goals/sample-cursor-smoke
 ```
 
-See `docs/goals/sample-cursor-smoke/goal.md`.
+Open the hub: http://goalbuddy.localhost:41737/ — see `docs/goals/sample-cursor-smoke/goal.md`.
 
 ## Usage
 
-1. In any workspace: `/goal-prep` to scaffold `docs/goals/<slug>/`.
-2. Then: `/goal Follow docs/goals/<slug>/goal.md.`
+### Manual PM loop (chat)
 
-CLI entry (after install):
+1. `/goal-prep` — scaffold `docs/goals/<slug>/`
+2. `/goal Follow docs/goals/<slug>/goal.md.` — PM uses **goalbuddy MCP tools** each turn
+
+### Auto-loop (SDK)
+
+Requires `CURSOR_API_KEY` from [Cursor Dashboard → Integrations](https://cursor.com/dashboard/integrations).
+
+```bash
+export CURSOR_API_KEY="cursor_..."
+node goalbuddy/scripts/goalbuddy.mjs run docs/goals/<slug> --auto 3
+```
+
+Use `--dry-run` with `GOALBUDDY_MOCK_AGENT_TEXT` for offline loop tests.
+
+### CLI (after install)
 
 ```bash
 node ~/.cursor/skills/goalbuddy/scripts/goalbuddy.mjs doctor --goal-ready
+node ~/.cursor/skills/goalbuddy/scripts/goalbuddy.mjs hub --json
 node ~/.cursor/skills/goalbuddy/scripts/goalbuddy.mjs board docs/goals/<slug>
+node ~/.cursor/skills/goalbuddy/scripts/goalbuddy.mjs completion-check docs/goals/<slug>
 ```
 
 ## Layout
 
 | Path | Purpose |
 |------|---------|
-| `goalbuddy/` | Main GoalBuddy skill (scripts, agents-src, commands-src, board surface) |
+| `goalbuddy/` | Main skill (scripts, MCP server, agents, board) |
 | `goal-prep/` | `/goal-prep` skill |
+| `packages/goal-runner/` | `@cursor/sdk` auto-loop package |
+| `.cursor/mcp.json` | Project MCP config (goalbuddy server) |
 | `scripts/install-from-repo.mjs` | Copy skills + run Cursor install |
 
 ## Publishing
