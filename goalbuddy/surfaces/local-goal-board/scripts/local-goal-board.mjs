@@ -412,7 +412,7 @@ function sendUnregisteredBoardPath(response, pathname, boards, baseUrl) {
     `GoalBuddy board path is not registered in this local hub: ${pathname}`,
     "",
     "This server is the GoalBuddy multi-board hub. Do not stop it just because a /<slug>/ board URL returned 404.",
-    "Start or rerun `npx goalbuddy board <goal-dir>` to register that goal on this same port, then open the printed /<slug>/ URL.",
+    "Start or rerun `node goalbuddy/scripts/goalbuddy.mjs board <goal-dir>` to register that goal on this same port, then open the printed /<slug>/ URL.",
     "",
     "Registered boards:",
     registeredBoards.length ? registeredBoards.join("\n") : "- none",
@@ -601,8 +601,8 @@ function usage() {
   console.log(`GoalBuddy Local Goal Board
 
 Usage:
-  npx goalbuddy board docs/goals/<slug>
-  npx goalbuddy board docs/goals/<slug> --once --json
+  node goalbuddy/scripts/goalbuddy.mjs board docs/goals/<slug>
+  node goalbuddy/scripts/goalbuddy.mjs board docs/goals/<slug> --once --json
 
 Options:
   --goal <path>   Goal directory containing state.yaml.

@@ -58,7 +58,7 @@ visual_board:
   local:
     status: not_requested # not_requested | starting | live | generated | blocked
     url: null
-    command: "npx goalbuddy board docs/goals/<goal-slug>"
+    command: "node ~/.cursor/skills/goalbuddy/scripts/goalbuddy.mjs board docs/goals/<goal-slug>"
 
 active_task: T001
 

@@ -1,0 +1,1 @@
+# Invalid active worker fixture

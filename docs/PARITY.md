@@ -49,7 +49,10 @@
 - Codex/Claude plugins and `--target codex|claude`
 - npm package `goalbuddy-cursor`
 - Upstream superpowers / site parity
-- CI
+
+## CI
+
+GitHub Actions workflow `.github/workflows/check.yml` runs `npm run check` and `doctor --goal-ready` on push/PR.
 
 ## Verify (port repo)
 

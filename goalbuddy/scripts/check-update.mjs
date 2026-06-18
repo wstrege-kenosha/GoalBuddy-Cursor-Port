@@ -8,13 +8,16 @@ const packageName = "goalbuddy";
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const args = process.argv.slice(2);
 
+const versionInfoPath = join(scriptDir, "..", "version.json");
+
 const report = {
   package: packageName,
   current_version: findCurrentVersion(),
   latest_version: null,
   update_available: false,
   check_status: "unknown",
-  update_command: "npx goalbuddy",
+  update_command: "node goalbuddy/scripts/goalbuddy.mjs update",
+  cursor_port: readCursorPortInfo(),
 };
 
 try {
@@ -38,6 +41,9 @@ if (args.includes("--json")) {
 }
 
 function findCurrentVersion() {
+  const versionJson = readJson(versionInfoPath);
+  if (versionJson?.upstreamVersion) return normalizeVersion(versionJson.upstreamVersion);
+
   const candidates = [
     join(scriptDir, "..", ".goalbuddy-install.json"),
     join(scriptDir, "..", "..", "..", ".codex-plugin", "plugin.json"),
@@ -51,6 +57,17 @@ function findCurrentVersion() {
   }
 
   return "0.0.0";
+}
+
+function readCursorPortInfo() {
+  const versionJson = readJson(versionInfoPath);
+  if (!versionJson) return null;
+  return {
+    name: versionJson.name || "goalbuddy-cursor",
+    cursor_port_version: versionJson.cursorPortVersion || null,
+    upstream_version: versionJson.upstreamVersion || null,
+    upstream_url: versionJson.upstreamUrl || null,
+  };
 }
 
 function latestPublishedVersion() {

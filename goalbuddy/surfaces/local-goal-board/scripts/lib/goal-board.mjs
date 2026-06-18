@@ -155,11 +155,14 @@ export function buildColumns(tasks) {
 }
 
 export function writeBoardApp(goalDir) {
-  const appDir = join(resolve(goalDir), ".goalbuddy-board");
+  const root = resolve(goalDir);
+  const appDir = join(root, ".goalbuddy-board");
   mkdirSync(appDir, { recursive: true });
-  writeFileSync(join(appDir, "index.html"), `${boardHtml()}\n`);
+  const boardPayload = createBoardPayload(root);
+  writeFileSync(join(appDir, "index.html"), `${boardHtml(boardPayload)}\n`);
   writeFileSync(join(appDir, "styles.css"), `${boardCss()}\n`);
   writeFileSync(join(appDir, "app.js"), `${boardJs()}\n`);
+  writeFileSync(join(appDir, "board-snapshot.json"), `${JSON.stringify(boardPayload, null, 2)}\n`);
   copyFileSync(logoAssetPath, join(appDir, "goalbuddy-mark.png"));
   return appDir;
 }
@@ -726,7 +729,12 @@ function splitInlineArray(text) {
   return values;
 }
 
-function boardHtml() {
+function embedBoardSnapshot(snapshot) {
+  const json = JSON.stringify(snapshot).replace(/</g, "\\u003c");
+  return `  <script id="board-snapshot" type="application/json">${json}</script>`;
+}
+
+function boardHtml(snapshot) {
   return `<!doctype html>
 <html lang="en">
 <head>
@@ -835,7 +843,8 @@ function boardHtml() {
       <div class="modal-body" id="modal-body"></div>
     </article>
   </div>
-  <script src="./app.js" type="module"></script>
+${embedBoardSnapshot(snapshot)}
+  <script src="./app.js" defer></script>
 </body>
 </html>`;
 }
@@ -1907,10 +1916,40 @@ settingsPopoverEl.addEventListener("change", (event) => {
   saveSettings({ ...currentSettings, [control.dataset.setting]: control.value });
 });
 
+async function loadBoardSnapshot() {
+  const embedded = document.getElementById("board-snapshot");
+  if (embedded?.textContent) {
+    try {
+      return JSON.parse(embedded.textContent);
+    } catch {
+      return null;
+    }
+  }
+  try {
+    const response = await fetch("./board-snapshot.json", { cache: "no-store" });
+    if (!response.ok) return null;
+    return await response.json();
+  } catch {
+    return null;
+  }
+}
+
+function boardOfflineMessage() {
+  return "Start the local board server, then open http://127.0.0.1:41737/<goal-slug>/ (or refresh this page after running: node ~/.cursor/skills/goalbuddy/scripts/goalbuddy.mjs board docs/goals/<slug>).";
+}
+
 async function loadBoard() {
-  const response = await fetch("./api/board", { cache: "no-store" });
-  if (!response.ok) throw new Error("Board request failed");
-  renderBoard(await response.json());
+  try {
+    const response = await fetch("./api/board", { cache: "no-store" });
+    if (!response.ok) throw new Error("Board request failed");
+    renderBoard(await response.json());
+    return true;
+  } catch {
+    const snapshot = await loadBoardSnapshot();
+    if (!snapshot) throw new Error(boardOfflineMessage());
+    renderBoard(snapshot);
+    return false;
+  }
 }
 
 async function loadBoardSwitcher() {
@@ -2370,17 +2409,21 @@ function el(tag, className = "", text = "") {
 
 loadSettings()
   .then(loadBoard)
-  .then(() => {
-    setLiveState("Live", true);
-    rememberCurrentBoard();
+  .then((live) => {
+    if (live) {
+      setLiveState("Live", true);
+      rememberCurrentBoard();
+      loadBoardSwitcher();
+      window.setInterval(loadBoardSwitcher, 5000);
+      connectEvents();
+    } else {
+      setLiveState("Snapshot", false);
+    }
     loadGithubStars();
-    loadBoardSwitcher();
-    window.setInterval(loadBoardSwitcher, 5000);
-    connectEvents();
   })
   .catch((error) => {
     setLiveState("Offline", false);
-    boardEl.textContent = error.message;
+    boardEl.replaceChildren(renderBoardError(error.message));
   });
 `;
 }

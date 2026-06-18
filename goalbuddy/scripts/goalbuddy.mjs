@@ -29,6 +29,7 @@ const REQUIRED_SCRIPTS = [
   "render-task-prompt.mjs",
   "local-goal-board.mjs",
   "lib/goal-board.mjs",
+  "lib/goal-state.mjs",
 ];
 
 const args = process.argv.slice(2);
