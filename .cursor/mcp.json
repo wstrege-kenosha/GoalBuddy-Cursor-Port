@@ -1,9 +1,9 @@
 {
   "mcpServers": {
-    "goalbuddy": {
+    "cursor-curator": {
       "command": "node",
       "args": [
-        "goalbuddy/mcp/server.mjs"
+        "cursor-curator/mcp/server.mjs"
       ],
       "cwd": "."
     }

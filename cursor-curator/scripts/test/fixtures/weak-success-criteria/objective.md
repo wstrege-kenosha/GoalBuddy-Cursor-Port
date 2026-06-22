@@ -1,0 +1,1 @@
+# Weak success criteria fixture

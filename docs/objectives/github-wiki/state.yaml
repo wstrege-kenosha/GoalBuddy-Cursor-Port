@@ -1,0 +1,170 @@
+# Cursor Curator v2 state.yaml
+
+version: 2
+
+objective:
+  title: "GitHub Wiki for Cursor Port"
+  slug: github-wiki
+  kind: specific
+  tranche: "Scout wiki state → author pages → publish to Cursor-Curator.wiki → verify live wiki"
+  status: done
+  success_criteria:
+    signal: "Live wiki with Home + Install + Usage + Upstream pages; real clone URL; publish receipt"
+    cadence: "after Worker publish and at final audit"
+    final_proof: "Wiki URL spot-check + list of page titles + publish method in receipt"
+  intake:
+    original_request: "https://github.com/wstrege-kenosha/Cursor-Curator/wiki — create a wiki for this"
+    interpreted_outcome: "Published GitHub wiki with structured port documentation"
+    input_shape: specific
+    audience: "Public Cursor users"
+    authority: requested
+    proof_type: artifact
+    completion_proof: "Wiki home and core pages live at repo wiki URL"
+    likely_misfire: "Draft markdown in main repo only; empty wiki; README paste without navigation"
+    blind_spots_considered:
+      - "wiki git vs GitHub web editor"
+      - "source of truth in-repo vs wiki-only"
+      - "README cd folder vs repo name Cursor-Curator"
+    existing_plan_facts:
+      - "Public repo https://github.com/wstrege-kenosha/Cursor-Curator"
+      - "README.md and docs/PARITY.md in main repo"
+
+rules:
+  pm_owns_state: true
+  one_active_task: true
+  max_write_workers: 1
+  no_implementation_without_worker_or_pm_task: true
+  no_completion_without_approval_gate_or_pm_audit: true
+  planning_is_not_completion: true
+  queued_required_worker_blocks_completion: true
+  continuous_until_full_outcome: true
+  missing_input_or_credentials_do_not_stop_objective: true
+  preserve_and_validate_existing_plan: true
+  intake_misfire_must_be_audited: true
+  goal_pressure_requires_success_criteria: true
+  no_completion_on_weak_proof: true
+  slice_policy:
+    max_consecutive_tiny_tasks: 2
+    prefer_vertical_slices: true
+    approval_gate_picks_largest_safe_slice: true
+    worker_completes_whole_slice: true
+
+agents:
+  scout: installed
+  worker: installed
+  approval_gate: installed
+
+visual_board:
+  selected: local
+  local:
+    status: live
+    url: "http://curator.localhost:41737/github-wiki/"
+    command: "node curator/scripts/curator.mjs board docs/objectives/github-wiki"
+
+active_task: null
+
+tasks:
+  - id: T001
+    type: scout
+    assignee: Scout
+    status: done
+    reasoning_hint: default
+    objective: "Map GitHub wiki setup for wstrege-kenosha/Cursor-Curator: current wiki pages (if any), wiki git remote pattern, gh/wiki edit options, and which README/PARITY sections become wiki pages."
+    inputs:
+      - README.md
+      - docs/PARITY.md
+      - https://github.com/wstrege-kenosha/Cursor-Curator/wiki
+      - https://github.com/wstrege-kenosha/Cursor-Curator
+    constraints:
+      - "Read-only."
+      - "Do not publish wiki content yet."
+    expected_output:
+      - "Wiki readiness checklist"
+      - "Proposed page outline"
+      - "Publish method options"
+      - "Ranked Worker slices"
+    receipt:
+      result: done
+      summary: "Wiki enabled, empty; .wiki.git not reachable without auth; gh absent. Six-page outline in T001-scout.md."
+      evidence:
+        - notes/T001-scout.md
+      note: notes/T001-scout.md
+  - id: T002
+    type: approval_gate
+    assignee: Approval Gate
+    status: done
+    reasoning_hint: default
+    objective: "Choose first slice: in-repo wiki source + git push to .wiki.git, or web UI steps, with allowed_files and verify."
+    inputs:
+      - "T001 receipt"
+      - "objective.md success criteria"
+    constraints:
+      - "Do not implement."
+    expected_output:
+      - "Decision"
+      - "Worker contract"
+    receipt:
+      result: done
+      decision: approved
+      summary: "Approved docs/wiki six pages + README fix + publish script/operator notes."
+  - id: T003
+    type: worker
+    assignee: Worker
+    status: done
+    reasoning_hint: default
+    objective: "Author docs/wiki pages, README wiki link + cd fix, publish-wiki script and operator notes; attempt wiki push if auth allows."
+    allowed_files:
+      - docs/wiki/**
+      - README.md
+      - scripts/publish-wiki.mjs
+      - docs/objectives/github-wiki/notes/**
+    verify:
+      - npm run check
+    stop_if:
+      - "Assert live wiki in receipt without publish evidence"
+    receipt:
+      result: done
+      summary: "Six docs/wiki pages + publish-wiki.mjs + operator notes; README wiki link and cd fix. Live push blocked: .wiki.git not found."
+      changed_files:
+        - docs/wiki/
+        - scripts/publish-wiki.mjs
+        - README.md
+      commands:
+        - cmd: npm run check
+          status: pass
+      note: notes/T003-worker.md
+  - id: T004
+    type: pm
+    assignee: PM
+    status: done
+    reasoning_hint: default
+    objective: "Operator: create first wiki page on GitHub UI or run publish-wiki.mjs with auth; then T999 audit live wiki."
+    receipt:
+      result: done
+      summary: "Wiki live with six pages; publish-wiki.mjs confirms docs/wiki sync; Install uses Cursor-Curator clone path."
+      evidence:
+        - https://github.com/wstrege-kenosha/Cursor-Curator/wiki
+        - notes/T004-pm.md
+      note: notes/T004-pm.md
+  - id: T999
+    type: approval_gate
+    assignee: Approval Gate
+    status: done
+    reasoning_hint: default
+    objective: "Audit wiki success criteria: live pages, correct URLs, no leaks."
+    receipt:
+      result: done
+      decision: complete
+      full_outcome_complete: true
+      summary: "All six wiki pages live; Home links Install/Usage/Loop/Parity/Troubleshooting; Install has correct clone URL and cd."
+      evidence:
+        - notes/T004-pm.md
+        - https://github.com/wstrege-kenosha/Cursor-Curator/wiki/Install
+
+checks:
+  dirty_fingerprint: unknown
+  last_verification:
+    result: pass
+    task: T999
+    commands:
+      - node scripts/publish-wiki.mjs

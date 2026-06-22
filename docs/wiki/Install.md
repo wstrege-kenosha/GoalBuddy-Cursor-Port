@@ -7,8 +7,8 @@
 ## Clone
 
 ```bash
-git clone https://github.com/wstrege-kenosha/GoalBuddy-Cursor-Port.git
-cd GoalBuddy-Cursor-Port
+git clone https://github.com/wstrege-kenosha/Cursor-Curator.git
+cd Cursor-Curator
 npm install
 node scripts/install-from-repo.mjs
 ```
@@ -21,33 +21,33 @@ npm run install:cursor
 
 The installer:
 
-1. Copies `goalbuddy/` and `goal-prep/` into `~/.cursor/skills` (macOS/Linux) or `%USERPROFILE%\.cursor\skills` (Windows)
-2. Runs `goalbuddy.mjs install` to register agents (`goal-scout`, `goal-judge`, `goal-worker`) and slash commands (`/goal-prep`, `/goal`, `/goal-board`)
-3. Installs a global `goalbuddy` CLI shim to `~/.cursor/bin`
-4. Merges the **goalbuddy** MCP server into `~/.cursor/mcp.json` (launcher script + repo path for npm deps) and, when run from this repo, also into the project `.cursor/mcp.json` (portable paths for contributors).
+1. Copies `cursor-curator/` and `objective-prep/` into `~/.cursor/skills` (macOS/Linux) or `%USERPROFILE%\.cursor\skills` (Windows)
+2. Runs `curator.mjs install` to register agents (`objective-scout`, `objective-approval-gate`, `objective-worker`) and slash commands (`/objective-prep`, `/objective`, `/objective-board`)
+3. Installs a global `curator` CLI shim to `~/.cursor/bin`
+4. Merges the **cursor-curator** MCP server into `~/.cursor/mcp.json` (launcher script + repo path for npm deps) and, when run from this repo, also into the project `.cursor/mcp.json` (portable paths for contributors).
 
 Requires `npm install` in the cloned repo first so MCP dependencies exist under `node_modules/`.
 
 ## Enable MCP
 
-After install, open **Cursor Settings → MCP** and confirm the `goalbuddy` server is enabled. `/goal` requires MCP tools for validation and prompt rendering.
+After install, open **Cursor Settings → MCP** and confirm the `curator` server is enabled. `/objective` requires MCP tools for validation and prompt rendering.
 
-GoalBuddy resolves the workspace from the goal slug automatically. When you create a goal in **another repo**, run once from that repo root:
+Cursor Curator resolves the workspace from the objective slug automatically. When you create an objective in **another repo**, run once from that repo root:
 
 ```bash
-goalbuddy workspace register
+curator workspace register
 ```
 
-`/goal-prep` runs this step automatically. `doctor` also registers the current repo when `docs/goals/` exists.
+`/objective-prep` runs this step automatically. `doctor` also registers the current repo when `docs/objectives/` exists.
 
 Project config (in the cloned repo):
 
 ```json
 {
   "mcpServers": {
-    "goalbuddy": {
+    "cursor-curator": {
       "command": "node",
-      "args": ["goalbuddy/mcp/server.mjs"],
+      "args": ["cursor-curator/mcp/server.mjs"],
       "cwd": "."
     }
   }
@@ -58,19 +58,19 @@ Project config (in the cloned repo):
 
 ```bash
 npm run check
-node goalbuddy/scripts/goalbuddy.mjs doctor
-node goalbuddy/scripts/goalbuddy.mjs doctor --goal-ready
+node curator/scripts/curator.mjs doctor
+node curator/scripts/curator.mjs doctor --objective-ready
 ```
 
 Doctor checks Node, skill files, installed agents/commands, MCP config, and runs an MCP smoke test on `sample-cursor-smoke`.
 
-Add `%USERPROFILE%\.cursor\bin` to PATH (once) so `goalbuddy doctor` and `goalbuddy board` work from any repo with `docs/goals/`.
+Add `%USERPROFILE%\.cursor\bin` to PATH (once) so `curator doctor` and `curator board` work from any repo with `docs/objectives/`.
 
-## Smoke goal
+## Smoke objective
 
 ```bash
-node goalbuddy/scripts/check-goal-state.mjs docs/goals/sample-cursor-smoke/state.yaml
-node goalbuddy/scripts/goalbuddy.mjs board docs/goals/sample-cursor-smoke
+node curator/scripts/check-objective-state.mjs docs/objectives/sample-cursor-smoke/state.yaml
+node curator/scripts/curator.mjs board docs/objectives/sample-cursor-smoke
 ```
 
-Hub: http://goalbuddy.localhost:41737/ — see [Usage](Usage) and `docs/goals/sample-cursor-smoke/goal.md`.
+Hub: http://curator.localhost:41737/ — see [Usage](Usage) and `docs/objectives/sample-cursor-smoke/objective.md`.

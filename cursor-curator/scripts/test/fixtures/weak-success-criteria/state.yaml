@@ -1,0 +1,31 @@
+version: 2
+
+objective:
+  title: "Weak success criteria fixture"
+  slug: "weak-success-criteria"
+  status: active
+  success_criteria:
+    signal: "<placeholder>"
+    final_proof: "TBD"
+  intake:
+    completion_proof: "<missing>"
+
+rules:
+  pm_owns_state: true
+  goal_pressure_requires_success_criteria: true
+  no_completion_on_weak_proof: true
+
+agents:
+  scout: installed
+  worker: installed
+  approval_gate: installed
+
+active_task: T001
+
+tasks:
+  - id: T001
+    type: scout
+    assignee: Scout
+    status: active
+    objective: "Fixture task for weak success criteria warnings."
+    receipt: null

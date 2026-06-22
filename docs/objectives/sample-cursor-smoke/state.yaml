@@ -1,0 +1,141 @@
+# Cursor Curator v2 state.yaml — sample smoke board
+
+version: 2
+
+objective:
+  title: "Sample Cursor smoke"
+  slug: sample-cursor-smoke
+  kind: specific
+  tranche: "Validate Scout/Approval Gate/Worker receipts and check-objective-state"
+  status: active
+  success_criteria:
+    signal: "check-objective-state.mjs exits ok on this state.yaml"
+    cadence: "after scaffold and at T999 audit"
+    final_proof: "check-objective-state pass + board URL captured in notes"
+  intake:
+    original_request: "Smoke-test Cursor port objective board"
+    interpreted_outcome: "Minimal valid v2 board with T001–T003 done"
+    input_shape: specific
+    audience: "port operators"
+    authority: requested
+    proof_type: artifact
+    completion_proof: "check-objective-state ok; board hub reachable"
+    likely_misfire: "Placeholder receipts that fail validation"
+    blind_spots_considered:
+      - "agent install state on fresh machine"
+    existing_plan_facts: []
+
+rules:
+  pm_owns_state: true
+  one_active_task: true
+  max_write_workers: 1
+  no_implementation_without_worker_or_pm_task: true
+  no_completion_without_approval_gate_or_pm_audit: true
+  planning_is_not_completion: true
+  queued_required_worker_blocks_completion: true
+  continuous_until_full_outcome: true
+  missing_input_or_credentials_do_not_stop_objective: true
+  preserve_and_validate_existing_plan: true
+  intake_misfire_must_be_audited: true
+  goal_pressure_requires_success_criteria: true
+  no_completion_on_weak_proof: true
+  slice_policy:
+    max_consecutive_tiny_tasks: 2
+    prefer_vertical_slices: true
+    approval_gate_picks_largest_safe_slice: true
+    worker_completes_whole_slice: true
+
+agents:
+  scout: installed
+  worker: installed
+  approval_gate: installed
+
+visual_board:
+  selected: local
+  local:
+    status: live
+    url: "http://curator.localhost:41737/sample-cursor-smoke/"
+    command: "node curator/scripts/curator.mjs board docs/objectives/sample-cursor-smoke"
+
+active_task: T999
+
+tasks:
+  - id: T001
+    type: scout
+    assignee: Scout
+    status: done
+    reasoning_hint: low
+    objective: "Confirm smoke objective paths and verification commands for the Cursor port repo."
+    inputs:
+      - README.md
+      - package.json
+      - cursor-curator/scripts/check-objective-state.mjs
+    constraints:
+      - "Read-only."
+    expected_output:
+      - "Verification command list"
+    receipt:
+      result: done
+      summary: "Mapped smoke paths; verify uses check-objective-state and doctor --objective-ready."
+      evidence:
+        - README.md
+        - docs/PARITY.md
+      note: notes/T001-scout.md
+  - id: T002
+    type: approval_gate
+    assignee: Approval Gate
+    status: done
+    reasoning_hint: low
+    objective: "Approve a single-file Worker slice to add notes/T003-worker.md under this goal."
+    inputs:
+      - "T001 receipt"
+    constraints:
+      - "Do not implement."
+    expected_output:
+      - "allowed_files and verify for Worker"
+    receipt:
+      result: done
+      decision: approved
+      summary: "Approved notes-only Worker; verify check-objective-state on this board."
+  - id: T003
+    type: worker
+    assignee: Worker
+    status: done
+    reasoning_hint: low
+    objective: "Add notes/T003-worker.md documenting smoke receipt validation."
+    allowed_files:
+      - notes/**
+    verify:
+      - node curator/scripts/check-objective-state.mjs docs/objectives/sample-cursor-smoke/state.yaml
+    stop_if:
+      - "Needs files outside allowed_files"
+    receipt:
+      result: done
+      summary: "Added smoke worker note; check-objective-state passes."
+      changed_files:
+        - notes/T003-worker.md
+      commands:
+        - cmd: node curator/scripts/check-objective-state.mjs docs/objectives/sample-cursor-smoke/state.yaml
+          status: pass
+  - id: T999
+    type: approval_gate
+    assignee: Approval Gate
+    status: active
+    reasoning_hint: low
+    objective: "Audit whether smoke board satisfies success criteria (check-objective-state + board URL)."
+    inputs:
+      - "T001–T003 receipts"
+      - "objective.md success criteria"
+    constraints:
+      - "Do not implement."
+    expected_output:
+      - "complete | not_complete"
+    receipt: null
+
+checks:
+  dirty_fingerprint: unknown
+  last_verification:
+    result: pass
+    task: T003
+    commands:
+      - node curator/scripts/check-objective-state.mjs docs/objectives/sample-cursor-smoke/state.yaml

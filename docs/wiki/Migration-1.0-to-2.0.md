@@ -1,6 +1,6 @@
 # Migrate 1.0.0 → 2.0.0
 
-Upgrade guide for existing GoalBuddy Cursor Port installs.
+Upgrade guide for existing Cursor Curator installs.
 
 **Full doc in repo:** `docs/MIGRATION-1.0-to-2.0.md`
 
@@ -9,30 +9,30 @@ Upgrade guide for existing GoalBuddy Cursor Port installs.
 ## Quick steps
 
 ```bash
-cd GoalBuddy-Cursor-Port
+cd Cursor-Curator
 git pull
 npm install
 npm run install:cursor
 ```
 
-1. **Cursor Settings → MCP** — enable `goalbuddy`
+1. **Cursor Settings → MCP** — enable `curator`
 2. **Restart Cursor**
-3. Verify: `node goalbuddy/scripts/goalbuddy.mjs doctor --goal-ready`
+3. Verify: `node curator/scripts/curator.mjs doctor --objective-ready`
 
 ## What you must do differently
 
 | 1.0.0 | 2.0.0 |
 |-------|-------|
-| `/goal` + CLI prompts | `/goal` + **MCP tools** (`validate_state`, `render_task_prompt`, `validate_receipt`) |
+| `/objective` + CLI prompts | `/objective` + **MCP tools** (`validate_state`, `render_task_prompt`, `validate_receipt`) |
 | Install skills only | Install skills **and** MCP config |
-| Manual turns only | Manual `/goal` each turn (same in 2.1.0) |
+| Manual turns only | Manual `/objective` each turn (same in 2.1.0) |
 
 **No `state.yaml` migration** — existing goals work as-is.
 
 ## Verify version
 
 ```bash
-node -e "console.log(JSON.parse(require('fs').readFileSync('goalbuddy/version.json','utf8')).cursorPortVersion)"
+node -e "console.log(JSON.parse(require('fs').readFileSync('cursor-curator/version.json','utf8')).cursorPortVersion)"
 # 2.1.0
 ```
 

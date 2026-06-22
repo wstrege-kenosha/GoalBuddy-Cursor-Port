@@ -16,8 +16,8 @@ jobs:
           cache: npm
       - run: npm ci
       - name: install Cursor surfaces for doctor
-        run: node goalbuddy/scripts/goalbuddy.mjs install
+        run: node cursor-curator/scripts/curator.mjs install
       - name: npm run check
         run: npm run check
-      - name: doctor --goal-ready
-        run: node goalbuddy/scripts/goalbuddy.mjs doctor --goal-ready
+      - name: doctor --objective-ready
+        run: node cursor-curator/scripts/curator.mjs doctor --objective-ready

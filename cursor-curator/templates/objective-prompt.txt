@@ -1,0 +1,1 @@
+/objective Follow docs/objectives/<slug>/objective.md.

@@ -1,9 +1,0 @@
-{
-  "hooks": {
-    "stop": [
-      {
-        "command": "node goalbuddy/scripts/hooks/append-session-note.mjs"
-      }
-    ]
-  }
-}

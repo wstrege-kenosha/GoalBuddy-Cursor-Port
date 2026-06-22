@@ -1,0 +1,9 @@
+{
+  "hooks": {
+    "stop": [
+      {
+        "command": "node curator/scripts/hooks/append-session-note.mjs"
+      }
+    ]
+  }
+}

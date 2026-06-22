@@ -1,0 +1,23 @@
+/** Central product identifiers for Cursor Curator (4.0+). */
+export const PRODUCT_NAME = "Cursor Curator";
+export const SKILL_NAME = "cursor-curator";
+export const PREP_SKILL_NAME = "objective-prep";
+export const CLI_NAME = "curator";
+export const MCP_SERVER_NAME = "cursor-curator";
+export const RECEIPT_SCHEMA = "cursor_curator_receipt_v1";
+export const DEFAULT_PUBLIC_HOST = "curator.localhost";
+export const ENV_PREFIX = "CURATOR";
+export const ENV_REPO_ROOT = "CURATOR_REPO_ROOT";
+export const ENV_SKILL_ROOT = "CURATOR_SKILL_ROOT";
+export const ENV_WORKSPACE = "CURATOR_WORKSPACE";
+export const ENV_WORKSPACE_FORCE = "CURATOR_WORKSPACE_FORCE";
+export const ENV_LOCAL_BOARD_SETTINGS_PATH = "CURATOR_LOCAL_BOARD_SETTINGS_PATH";
+export const BOARD_DOTDIR = ".cursor-curator-board";
+export const PORT_MARKER_FILE = ".cursor-curator-port.json";
+export const INSTALL_MARKER_FILE = ".cursor-curator-install.json";
+export const USER_DATA_DIR = ".cursor-curator";
+export const LOCAL_BOARD_SETTINGS_KEY = "cursor-curator.localBoardSettings.v1";
+export const BOARD_SKIN_KEY = "cursor-curator.boardSkin.v1";
+export const LEGACY_SKILL_NAME = "cursor-curator";
+export const LEGACY_CLI_NAME = "cursor-curator";
+export const LEGACY_MCP_SERVER_NAME = "cursor-curator";

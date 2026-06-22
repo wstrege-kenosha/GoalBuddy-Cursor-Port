@@ -9,7 +9,7 @@ const __dirname = fileURLToPath(new URL(".", import.meta.url));
 const repoRoot = resolve(__dirname, "..");
 const wikiSrc = join(repoRoot, "docs", "wiki");
 const owner = process.env.GITHUB_WIKI_OWNER || "wstrege-kenosha";
-const repo = process.env.GITHUB_WIKI_REPO || "GoalBuddy-Cursor-Port";
+const repo = process.env.GITHUB_WIKI_REPO || "Cursor-Curator";
 const wikiUrl = `https://github.com/${owner}/${repo}.wiki.git`;
 
 if (process.argv.includes("--help") || process.argv.includes("-h")) {

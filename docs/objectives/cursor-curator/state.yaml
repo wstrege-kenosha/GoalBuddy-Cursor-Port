@@ -1,0 +1,304 @@
+# Cursor Curator v2 state.yaml
+# Board truth lives here. objective.md is the editable charter; notes/ holds long receipts only.
+
+version: 2
+
+objective:
+  title: "Cursor Curator"
+  slug: cursor-curator
+  kind: specific
+  tranche: "Cursor port of tolibear/curator — install, MCP, hub (2.1.0); parity vs upstream 0.3.8"
+  status: done
+  success_criteria:
+    signal: "Cursor operator installs from this repo, runs Objective Prep + one Scout/Approval Gate/Worker cycle with live board and passing doctor/scripts"
+    cadence: "after each Worker package and at final audit"
+    final_proof: "Receipts + doctor output + sample objective board URL + README install steps exercised on this machine"
+  intake:
+    original_request: "https://github.com/tolibear/curator — build a repo for a cursor port of this"
+    interpreted_outcome: "Ship a Cursor-native Cursor Curator port repo with working prep/board/agents loop and documented upstream parity"
+    input_shape: specific
+    audience: "Cursor users wanting /goal-style long runs"
+    authority: requested
+    proof_type: artifact
+    completion_proof: "Installable repo; Objective Prep + /objective loop verified; doctor goal-ready; parity note vs upstream 0.3.x"
+    likely_misfire: "Docs-only or Codex-dependent wrapper without verified Cursor install path"
+    blind_spots_considered:
+      - "npm publish vs vendored scripts only"
+      - "full 0.3.8 parity vs MVP scope"
+      - "Windows vs Unix paths for ~/.cursor"
+      - "vendor upstream JS vs rewrite"
+    existing_plan_facts:
+      - "Upstream (ported from): https://github.com/tolibear/curator (MIT, npm curator @ 0.3.8)"
+      - "This port repo: https://github.com/wstrege-kenosha/Cursor-Curator (cursorPortVersion 2.0.0)"
+      - "Parity matrix: docs/PARITY.md"
+
+rules:
+  pm_owns_state: true
+  one_active_task: true
+  max_write_workers: 1
+  no_implementation_without_worker_or_pm_task: true
+  no_completion_without_approval_gate_or_pm_audit: true
+  planning_is_not_completion: true
+  queued_required_worker_blocks_completion: true
+  continuous_until_full_outcome: true
+  missing_input_or_credentials_do_not_stop_objective: true
+  preserve_and_validate_existing_plan: true
+  intake_misfire_must_be_audited: true
+  goal_pressure_requires_success_criteria: true
+  no_completion_on_weak_proof: true
+  slice_policy:
+    max_consecutive_tiny_tasks: 2
+    prefer_vertical_slices: true
+    approval_gate_picks_largest_safe_slice: true
+    worker_completes_whole_slice: true
+
+agents:
+  scout: installed
+  worker: installed
+  approval_gate: installed
+
+visual_board:
+  selected: local
+  local:
+    status: live
+    url: "http://curator.localhost:41737/cursor-curator/"
+    command: "node ~/.cursor/skills/cursor-curator/scripts/curator.mjs board docs/objectives/cursor-curator"
+
+active_task: null
+
+tasks:
+  - id: T001
+    type: scout
+    assignee: Scout
+    status: done
+    reasoning_hint: default
+    objective: "Map upstream tolibear/curator (layout, scripts, Codex/Claude install model, board hub) and this empty port repo; list verification commands and largest safe first implementation slice for Cursor."
+    inputs:
+      - "https://github.com/tolibear/cursor-curator"
+      - "README.md (upstream)"
+      - "package.json (upstream)"
+      - "plugins/curator (upstream)"
+      - "~/.cursor/skills/curator (local reference if present)"
+      - "w:/Experimental/Cursor CuratorCursorPort"
+    constraints:
+      - "Read-only."
+      - "Do not edit implementation files outside notes/ unless PM task."
+      - "Prefer concrete file-path and command evidence."
+      - "Produce parity matrix: upstream feature → Cursor port status."
+    expected_output:
+      - "Upstream repo map"
+      - "Cursor target install layout proposal"
+      - "Verification commands"
+      - "Ranked implementation slices"
+      - "Candidate next tasks for Judge"
+    receipt:
+      result: done
+      summary: "Mapped upstream 0.3.8 vs local Cursor v1.0.0; port repo prep-only. Recommended vendored slice #1."
+      evidence:
+        - notes/T001-scout.md
+        - https://github.com/tolibear/cursor-curator
+      note: notes/T001-scout.md
+  - id: T002
+    type: approval_gate
+    assignee: Approval Gate
+    status: done
+    reasoning_hint: default
+    objective: "Review Scout findings and choose the first safe implementation slice (largest useful vertical: e.g. repo skeleton + vendored scripts + Cursor skills/commands/agents + README install)."
+    inputs:
+      - "T001 receipt"
+      - "objective.md success criteria and constraints"
+    constraints:
+      - "Do not implement."
+      - "Pick largest safe useful slice with allowed_files, verify, stop_if."
+      - "Explicitly defer out-of-scope upstream features with rationale."
+    expected_output:
+      - "Decision"
+      - "Exact Worker objective"
+      - "allowed_files"
+      - "verify"
+      - "stop_if"
+    receipt:
+      result: done
+      decision: approved
+      summary: "Approved vendored Cursor v1.0.0 + git install; deferred npm/Codex/PARITY/success criteria E2E."
+  - id: T003
+    type: worker
+    assignee: Worker
+    status: done
+    reasoning_hint: default
+    objective: "Ship git-installable Cursor Cursor Curator port v1.0.0: add root package.json, README.md, .gitignore, scripts/install-from-repo.mjs, and vendored cursor-curator/ (full local skill tree; version.json must attribute upstream curator 0.3.8) and objective-prep/ (SKILL.md). Install script copies both into ~/.cursor/skills/, then runs node <cursorHome>/skills/cursor-curator/scripts/curator.mjs install. README documents clone + one install command. Do not edit docs/objectives/** or publish to npm."
+    allowed_files:
+      - package.json
+      - README.md
+      - .gitignore
+      - scripts/**
+      - cursor-curator/**
+      - objective-prep/**
+    verify:
+      - npm run check
+      - node --check cursor-curator/scripts/*.mjs cursor-curator/scripts/lib/*.mjs scripts/*.mjs
+      - node curator/scripts/curator.mjs doctor
+      - node scripts/install-from-repo.mjs
+      - node curator/scripts/curator.mjs doctor --objective-ready
+    stop_if:
+      - "Cannot read proven source at ~/.cursor/skills/curator or objective-prep and no equivalent tree exists in repo"
+      - "Install would modify paths outside ~/.cursor/skills, ~/.cursor/agents, ~/.cursor/commands, or repo allowed_files"
+      - "MVP requires Codex/Claude plugin paths or npm registry publish"
+      - "npm run check or doctor fails twice after a fix attempt"
+      - "Needs files outside allowed_files (including docs/objectives/**)"
+    receipt:
+      result: done
+      summary: "Vendored cursor-curator+objective-prep, install script, README; npm run check and doctor --objective-ready pass."
+      changed_files:
+        - package.json
+        - README.md
+        - .gitignore
+        - scripts/install-from-repo.mjs
+        - scripts/check-port.mjs
+        - objective-prep/SKILL.md
+        - cursor-curator/
+      commands:
+        - cmd: npm run check
+          status: pass
+        - cmd: node curator/scripts/curator.mjs doctor
+          status: pass
+        - cmd: node scripts/install-from-repo.mjs
+          status: pass
+        - cmd: node curator/scripts/curator.mjs doctor --objective-ready
+          status: pass
+      note: notes/T003-worker.md
+  - id: T004
+    type: worker
+    assignee: Worker
+    status: done
+    reasoning_hint: default
+    objective: "Close success criteria gaps: add docs/PARITY.md from T001 matrix; root LICENSE; git init; document fresh-clone install E2E in notes/T004-worker.md; add docs/objectives/sample-cursor-smoke/ scaffold and run check-objective-state + board URL receipt."
+    allowed_files:
+      - docs/PARITY.md
+      - LICENSE
+      - .gitignore
+      - notes/**
+      - docs/objectives/sample-cursor-smoke/**
+      - README.md
+    verify:
+      - npm run check
+      - node curator/scripts/curator.mjs doctor --objective-ready
+      - node curator/scripts/check-objective-state.mjs docs/objectives/sample-cursor-smoke/state.yaml
+    stop_if:
+      - "Needs files outside allowed_files"
+      - "Requires npm registry publish or Codex/Claude paths"
+    receipt:
+      result: done
+      summary: "PARITY.md, LICENSE, git init, sample-cursor-smoke board, E2E notes; all verify pass."
+      changed_files:
+        - docs/PARITY.md
+        - LICENSE
+        - README.md
+        - notes/T004-worker.md
+        - docs/objectives/sample-cursor-smoke/
+      commands:
+        - cmd: git init
+          status: pass
+        - cmd: npm run check
+          status: pass
+        - cmd: node curator/scripts/curator.mjs doctor --objective-ready
+          status: pass
+        - cmd: node curator/scripts/check-objective-state.mjs docs/objectives/sample-cursor-smoke/state.yaml
+          status: pass
+        - cmd: node curator/scripts/curator.mjs board docs/objectives/sample-cursor-smoke
+          status: pass
+        - cmd: node scripts/install-from-repo.mjs
+          status: pass
+      note: notes/T004-worker.md
+  - id: T005
+    type: approval_gate
+    assignee: Approval Gate
+    status: done
+    reasoning_hint: default
+    objective: "Final audit: map T001–T004 receipts and verification to objective.md success criteria; set full_outcome_complete if satisfied."
+    inputs:
+      - "All task receipts"
+      - "notes/T004-worker.md"
+      - "docs/PARITY.md"
+      - "docs/objectives/sample-cursor-smoke/"
+    constraints:
+      - "Do not implement."
+      - "Map each success criteria clause to evidence."
+    expected_output:
+      - "complete | not_complete"
+      - "full_outcome_complete: true | false"
+    receipt:
+      result: done
+      decision: not_complete
+      full_outcome_complete: false
+      summary: "Install/PARITY/sample fixture met; live /objective-prep + operator S/J/W cycle still required."
+  - id: T006
+    type: pm
+    assignee: PM
+    status: done
+    reasoning_hint: default
+    objective: "Live operator E2E: run Objective Prep for test outcome into docs/objectives/curator-prep-live-test/, then execute live Scout→Judge→Worker via Task on that board; document in docs/objectives/cursor-curator/notes/T006-pm-e2e.md."
+    allowed_files:
+      - docs/objectives/curator-prep-live-test/**
+      - docs/objectives/cursor-curator/notes/T006-pm-e2e.md
+    verify:
+      - node curator/scripts/check-objective-state.mjs docs/objectives/curator-prep-live-test/state.yaml
+      - node curator/scripts/curator.mjs board docs/objectives/curator-prep-live-test
+    receipt:
+      result: done
+      summary: "Live curator-prep-live-test board; Scout/Approval Gate/Worker via Task; proof in notes/T006-pm-e2e.md and curator-prep-live-test/notes/live-cycle-proof.md."
+      evidence:
+        - docs/objectives/cursor-curator/notes/T006-pm-e2e.md
+        - docs/objectives/curator-prep-live-test/notes/live-cycle-proof.md
+      note: notes/T006-pm-e2e.md
+  - id: T007
+    type: approval_gate
+    assignee: Approval Gate
+    status: done
+    reasoning_hint: default
+    objective: "Final success criteria audit after T006 live E2E; set objective.status done if full_outcome_complete."
+    receipt:
+      result: done
+      decision: complete
+      full_outcome_complete: true
+      summary: "Oracle satisfied: T003–T004 install/PARITY; T006 live prep + Task S/J/W; verify pass 2026-06-04."
+      evidence:
+        - notes/T006-pm-e2e.md
+        - docs/objectives/curator-prep-live-test/notes/live-cycle-proof.md
+        - docs/PARITY.md
+  - id: T999
+    type: approval_gate
+    assignee: Approval Gate
+    status: done
+    reasoning_hint: default
+    objective: "Audit whether the port satisfies the success criteria and original request."
+    inputs:
+      - "All done task receipts"
+      - "Last verification"
+      - "objective.md success criteria"
+    constraints:
+      - "Do not implement."
+      - "Reject completion if required Worker work is still queued or active."
+      - "Map receipts to success criteria signal explicitly."
+    expected_output:
+      - "complete | not_complete"
+      - "full_outcome_complete: true | false"
+      - "missing evidence"
+      - "next task if not complete"
+    receipt:
+      result: done
+      decision: not_complete
+      full_outcome_complete: false
+      summary: "T003 slice passes check/doctor; success criteria needs PARITY.md, clone E2E, sample goal cycle, root LICENSE, git."
+      note: notes/T002-approval-gate.md
+
+checks:
+  dirty_fingerprint: unknown
+  last_verification:
+    result: pass
+    task: T007
+    commands:
+      - "npm run check"
+      - "node curator/scripts/curator.mjs doctor --objective-ready"
+      - "node curator/scripts/check-objective-state.mjs docs/objectives/curator-prep-live-test/state.yaml"
+      - "node curator/scripts/check-objective-state.mjs docs/objectives/cursor-curator/state.yaml"

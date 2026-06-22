@@ -1,0 +1,8 @@
+{
+  "name": "cursor-curator",
+  "upstream": "goalbuddy",
+  "upstreamVersion": "0.3.8",
+  "upstreamUrl": "https://github.com/tolibear/goalbuddy",
+  "portUrl": "https://github.com/wstrege-kenosha/Cursor-Curator",
+  "cursorPortVersion": "4.0.0"
+}

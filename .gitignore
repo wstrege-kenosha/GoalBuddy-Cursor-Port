@@ -6,16 +6,18 @@ Thumbs.db
 .env.*
 
 # Install-generated local state (machine-specific paths)
-goalbuddy/install.json
-goalbuddy/.goalbuddy-install.json
-goalbuddy/known-workspaces.json
+cursor-curator/install.json
+cursor-curator/.cursor-curator-install.json
+cursor-curator/known-workspaces.json
+**/.cursor-curator-port.json
 **/.goalbuddy-port.json
 
 # Generated goal board artifacts
-**/.goalbuddy-board/
-!goalbuddy/surfaces/local-goal-board/examples/**/.goalbuddy-board/
+**/.cursor-curator-board/
+!cursor-curator/surfaces/local-goal-board/examples/**/.cursor-curator-board/
 
 # Ephemeral goal workspaces from manual testing
-docs/goals/goal-prep-live-test/
+docs/objectives/curator-prep-live-test/
+docs/objectives/goal-prep-live-test/
 
 /notes/

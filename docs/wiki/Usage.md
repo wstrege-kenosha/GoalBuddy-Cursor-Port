@@ -2,48 +2,55 @@
 
 ## In Cursor (PM loop)
 
-1. `/goal-prep` — describe your outcome; GoalBuddy scaffolds `docs/goals/<slug>/` in your workspace.
-2. `/goal Follow docs/goals/<slug>/goal.md.` — PM runs Scout → Judge → Worker using **goalbuddy MCP tools** each turn.
+1. `/objective-prep` — describe your outcome; Cursor Curator scaffolds `docs/objectives/<slug>/` in your workspace.
+2. `/objective Follow docs/objectives/<slug>/objective.md.` — PM runs Scout → Approval Gate → Worker using **cursor-curator MCP tools** each turn.
 
-### MCP tool sequence (each `/goal` turn)
+### MCP tool sequence (each `/objective` turn)
 
+0. `session_resume_digest` — turn-0 handoff; use `list_objectives` with `stale_days: 7` when objectives may be idle
 1. `get_active_task` → `validate_state` (stop if errors)
-2. `render_task_prompt` → spawn Task subagent (`goal-scout` | `goal-judge` | `goal-worker`)
-3. `validate_receipt` before writing state
-4. PM updates `state.yaml`
-5. `validate_state` again → `append_session_note`
+2. `misfire_audit_check` / `subgoal_rollup_check` when rules require them
+3. `render_task_prompt` → spawn Task subagent (`objective-scout` | `objective-approval-gate` | `objective-worker`)
+4. `validate_receipt` → `verify_worker_receipt` for done Workers (writes `checks.last_verification` patch)
+5. PM updates `state.yaml`
+6. `validate_state` again → `append_session_note`
 
 ## CLI (after install)
 
-Add `%USERPROFILE%\.cursor\bin` (Windows) or `~/.cursor/bin` (macOS/Linux) to PATH. Then from any repo with a goal:
+Add `%USERPROFILE%\.cursor\bin` (Windows) or `~/.cursor/bin` (macOS/Linux) to PATH. Then from any repo with an objective:
 
 ```bash
-goalbuddy doctor --goal-ready
-goalbuddy hub --json
-goalbuddy board docs/goals/<slug>
-goalbuddy prompt docs/goals/<slug> --task T001 --json
-goalbuddy completion-check docs/goals/<slug>
-goalbuddy stale --days 7
-goalbuddy receipt notes/T003-worker.md --role worker
+curator doctor --objective-ready
+curator hub --json
+curator board docs/objectives/<slug>
+curator resume docs/objectives/<slug> --json
+curator verify-receipt docs/objectives/<slug> --task T003 --receipt-file notes/T003-worker.md
+curator blocked docs/objectives/<slug> --json
+curator misfire-audit docs/objectives/<slug>
+curator subgoal-rollup docs/objectives/<slug>
+curator prompt docs/objectives/<slug> --task T001 --json
+curator completion-check docs/objectives/<slug>
+curator stale --days 7
+curator receipt notes/T003-worker.md --role worker
 ```
 
 Or use the full path:
 
 ```bash
-node ~/.cursor/skills/goalbuddy/scripts/goalbuddy.mjs doctor --goal-ready
+node ~/.cursor/skills/cursor-curator/scripts/curator.mjs doctor --objective-ready
 ```
 
 ## Local board and hub
 
-- **Hub** (all goals): http://goalbuddy.localhost:41737/
-- **Single goal**: http://goalbuddy.localhost:41737/<slug>/
+- **Hub** (all objectives): http://curator.localhost:41737/
+- **Single objective**: http://curator.localhost:41737/<slug>/
 
-Use http://127.0.0.1:41737/ if `goalbuddy.localhost` does not resolve.
+Use http://127.0.0.1:41737/ if `curator.localhost` does not resolve.
 
 ## Repo layout
 
 | Path | Purpose |
 |------|---------|
-| `goalbuddy/` | Main skill (scripts, MCP, agents, board) |
-| `goal-prep/` | Prep skill |
+| `cursor-curator/` | Main skill (scripts, MCP, agents, board) |
+| `objective-prep/` | Prep skill |
 | `scripts/install-from-repo.mjs` | Install into `~/.cursor/skills` |

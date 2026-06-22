@@ -10,15 +10,15 @@ const repoRoot = resolve(__dirname, "..");
 
 const CANONICAL_BOARD = join(
   repoRoot,
-  "goalbuddy",
+  "cursor-curator",
   "surfaces",
   "local-goal-board",
   "scripts",
   "lib",
-  "goal-board.mjs",
+  "objective-board.mjs",
 );
-const RUNTIME_BOARD_REEXPORT = join(repoRoot, "goalbuddy", "scripts", "lib", "goal-board.mjs");
-const EXPECTED_BOARD_REEXPORT = 'export * from "../../surfaces/local-goal-board/scripts/lib/goal-board.mjs";\n';
+const RUNTIME_BOARD_REEXPORT = join(repoRoot, "cursor-curator", "scripts", "lib", "objective-board.mjs");
+const EXPECTED_BOARD_REEXPORT = 'export * from "../../surfaces/local-goal-board/scripts/lib/objective-board.mjs";\n';
 
 function collectMjs(dir, out = []) {
   if (!existsSync(dir)) return out;
@@ -44,7 +44,7 @@ function verifyBoardModuleLayout() {
   const runtimeText = readFileSync(RUNTIME_BOARD_REEXPORT, "utf8").replace(/\r\n/g, "\n");
   const expected = EXPECTED_BOARD_REEXPORT;
   if (runtimeText !== expected) {
-    console.error("goalbuddy/scripts/lib/goal-board.mjs must re-export the canonical surfaces board module");
+    console.error("cursor-curator/scripts/lib/objective-board.mjs must re-export the canonical surfaces board module");
     return false;
   }
 
@@ -68,8 +68,8 @@ function runNodeTests(testFile, label) {
 
 const roots = [
   join(repoRoot, "scripts"),
-  join(repoRoot, "goalbuddy"),
-  join(repoRoot, "goal-prep"),
+  join(repoRoot, "cursor-curator"),
+  join(repoRoot, "objective-prep"),
 ];
 
 const mjsFiles = roots.flatMap((root) => collectMjs(root));
@@ -90,7 +90,7 @@ console.log(`syntax ok (${mjsFiles.length} .mjs files)`);
 
 const boardTestFile = join(
   repoRoot,
-  "goalbuddy",
+  "cursor-curator",
   "surfaces",
   "local-goal-board",
   "test",
@@ -98,18 +98,21 @@ const boardTestFile = join(
 );
 if (!runNodeTests(boardTestFile, "local-goal-board tests")) failed = true;
 
-const validatorTestFile = join(repoRoot, "goalbuddy", "scripts", "test", "check-goal-state.test.mjs");
-if (!runNodeTests(validatorTestFile, "check-goal-state tests")) failed = true;
+const validatorTestFile = join(repoRoot, "cursor-curator", "scripts", "test", "check-objective-state.test.mjs");
+if (!runNodeTests(validatorTestFile, "check-objective-state tests")) failed = true;
 
-const phaseATestFile = join(repoRoot, "goalbuddy", "scripts", "test", "phase-a-cli.test.mjs");
+const phaseATestFile = join(repoRoot, "cursor-curator", "scripts", "test", "phase-a-cli.test.mjs");
 if (!runNodeTests(phaseATestFile, "phase-a cli tests")) failed = true;
 
-const phaseBTestFile = join(repoRoot, "goalbuddy", "scripts", "test", "phase-b-mcp.test.mjs");
+const phaseBTestFile = join(repoRoot, "cursor-curator", "scripts", "test", "phase-b-mcp.test.mjs");
 if (!runNodeTests(phaseBTestFile, "phase-b mcp tests")) failed = true;
+
+const verifyTestFile = join(repoRoot, "cursor-curator", "scripts", "test", "goal-verify.test.mjs");
+if (!runNodeTests(verifyTestFile, "goal-verify tests")) failed = true;
 
 const doctor = spawnSync(
   process.execPath,
-  [join(repoRoot, "goalbuddy", "scripts", "goalbuddy.mjs"), "doctor"],
+  [join(repoRoot, "cursor-curator", "scripts", "curator.mjs"), "doctor"],
   { cwd: repoRoot, encoding: "utf8", stdio: "inherit" },
 );
 
@@ -118,8 +121,8 @@ if (doctor.status !== 0) failed = true;
 const smoke = spawnSync(
   process.execPath,
   [
-    join(repoRoot, "goalbuddy", "scripts", "check-goal-state.mjs"),
-    join(repoRoot, "docs", "goals", "sample-cursor-smoke", "state.yaml"),
+    join(repoRoot, "cursor-curator", "scripts", "check-objective-state.mjs"),
+    join(repoRoot, "docs", "objectives", "sample-cursor-smoke", "state.yaml"),
   ],
   { cwd: repoRoot, encoding: "utf8", stdio: "inherit" },
 );

@@ -1,0 +1,29 @@
+version: 2
+
+objective:
+  title: Agent warning
+  slug: agent-warning
+  status: active
+  success_criteria:
+    signal: npm run check exits 0
+    final_proof: check passes
+  intake:
+    completion_proof: npm run check exits 0
+
+rules:
+  pm_owns_state: true
+
+agents:
+  scout: bundled_not_installed
+  worker: installed
+  approval_gate: installed
+
+active_task: T001
+
+tasks:
+  - id: T001
+    type: scout
+    assignee: Scout
+    status: active
+    objective: "Fixture"
+    receipt: null

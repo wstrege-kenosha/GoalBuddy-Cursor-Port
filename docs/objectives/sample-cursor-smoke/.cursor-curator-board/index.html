@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="en" data-skin="control-room">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Cursor Curator Board</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Courier+Prime&family=Fraunces:opsz,wght@9..144,600;700&family=IBM+Plex+Mono:wght@450;500&family=IBM+Plex+Sans:wght@400;500;600;700&family=Inter:wght@400;600&family=JetBrains+Mono:wght@450;500&family=Literata:opsz,wght@7..72,600&family=Nunito+Sans:wght@400;600;700&family=Outfit:wght@500;700&family=Source+Sans+3:wght@400;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body class="theme-board">
+  <header class="topbar">
+    <div class="topbar-primary">
+      <div class="brand" aria-label="Cursor Curator">
+        <img class="brand-mark" src="./curator-mark.png" alt="Cursor Curator">
+        <span class="brand-name">Cursor Curator</span>
+        <span class="live-dot" id="live-dot" aria-hidden="true"></span>
+      </div>
+      <nav class="board-switcher is-empty" aria-label="Local Cursor Curator boards">
+        <label for="board-switcher">Board</label>
+        <select id="board-switcher" aria-label="Switch local board"></select>
+      </nav>
+    </div>
+    <div class="header-tools">
+      <div class="repo-links">
+        <a class="github-stars" href="https://github.com/wstrege-kenosha/Cursor-Curator" target="_blank" rel="noreferrer" aria-label="Open wstrege-kenosha/Cursor-Curator on GitHub">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 2.8 2.84 5.76 6.36.92-4.6 4.48 1.08 6.34L12 17.32 6.32 20.3l1.08-6.34-4.6-4.48 6.36-.92L12 2.8Z"></path></svg>
+          <span id="github-stars">wstrege-kenosha/Cursor-Curator</span>
+        </a>
+        <a class="github-upstream" href="https://github.com/tolibear/goalbuddy" target="_blank" rel="noreferrer" aria-label="Open upstream Cursor Curator on GitHub">Upstream: tolibear/goalbuddy @ 0.3.8</a>
+      </div>
+      <div class="settings-wrap">
+        <button class="settings-button" id="settings-button" type="button" aria-expanded="false" aria-controls="settings-popover">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M12.2 2.75h-.4a1.6 1.6 0 0 0-1.58 1.36l-.18 1.18c-.46.16-.9.34-1.31.56l-1.02-.64a1.6 1.6 0 0 0-2.08.31l-.28.28a1.6 1.6 0 0 0-.31 2.08l.64 1.02c-.22.42-.4.86-.56 1.31l-1.18.18A1.6 1.6 0 0 0 2.58 12v.4A1.6 1.6 0 0 0 3.94 14l1.18.18c.16.46.34.9.56 1.31l-.64 1.02a1.6 1.6 0 0 0 .31 2.08l.28.28a1.6 1.6 0 0 0 2.08.31l1.02-.64c.42.22.86.4 1.31.56l.18 1.18a1.6 1.6 0 0 0 1.58 1.36h.4a1.6 1.6 0 0 0 1.58-1.36l.18-1.18c.46-.16.9-.34 1.31-.56l1.02.64a1.6 1.6 0 0 0 2.08-.31l.28-.28a1.6 1.6 0 0 0 .31-2.08l-.64-1.02c.22-.42.4-.86.56-1.31l1.18-.18a1.6 1.6 0 0 0 1.36-1.58V12a1.6 1.6 0 0 0-1.36-1.58l-1.18-.18a7.2 7.2 0 0 0-.56-1.31l.64-1.02a1.6 1.6 0 0 0-.31-2.08l-.28-.28a1.6 1.6 0 0 0-2.08-.31l-1.02.64c-.42-.22-.86-.4-1.31-.56l-.18-1.18a1.6 1.6 0 0 0-1.58-1.39Z"></path>
+            <circle cx="12" cy="12.2" r="3.15"></circle>
+          </svg>
+          <span class="visually-hidden" id="live-state" aria-live="polite">Connecting</span>
+        </button>
+        <section class="settings-popover" id="settings-popover" aria-label="Local board settings" hidden>
+          <div class="settings-heading">
+            <p class="eyebrow">Board settings</p>
+            <h2>Local preferences</h2>
+          </div>
+          <div class="setting-row">
+            <label for="setting-skin">Skin</label>
+            <select id="setting-skin" data-setting="skin">
+              <option value="control-room">Control Room</option>
+              <option value="field-notes">Field Notes</option>
+              <option value="proof-ledger">Proof Ledger</option>
+              <option value="relay-map">Relay Map</option>
+            </select>
+          </div>
+          <div class="setting-row">
+            <label for="setting-theme">Theme</label>
+            <select id="setting-theme" data-setting="theme">
+              <option value="system">System</option>
+              <option value="light">Light</option>
+              <option value="dark">Dark</option>
+            </select>
+          </div>
+          <div class="setting-row">
+            <label for="setting-density">Density</label>
+            <select id="setting-density" data-setting="density">
+              <option value="comfortable">Comfortable</option>
+              <option value="compact">Compact</option>
+            </select>
+          </div>
+          <div class="setting-row">
+            <label for="setting-completed">Completed</label>
+            <select id="setting-completed" data-setting="completedVisibility">
+              <option value="show">Show</option>
+              <option value="collapse">Collapse</option>
+            </select>
+          </div>
+          <div class="setting-row">
+            <label for="setting-board-open">Open boards</label>
+            <select id="setting-board-open" data-setting="boardOpenBehavior">
+              <option value="last">Last viewed</option>
+              <option value="newest">Newest active</option>
+            </select>
+          </div>
+          <div class="setting-row">
+            <label for="setting-motion">Motion</label>
+            <select id="setting-motion" data-setting="motion">
+              <option value="system">System</option>
+              <option value="reduce">Reduce</option>
+              <option value="allow">Allow</option>
+            </select>
+          </div>
+        </section>
+      </div>
+    </div>
+  </header>
+  <main class="shell">
+    <section class="goal-header" aria-labelledby="goal-title">
+      <div>
+        <p class="eyebrow" id="objective-eyebrow">Objective</p>
+        <h1 id="goal-title">Cursor Curator Board</h1>
+        <p id="goal-tranche" class="goal-tranche"></p>
+      </div>
+      <dl class="goal-meta">
+        <div><dt>Status</dt><dd id="goal-status">Unknown</dd></div>
+        <div><dt>Active</dt><dd id="goal-active">None</dd></div>
+        <div><dt>Updated</dt><dd id="goal-updated">Waiting</dd></div>
+      </dl>
+    </section>
+    <section class="validation-banner" id="validation-banner" hidden aria-live="polite">
+      <div>
+        <p class="eyebrow" id="validation-eyebrow">Validation</p>
+        <ul id="validation-list" class="validation-list"></ul>
+      </div>
+    </section>
+    <section class="now-hero" id="now-hero" aria-label="Current focus">
+      <div>
+        <p class="eyebrow" id="now-eyebrow">Now</p>
+        <p id="now-interpreted" class="now-interpreted"></p>
+        <p id="now-active-objective" class="now-active-objective"></p>
+      </div>
+    </section>
+    <section class="intake-strip" id="intake-strip" aria-label="Intake">
+      <div class="intake-grid">
+        <div><p class="eyebrow" id="intake-eyebrow">Original request</p><p id="intake-original" class="intake-value"></p></div>
+        <div><p class="eyebrow">Completion proof</p><p id="intake-completion-proof" class="intake-value"></p></div>
+        <div><p class="eyebrow">Likely misfire</p><p id="intake-misfire" class="intake-value"></p></div>
+      </div>
+    </section>
+    <section class="progress-rail" id="progress-rail" aria-label="Progress">
+      <div class="progress-counts" id="progress-counts"></div>
+      <div class="progress-meta">
+        <span id="progress-verification" class="progress-verification"></span>
+        <span id="progress-criteria" class="progress-criteria"></span>
+      </div>
+    </section>
+    <section class="session-pin" id="session-pin" hidden>
+      <p class="eyebrow" id="session-pin-eyebrow">Last session</p>
+      <p id="session-pin-text" class="session-pin-text"></p>
+    </section>
+    <section class="success-criteria-strip" id="success-criteria-strip" aria-label="Success criteria">
+      <div>
+        <p class="eyebrow" id="success-criteria-eyebrow">Signal</p>
+        <p id="success-criteria-signal" class="success-criteria-signal">Waiting for board data…</p>
+        <p id="success-criteria-final-proof" class="success-criteria-meta"></p>
+      </div>
+      <div class="success-criteria-status-wrap">
+        <span class="badge" id="success-criteria-health">unknown</span>
+        <p id="success-criteria-audit" class="success-criteria-meta"></p>
+      </div>
+    </section>
+    <section class="session-strip" id="session-strip" hidden>
+      <div>
+        <p class="eyebrow" id="session-eyebrow">Session log</p>
+        <pre id="session-log" class="session-log"></pre>
+      </div>
+    </section>
+    <div class="board-frame">
+      <div class="relay-trail" id="relay-trail" hidden aria-hidden="true"></div>
+      <section class="board" id="board" aria-label="Objective task board"></section>
+    </div>
+  </main>
+  <footer class="board-provenance" aria-label="Cursor Curator port provenance">
+    <p>
+      Board UI from
+      <a href="https://github.com/wstrege-kenosha/Cursor-Curator" target="_blank" rel="noreferrer">wstrege-kenosha/Cursor-Curator</a> · Cursor port 4.0.0
+      · ported from upstream
+      <a href="https://github.com/tolibear/goalbuddy" target="_blank" rel="noreferrer">tolibear/goalbuddy</a> (0.3.8)
+    </p>
+  </footer>
+  <div class="modal" id="task-modal" hidden>
+    <button class="modal-scrim" type="button" data-close-modal aria-label="Close task detail"></button>
+    <article class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+      <header class="modal-header">
+        <div>
+          <p class="eyebrow" id="modal-kicker">Task</p>
+          <h2 id="modal-title">Task detail</h2>
+        </div>
+        <button class="icon-button" type="button" data-close-modal aria-label="Close task detail">x</button>
+      </header>
+      <div class="modal-body" id="modal-body"></div>
+    </article>
+  </div>
+  <script id="board-snapshot" type="application/json">{"generatedAt":"2026-06-22T16:08:35.944Z","repo":{"portUrl":"https://github.com/wstrege-kenosha/Cursor-Curator","portLabel":"wstrege-kenosha/Cursor-Curator","portApiSlug":"wstrege-kenosha/Cursor-Curator","upstreamUrl":"https://github.com/tolibear/goalbuddy","upstreamLabel":"tolibear/goalbuddy","cursorPortVersion":"4.0.0","upstreamVersion":"0.3.8"},"source":{"goalDir":"W:\\Experimental\\GoalBuddyCursorPort\\docs\\objectives\\sample-cursor-smoke","statePath":"W:\\Experimental\\GoalBuddyCursorPort\\docs\\objectives\\sample-cursor-smoke\\state.yaml","stateMtimeMs":1782142243348.6233,"notesDir":"W:\\Experimental\\GoalBuddyCursorPort\\docs\\objectives\\sample-cursor-smoke\\notes"},"objective":{"title":"Sample Cursor smoke","slug":"sample-cursor-smoke","kind":"specific","status":"active","tranche":"Validate Scout/Approval Gate/Worker receipts and check-objective-state","activeTask":"T999","success_criteria":{"signal":"check-objective-state.mjs exits ok on this state.yaml","cadence":"after scaffold and at T999 audit","final_proof":"check-objective-state pass + board URL captured in notes"},"intake":{"original_request":"Smoke-test Cursor port objective board","interpreted_outcome":"Minimal valid v2 board with T001–T003 done","input_shape":"specific","audience":"port operators","authority":"requested","proof_type":"artifact","completion_proof":"check-objective-state ok; board hub reachable","likely_misfire":"Placeholder receipts that fail validation","blind_spots_considered":["agent install state on fresh machine"],"existing_plan_facts":[]}},"validation":{"ok":true,"errors":[],"warnings":[]},"completion":{"ready":false,"blockers":["active tasks remain: T999","missing final Approval Gate/PM audit with decision complete and full_outcome_complete: true"],"success_criteria_ready":true,"audit_ready":false},"lastVerification":{"result":"pass","task":"T003","commands":[]},"activeTaskDetail":{"id":"T999","objective":"Audit whether smoke board satisfies success criteria (check-objective-state + board URL).","assignee":"Approval Gate","type":"approval_gate","verify":[]},"progress":{"total":4,"done":3,"blocked":0,"queued":0,"active":1,"pct":75},"sessionPreview":null,"counts":{"total":4,"todo":0,"inProgress":1,"blocked":0,"completed":3},"columns":[{"id":"todo","title":"Todo","description":"Queued work ready to pull","tasks":[]},{"id":"in-progress","title":"In Progress","description":"The active task","tasks":[{"id":"T999","title":"Audit whether smoke board satisfies success criteria (check-objective-state + board URL)","objective":"Audit whether smoke board satisfies success criteria (check-objective-state + board URL).","status":"active","column":"in-progress","type":"approval_gate","assignee":"Approval Gate","active":true,"inputs":["T001–T003 receipts","objective.md success criteria"],"constraints":["Do not implement."],"expectedOutput":["complete | not_complete"],"allowedFiles":[],"verify":[],"stopIf":[],"subgoal":null,"receipt":{"present":false,"summary":"","result":"","note":""}}]},{"id":"blocked","title":"Blocked","description":"Needs unblock or a smaller slice","tasks":[]},{"id":"completed","title":"Completed","description":"Receipted work","tasks":[{"id":"T003","title":"Add notes/T003-worker.md documenting smoke receipt validation","objective":"Add notes/T003-worker.md documenting smoke receipt validation.","status":"done","column":"completed","type":"worker","assignee":"Worker","active":false,"inputs":[],"constraints":[],"expectedOutput":[],"allowedFiles":["notes/**"],"verify":["node curator/scripts/check-objective-state.mjs docs/objectives/sample-cursor-smoke/state.yaml"],"stopIf":["Needs files outside allowed_files"],"subgoal":null,"receipt":{"present":true,"result":"done","summary":"Added smoke worker note; check-objective-state passes.","decision":"","note":"","changedFiles":["notes/T003-worker.md"],"commands":[{"cmd":"node curator/scripts/check-objective-state.mjs docs/objectives/sample-cursor-smoke/state.yaml","status":"pass"}],"evidence":[]}},{"id":"T002","title":"Approve a single-file Worker slice to","objective":"Approve a single-file Worker slice to add notes/T003-worker.md under this goal.","status":"done","column":"completed","type":"approval_gate","assignee":"Approval Gate","active":false,"inputs":["T001 receipt"],"constraints":["Do not implement."],"expectedOutput":["allowed_files and verify for Worker"],"allowedFiles":[],"verify":[],"stopIf":[],"subgoal":null,"receipt":{"present":true,"result":"done","summary":"Approved notes-only Worker; verify check-objective-state on this board.","decision":"approved","note":"","changedFiles":[],"commands":[],"evidence":[]}},{"id":"T001","title":"Confirm smoke objective paths and verification commands for the Cursor port repo","objective":"Confirm smoke objective paths and verification commands for the Cursor port repo.","status":"done","column":"completed","type":"scout","assignee":"Scout","active":false,"inputs":["README.md","package.json","cursor-curator/scripts/check-objective-state.mjs"],"constraints":["Read-only."],"expectedOutput":["Verification command list"],"allowedFiles":[],"verify":[],"stopIf":[],"subgoal":null,"receipt":{"present":true,"result":"done","summary":"Mapped smoke paths; verify uses check-objective-state and doctor --objective-ready.","decision":"","note":"notes/T001-scout.md","changedFiles":[],"commands":[],"evidence":["README.md","docs/PARITY.md"]},"note":{"path":"notes/T001-scout.md","title":"T001 Scout — sample-cursor-smoke","content":"# T001 Scout — sample-cursor-smoke\r\n\r\nSmoke objective: validate Cursor port without editing `cursor-curator`.\r\n\r\n**Verify commands:**\r\n\r\n- `npm run check`\r\n- `node curator/scripts/curator.mjs doctor --objective-ready`\r\n- `node curator/scripts/check-objective-state.mjs docs/objectives/sample-cursor-smoke/state.yaml`\r\n- `node curator/scripts/curator.mjs board docs/objectives/sample-cursor-smoke`\r\n","mtimeMs":1782142243328.6233}}]}],"tasks":[{"id":"T001","title":"Confirm smoke objective paths and verification commands for the Cursor port repo","objective":"Confirm smoke objective paths and verification commands for the Cursor port repo.","status":"done","column":"completed","type":"scout","assignee":"Scout","active":false,"inputs":["README.md","package.json","cursor-curator/scripts/check-objective-state.mjs"],"constraints":["Read-only."],"expectedOutput":["Verification command list"],"allowedFiles":[],"verify":[],"stopIf":[],"subgoal":null,"receipt":{"present":true,"result":"done","summary":"Mapped smoke paths; verify uses check-objective-state and doctor --objective-ready.","decision":"","note":"notes/T001-scout.md","changedFiles":[],"commands":[],"evidence":["README.md","docs/PARITY.md"]},"note":{"path":"notes/T001-scout.md","title":"T001 Scout — sample-cursor-smoke","content":"# T001 Scout — sample-cursor-smoke\r\n\r\nSmoke objective: validate Cursor port without editing `cursor-curator`.\r\n\r\n**Verify commands:**\r\n\r\n- `npm run check`\r\n- `node curator/scripts/curator.mjs doctor --objective-ready`\r\n- `node curator/scripts/check-objective-state.mjs docs/objectives/sample-cursor-smoke/state.yaml`\r\n- `node curator/scripts/curator.mjs board docs/objectives/sample-cursor-smoke`\r\n","mtimeMs":1782142243328.6233}},{"id":"T002","title":"Approve a single-file Worker slice to","objective":"Approve a single-file Worker slice to add notes/T003-worker.md under this goal.","status":"done","column":"completed","type":"approval_gate","assignee":"Approval Gate","active":false,"inputs":["T001 receipt"],"constraints":["Do not implement."],"expectedOutput":["allowed_files and verify for Worker"],"allowedFiles":[],"verify":[],"stopIf":[],"subgoal":null,"receipt":{"present":true,"result":"done","summary":"Approved notes-only Worker; verify check-objective-state on this board.","decision":"approved","note":"","changedFiles":[],"commands":[],"evidence":[]}},{"id":"T003","title":"Add notes/T003-worker.md documenting smoke receipt validation","objective":"Add notes/T003-worker.md documenting smoke receipt validation.","status":"done","column":"completed","type":"worker","assignee":"Worker","active":false,"inputs":[],"constraints":[],"expectedOutput":[],"allowedFiles":["notes/**"],"verify":["node curator/scripts/check-objective-state.mjs docs/objectives/sample-cursor-smoke/state.yaml"],"stopIf":["Needs files outside allowed_files"],"subgoal":null,"receipt":{"present":true,"result":"done","summary":"Added smoke worker note; check-objective-state passes.","decision":"","note":"","changedFiles":["notes/T003-worker.md"],"commands":[{"cmd":"node curator/scripts/check-objective-state.mjs docs/objectives/sample-cursor-smoke/state.yaml","status":"pass"}],"evidence":[]}},{"id":"T999","title":"Audit whether smoke board satisfies success criteria (check-objective-state + board URL)","objective":"Audit whether smoke board satisfies success criteria (check-objective-state + board URL).","status":"active","column":"in-progress","type":"approval_gate","assignee":"Approval Gate","active":true,"inputs":["T001–T003 receipts","objective.md success criteria"],"constraints":["Do not implement."],"expectedOutput":["complete | not_complete"],"allowedFiles":[],"verify":[],"stopIf":[],"subgoal":null,"receipt":{"present":false,"summary":"","result":"","note":""}}],"notes":[{"path":"notes/T001-scout.md","title":"T001 Scout — sample-cursor-smoke","mtimeMs":1782142243328.6233},{"path":"notes/T003-worker.md","title":"T003 Worker — sample-cursor-smoke","mtimeMs":1780587748137.313}],"sessionLog":null}</script>
+  <script src="./app.js" defer></script>
+</body>
+</html>

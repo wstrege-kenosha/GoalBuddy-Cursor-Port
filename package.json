@@ -1,7 +1,7 @@
 {
-  "name": "goalbuddy-cursor-port",
-  "version": "2.1.0",
-  "description": "Git-installable Cursor port of GoalBuddy (upstream 0.3.8)",
+  "name": "cursor-curator",
+  "version": "4.0.0",
+  "description": "Git-installable Cursor Curator — goal orchestration for Cursor (upstream Cursor Curator 0.3.8)",
   "license": "MIT",
   "engines": {
     "node": ">=18"
