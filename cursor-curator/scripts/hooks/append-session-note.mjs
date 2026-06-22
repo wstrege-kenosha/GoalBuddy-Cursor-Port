@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { appendSessionNote } from "../lib/goal-session.mjs";
+import { appendSessionNote } from "../lib/objective-session.mjs";
 
 const input = process.env.CURSOR_HOOK_INPUT || "";
 let payload = {};

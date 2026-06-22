@@ -1,6 +1,6 @@
 # Cursor Curator
 
-Git-installable [Cursor Curator](https://github.com/tolibear/cursor-curator) for Cursor (`cursorPortVersion` **2.1.0**, `upstreamVersion` **0.3.8**).
+Git-installable [Cursor Curator](https://github.com/tolibear/cursor-curator) for Cursor (`cursorPortVersion` **4.0.0**, `upstreamVersion` **0.3.8**).
 
 | Page | Topic |
 |------|--------|
@@ -8,7 +8,7 @@ Git-installable [Cursor Curator](https://github.com/tolibear/cursor-curator) for
 | [Migration 1.0 → 2.0](Migration-1.0-to-2.0) | Upgrade from 1.0.0 |
 | [Install](Install) | Clone, install skills, MCP, verify |
 | [Usage](Usage) | `/objective-prep`, `/objective`, MCP, board |
-| [Cursor Curator loop](Cursor-Curator-Loop) | Scout, Judge, Worker, success criteria, MCP gates |
+| [Cursor Curator loop](Cursor-Curator-Loop) | Scout, Approval Gate, Worker, success criteria, MCP gates |
 | [Upstream parity](Upstream-Parity) | vs [tolibear/cursor-curator](https://github.com/tolibear/cursor-curator) |
 | [Troubleshooting](Troubleshooting) | Common fixes |
 
@@ -16,9 +16,10 @@ Git-installable [Cursor Curator](https://github.com/tolibear/cursor-curator) for
 
 This port is not on npm; install from git only.
 
-## Highlights (2.1.0)
+## Highlights (4.0.0)
 
-- Multi-goal **hub** at http://curator.localhost:41737/
-- **MCP server** for validation and prompt gates in `/objective`
+- **Objective paths:** `docs/objectives/`, `objective.md`, YAML `objective:`, shared `objective-*.mjs` libs
+- Multi-objective **hub** at http://curator.localhost:41737/
+- **MCP server** for validation, prompts, receipts, verification, session resume, blocked/misfire/rollup
 - **Manual PM loop** via `/objective` in Cursor chat
-- Global **`curator` CLI** for `doctor`, `board`, `hub`, and gates
+- Global **`curator` CLI** for `doctor`, `board`, `hub`, `resume`, `verify-receipt`, and gates

@@ -2,14 +2,15 @@
 
 This repo is a **Cursor port** of [tolibear/cursor-curator](https://github.com/tolibear/cursor-curator) @ **0.3.8**. It is not an official upstream release.
 
-## Included in the port (2.1.0)
+## Included in the port (4.0.0)
 
 - `/objective-prep` and `/objective` via Cursor skills and commands
-- `state.yaml` v2 boards and shared `goal-state.mjs` validator
-- Scout / Judge / Worker agents with MCP-aware prompts
+- `state.yaml` v2 boards and shared `objective-state.mjs` validator
+- Scout / Approval Gate / Worker agents with MCP-aware prompts
 - Local board hub at `curator.localhost:41737` with multi-objective dashboard
-- **cursor-curator MCP server** (validation, prompts, receipts, completion)
-- CLI gates: `receipt`, `completion-check`, `stale`, `hub`, global `curator` command
+- **cursor-curator MCP server** (validation, prompts, receipts, verification, completion, session resume, blocked/misfire/rollup checks)
+- CLI gates: `receipt`, `completion-check`, `verify-receipt`, `resume`, `blocked`, `misfire-audit`, `subgoal-rollup`, `stale`, `hub`, global `curator` command
+- Shared libs under `cursor-curator/scripts/lib/objective-*.mjs`
 - GitHub Actions CI (`npm run check`)
 - `node scripts/install-from-repo.mjs` (replaces `npx cursor-curator` for Cursor)
 
@@ -25,7 +26,7 @@ This repo is a **Cursor port** of [tolibear/cursor-curator](https://github.com/t
 
 | | Version |
 |--|---------|
-| Cursor port | 2.1.0 |
+| Cursor port | 4.0.0 |
 | Upstream lineage | 0.3.8 |
 
 Full matrix in the repo: `docs/PARITY.md`.

@@ -90,7 +90,7 @@ tasks:
       - "Cursor target install layout proposal"
       - "Verification commands"
       - "Ranked implementation slices"
-      - "Candidate next tasks for Judge"
+      - "Candidate next tasks for Approval Gate"
     receipt:
       result: done
       summary: "Mapped upstream 0.3.8 vs local Cursor v1.0.0; port repo prep-only. Recommended vendored slice #1."
@@ -237,7 +237,7 @@ tasks:
     assignee: PM
     status: done
     reasoning_hint: default
-    objective: "Live operator E2E: run Objective Prep for test outcome into docs/objectives/curator-prep-live-test/, then execute live Scout→Judge→Worker via Task on that board; document in docs/objectives/cursor-curator/notes/T006-pm-e2e.md."
+    objective: "Live operator E2E: run Objective Prep for test outcome into docs/objectives/curator-prep-live-test/, then execute live Scout→Approval Gate→Worker via Task on that board; document in docs/objectives/cursor-curator/notes/T006-pm-e2e.md."
     allowed_files:
       - docs/objectives/curator-prep-live-test/**
       - docs/objectives/cursor-curator/notes/T006-pm-e2e.md

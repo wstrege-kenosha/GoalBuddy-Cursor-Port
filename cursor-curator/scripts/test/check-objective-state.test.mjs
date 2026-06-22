@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { test } from "node:test";
-import { isWeakProof, validateGoalState } from "../lib/goal-state.mjs";
+import { isWeakProof, validateGoalState } from "../lib/objective-state.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(__dirname, "../../..");

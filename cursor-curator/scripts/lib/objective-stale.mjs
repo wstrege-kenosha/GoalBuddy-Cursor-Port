@@ -1,6 +1,6 @@
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join, resolve } from "node:path";
-import { validateGoalState } from "./goal-state.mjs";
+import { validateGoalState } from "./objective-state.mjs";
 
 const DEFAULT_STALE_DAYS = 7;
 

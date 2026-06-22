@@ -2,13 +2,13 @@ import { readFileSync, unlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { randomBytes } from "node:crypto";
-import { parseReceiptInput, validateReceipt } from "./goal-receipt.mjs";
-import { checkCompletionReadiness } from "./goal-completion.mjs";
-import { validateGoalState } from "./goal-state.mjs";
+import { parseReceiptInput, validateReceipt } from "./objective-receipt.mjs";
+import { checkCompletionReadiness } from "./objective-completion.mjs";
+import { validateGoalState } from "./objective-state.mjs";
 import {
   formatLastVerificationYaml,
   verifyWorkerReceiptForTask,
-} from "./goal-verify.mjs";
+} from "./objective-verify.mjs";
 
 export function parseReceiptFromText(text) {
   if (!text || typeof text !== "string") return null;

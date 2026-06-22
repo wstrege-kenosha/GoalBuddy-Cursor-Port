@@ -3,7 +3,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { basename, dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseGoalStateText } from "../surfaces/local-goal-board/scripts/lib/objective-board.mjs";
-import { misfireAuditStatus } from "./lib/goal-misfire.mjs";
+import { misfireAuditStatus } from "./lib/objective-misfire.mjs";
 
 const ROLE_DEFAULTS = {
   scout: { agent: "objective_scout", reasoning: "low", sandbox: "read-only" },

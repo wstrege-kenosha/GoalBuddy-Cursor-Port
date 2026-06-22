@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { validateGoalState } from "./lib/goal-state.mjs";
+import { validateGoalState } from "./lib/objective-state.mjs";
 
 const statePath = process.argv[2];
 const isChildCheck = process.argv.includes("--child");

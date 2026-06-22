@@ -5,7 +5,7 @@ version: 2
 
 objective:
   title: "<Goal title>"
-  slug: "<goal-slug>"
+  slug: "<objective-slug>"
   kind: open_ended # specific | open_ended | existing_plan | recovery | audit
   tranche: "<continuous execution: complete successive safe verified slices until the full original outcome is complete>"
   status: active # active | blocked | done
@@ -58,7 +58,7 @@ visual_board:
   local:
     status: not_requested # not_requested | starting | live | generated | blocked
     url: null
-    command: "node ~/.cursor/skills/cursor-curator/scripts/curator.mjs board docs/objectives/<goal-slug>"
+    command: "node ~/.cursor/skills/cursor-curator/scripts/curator.mjs board docs/objectives/<objective-slug>"
 
 active_task: T001
 
@@ -108,7 +108,7 @@ tasks:
     assignee: Worker
     status: queued
     reasoning_hint: default
-    objective: "Execute the first safe implementation task selected by Judge."
+    objective: "Execute the first safe implementation task selected by Approval Gate."
     allowed_files: []
     verify: []
     stop_if:

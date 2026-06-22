@@ -2,10 +2,10 @@ import assert from "node:assert/strict";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { test } from "node:test";
-import { checkCompletionReadiness } from "../lib/goal-completion.mjs";
-import { buildHubPayload } from "../lib/goal-hub.mjs";
-import { validateReceipt } from "../lib/goal-receipt.mjs";
-import { findStaleGoals } from "../lib/goal-stale.mjs";
+import { checkCompletionReadiness } from "../lib/objective-completion.mjs";
+import { buildHubPayload } from "../lib/objective-hub.mjs";
+import { validateReceipt } from "../lib/objective-receipt.mjs";
+import { findStaleGoals } from "../lib/objective-stale.mjs";
 import { createParallelPlan } from "../parallel-plan.mjs";
 
 const __dirname = fileURLToPath(new URL(".", import.meta.url));

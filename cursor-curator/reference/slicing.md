@@ -30,7 +30,7 @@ rules:
     worker_completes_whole_slice: true
 ```
 
-## Judge responsibility
+## Approval Gate responsibility
 
 Choose one coherent Worker package with:
 

@@ -336,11 +336,11 @@ function sendHubPage(response, baseUrl, boards) {
 }
 
 async function loadHubModule() {
-  const localPath = new URL("./lib/goal-hub.mjs", import.meta.url);
+  const localPath = new URL("./lib/objective-hub.mjs", import.meta.url);
   try {
     return await import(localPath);
   } catch {
-    const skillPath = new URL("../../../scripts/lib/goal-hub.mjs", import.meta.url);
+    const skillPath = new URL("../../../scripts/lib/objective-hub.mjs", import.meta.url);
     return import(skillPath);
   }
 }

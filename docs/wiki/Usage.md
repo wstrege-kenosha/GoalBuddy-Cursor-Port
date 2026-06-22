@@ -52,5 +52,8 @@ Use http://127.0.0.1:41737/ if `curator.localhost` does not resolve.
 | Path | Purpose |
 |------|---------|
 | `cursor-curator/` | Main skill (scripts, MCP, agents, board) |
+| `cursor-curator/scripts/lib/objective-*.mjs` | Shared validators and PM helpers |
 | `objective-prep/` | Prep skill |
 | `scripts/install-from-repo.mjs` | Install into `~/.cursor/skills` |
+
+Shared implementation modules live under `cursor-curator/scripts/lib/objective-*.mjs` (for example `objective-state.mjs`, `objective-verify.mjs`, `objective-session.mjs`).

@@ -1,4 +1,4 @@
-# T002 Judge — Approved Worker slice #1
+# T002 Approval Gate — Approved Worker slice #1
 
 **Decision:** Approved vendored Cursor port v1.0.0 + git-only install.
 

@@ -20,7 +20,7 @@ Upstream parity matrix: [docs/PARITY.md](docs/PARITY.md). **Wiki:** [Cursor Cura
 - **Manual PM loop** — `/objective-prep` and `/objective` with **cursor-curator MCP tools** each turn
 - **Multi-objective hub** at `http://curator.localhost:41737/` with objective discovery
 - **MCP server** (`cursor-curator`) — validate state, render prompts, validate receipts, completion gates
-- **CLI** — `doctor`, `board`, `hub`, `prompt`, `receipt`, `completion-check`, `stale`, `migrate`
+- **CLI** — `doctor`, `board`, `hub`, `prompt`, `receipt`, `completion-check`, `resume`, `verify-receipt`, `blocked`, `misfire-audit`, `subgoal-rollup`, `stale`, `migrate`
 - **Global `curator` command** — after install, add `~/.cursor/bin` to PATH
 
 ## Install
@@ -76,6 +76,8 @@ Add `%USERPROFILE%\.cursor\bin` (Windows) or `~/.cursor/bin` (macOS/Linux) to PA
 curator doctor --objective-ready
 curator hub --json
 curator board docs/objectives/<slug>
+curator resume docs/objectives/<slug>
+curator verify-receipt docs/objectives/<slug> --task T003 --receipt-file notes/T003-worker.md
 curator completion-check docs/objectives/<slug>
 ```
 

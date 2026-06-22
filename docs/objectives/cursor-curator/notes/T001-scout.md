@@ -40,7 +40,7 @@ Only: `docs/objectives/cursor-curator/{objective.md,state.yaml,notes/,.cursor-cu
 | Objective Prep | `$objective-prep` / plugin skill | `/objective-prep` + `objective-prep` skill | Scaffold only (objective.md) |
 | PM `/objective` loop | Native + CLI prompt | `/objective` command + `curator.mjs prompt` | Charter only |
 | state.yaml v2 | Yes | Yes (prep) | Yes |
-| Scout/Approval Gate/Worker | Codex toml + Claude md | `goal-*.md` agents | Queued, not in repo |
+| Scout/Approval Gate/Worker | Codex toml + Claude md | `objective-*.md` agents | Queued, not in repo |
 | Local board hub | `curator.localhost:41737` | Same (board cmd in state) | Snapshot generated |
 | doctor | `--target codex\|claude` | `doctor` (cursor only) | Missing |
 | install | `npx cursor-curator` | `curator.mjs install` | Missing |
@@ -67,7 +67,7 @@ Only: `docs/objectives/cursor-curator/{objective.md,state.yaml,notes/,.cursor-cu
 - Charter/state `existing_plan_facts` say workspace empty; prep added board + 6 files.
 - Operator already has Cursor port in `~/.cursor` but port **repo** has no distributable payload yet.
 
-## Ambiguity (Judge)
+## Ambiguity (Approval Gate)
 
 - Source of truth for vendoring: upstream npm pack vs existing local cursor tree vs hybrid.
 - Publish `cursor-curator-cursor` to npm or git-only install.

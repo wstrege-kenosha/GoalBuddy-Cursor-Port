@@ -1,7 +1,7 @@
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { basename, join, resolve } from "node:path";
-import { isWeakProof, validateGoalState } from "./goal-state.mjs";
-import { discoverObjectiveStatePaths } from "./goal-stale.mjs";
+import { isWeakProof, validateGoalState } from "./objective-state.mjs";
+import { discoverObjectiveStatePaths } from "./objective-stale.mjs";
 import { readBoardRepoLinks } from "../../surfaces/local-goal-board/scripts/lib/port-metadata.mjs";
 import {
   hubPageCss,
@@ -9,7 +9,7 @@ import {
   themeSurfaceCss,
   themeTokensCss,
 } from "../../surfaces/local-goal-board/scripts/lib/board-theme.mjs";
-import { readLastVerificationFromState } from "./goal-verify.mjs";
+import { readLastVerificationFromState } from "./objective-verify.mjs";
 
 export function discoverObjectiveDirs(roots = [process.cwd()]) {
   return discoverObjectiveStatePaths(roots).map((statePath) => resolve(statePath, ".."));

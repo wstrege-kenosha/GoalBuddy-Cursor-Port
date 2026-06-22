@@ -17,16 +17,16 @@ import { installCliBin } from "./install-cli-bin.mjs";
 import { getWorkspaceRoot, registerKnownWorkspace } from "../mcp/path-utils.mjs";
 import { runMcpSmokeTest } from "../mcp/tools.mjs";
 import { renderTaskPrompt } from "./render-task-prompt.mjs";
-import { checkCompletionReadiness } from "./lib/goal-completion.mjs";
-import { buildBlockedTriagePlan, listBlockedTasks } from "./lib/goal-blocked.mjs";
-import { buildHubPayload } from "./lib/goal-hub.mjs";
-import { misfireAuditStatus } from "./lib/goal-misfire.mjs";
-import { validateReceipt } from "./lib/goal-receipt.mjs";
-import { buildResumeDigest } from "./lib/goal-session.mjs";
-import { checkSubgoalRollup } from "./lib/goal-subgoal.mjs";
-import { findStaleGoals } from "./lib/goal-stale.mjs";
-import { parseReceiptFromText } from "./lib/goal-state-write.mjs";
-import { verifyWorkerReceiptForTask } from "./lib/goal-verify.mjs";
+import { checkCompletionReadiness } from "./lib/objective-completion.mjs";
+import { buildBlockedTriagePlan, listBlockedTasks } from "./lib/objective-blocked.mjs";
+import { buildHubPayload } from "./lib/objective-hub.mjs";
+import { misfireAuditStatus } from "./lib/objective-misfire.mjs";
+import { validateReceipt } from "./lib/objective-receipt.mjs";
+import { buildResumeDigest } from "./lib/objective-session.mjs";
+import { checkSubgoalRollup } from "./lib/objective-subgoal.mjs";
+import { findStaleGoals } from "./lib/objective-stale.mjs";
+import { parseReceiptFromText } from "./lib/objective-state-write.mjs";
+import { verifyWorkerReceiptForTask } from "./lib/objective-verify.mjs";
 import { loadBoard, selectTask } from "./render-task-prompt.mjs";
 import { runMigrate as runMigrate30 } from "./migrate-3.0.mjs";
 import { runMigrate as runMigrate40 } from "./migrate-4.0.mjs";
@@ -51,13 +51,17 @@ const REQUIRED_SCRIPTS = [
   "render-task-prompt.mjs",
   "local-goal-board.mjs",
   "lib/objective-board.mjs",
-  "lib/goal-state.mjs",
-  "lib/goal-receipt.mjs",
-  "lib/goal-completion.mjs",
-  "lib/goal-stale.mjs",
-  "lib/goal-hub.mjs",
-  "lib/goal-session.mjs",
-  "lib/goal-state-write.mjs",
+  "lib/objective-state.mjs",
+  "lib/objective-receipt.mjs",
+  "lib/objective-completion.mjs",
+  "lib/objective-stale.mjs",
+  "lib/objective-hub.mjs",
+  "lib/objective-session.mjs",
+  "lib/objective-state-write.mjs",
+  "lib/objective-verify.mjs",
+  "lib/objective-misfire.mjs",
+  "lib/objective-blocked.mjs",
+  "lib/objective-subgoal.mjs",
   "run-mcp-server.mjs",
   "install-mcp.mjs",
   "install-cli-bin.mjs",

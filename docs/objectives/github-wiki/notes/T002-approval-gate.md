@@ -1,4 +1,4 @@
-# T002 Judge — first Worker slice (T003 contract)
+# T002 Approval Gate — first Worker slice (T003 contract)
 
 **Decision:** Approve T003 as largest safe vertical slice after T001 scout.
 

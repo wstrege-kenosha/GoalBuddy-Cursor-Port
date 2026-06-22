@@ -1,8 +1,8 @@
 import { appendFileSync, existsSync, mkdirSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
-import { validateGoalState } from "./goal-state.mjs";
-import { readLastVerificationFromState } from "./goal-verify.mjs";
-import { discoverObjectiveStatePaths, findStaleGoals } from "./goal-stale.mjs";
+import { validateGoalState } from "./objective-state.mjs";
+import { readLastVerificationFromState } from "./objective-verify.mjs";
+import { discoverObjectiveStatePaths, findStaleGoals } from "./objective-stale.mjs";
 
 export function appendSessionNote(options = {}) {
   const workspaceRoot = resolve(options.workspaceRoot || process.cwd());

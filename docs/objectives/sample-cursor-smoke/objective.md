@@ -2,11 +2,11 @@
 
 ## Objective
 
-Demonstrate a completed Scout → Judge → Worker cycle on a minimal v2 objective board for Cursor port verification.
+Demonstrate a completed Scout → Approval Gate → Worker cycle on a minimal v2 objective board for Cursor port verification.
 
 ## Original Request
 
-Smoke-test Cursor Curator Cursor install and goal-state validation without touching production goals.
+Smoke-test Cursor Curator Cursor install and objective-state validation without touching production goals.
 
 ## Intake Summary
 
@@ -20,7 +20,7 @@ Smoke-test Cursor Curator Cursor install and goal-state validation without touch
 - Blind spots considered: Windows path for `~/.cursor`
 - Existing plan facts: Scaffold only; no implementation in this goal
 
-## Goal Oracle
+## Success criteria
 
 `node curator/scripts/check-objective-state.mjs docs/objectives/sample-cursor-smoke/state.yaml` returns `ok: true`.
 
@@ -38,7 +38,7 @@ Validate board schema and receipts for T001–T003; final audit deferred to T999
 
 ## Stop Rule
 
-Stop when T999 Judge records `full_outcome_complete: true` after verification.
+Stop when T999 Approval Gate records `full_outcome_complete: true` after verification.
 
 ## Canonical Board
 

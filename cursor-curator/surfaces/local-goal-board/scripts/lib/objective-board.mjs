@@ -16,10 +16,10 @@ import {
   githubSlugFromUrl,
   readBoardRepoLinks,
 } from "./port-metadata.mjs";
-import { checkCompletionReadiness } from "../../../../scripts/lib/goal-completion.mjs";
-import { readLastVerificationFromState } from "../../../../scripts/lib/goal-verify.mjs";
-import { readSessionDigest } from "../../../../scripts/lib/goal-session.mjs";
-import { validateGoalState } from "../../../../scripts/lib/goal-state.mjs";
+import { checkCompletionReadiness } from "../../../../scripts/lib/objective-completion.mjs";
+import { readLastVerificationFromState } from "../../../../scripts/lib/objective-verify.mjs";
+import { readSessionDigest } from "../../../../scripts/lib/objective-session.mjs";
+import { validateGoalState } from "../../../../scripts/lib/objective-state.mjs";
 
 export { readBoardRepoLinks };
 

@@ -16,7 +16,7 @@ Operator ran Objective Prep flow in Cursor session (PM), creating:
 /objective Follow docs/objectives/curator-prep-live-test/objective.md.
 ```
 
-## Live Scout → Judge → Worker
+## Live Scout → Approval Gate → Worker
 
 | Task | Agent | Transcript |
 |------|-------|------------|

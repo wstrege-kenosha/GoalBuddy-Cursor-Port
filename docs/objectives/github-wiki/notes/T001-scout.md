@@ -27,7 +27,7 @@ git clone https://github.com/wstrege-kenosha/Cursor-Curator.git
 cd cursor-curator   # ← wrong vs clone dir Cursor-Curator
 ```
 
-Wiki **Install** page should use `cd Cursor-Curator` (or document case on Windows). Judge may pair wiki publish with README fix in main repo.
+Wiki **Install** page should use `cd Cursor-Curator` (or document case on Windows). Approval Gate may pair wiki publish with README fix in main repo.
 
 ## Source → wiki page outline
 
@@ -49,7 +49,7 @@ Wiki **Install** page should use `cd Cursor-Curator` (or document case on Window
 - [ ] No machine-specific paths or secrets
 - [ ] Publish receipt (UI steps or git remote + commit)
 
-## Ranked Worker slices (for Judge)
+## Ranked Worker slices (for Approval Gate)
 
 1. **Web UI vertical slice** — Home + Install + Usage (fix `cd` in Install only on wiki).
 2. **Git wiki repo** — after first page; optional `docs/wiki/*.md` in main as source of truth.

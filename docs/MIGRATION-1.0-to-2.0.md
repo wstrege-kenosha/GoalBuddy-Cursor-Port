@@ -120,7 +120,7 @@ Restart Cursor if it was already open during install.
 Required so:
 
 - Updated `/objective` command (MCP-gated) loads
-- `goal-*.md` agent prompts reload
+- `objective-*.md` agent prompts reload
 - MCP server connects
 
 ### 6. Verify

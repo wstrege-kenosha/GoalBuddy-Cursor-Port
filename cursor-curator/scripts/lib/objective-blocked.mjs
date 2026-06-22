@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { findBlockedTasksInText } from "./goal-stale.mjs";
+import { findBlockedTasksInText } from "./objective-stale.mjs";
 
 export function listBlockedTasks(statePath) {
   const resolved = resolve(statePath);

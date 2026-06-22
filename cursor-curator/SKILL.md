@@ -131,9 +131,6 @@ Prompt scripts emit `objective_scout` (underscore). Map to hyphenated Cursor nam
 3. `render_task_prompt` → spawn Task subagent (scout/approval_gate/worker)
 4. `validate_receipt` → `verify_worker_receipt` for done Workers
 5. PM updates `state.yaml` → `validate_state` → `append_session_note`
-3. `validate_receipt` before writing state
-4. PM updates `state.yaml`
-5. `validate_state` again → `append_session_note`
 
 CLI equivalents (fallback only):
 
@@ -156,7 +153,23 @@ Reports safe parallel Scout or disjoint Worker scopes; does not mutate state or 
 node ~/.cursor/skills/cursor-curator/scripts/curator.mjs board docs/objectives/<slug>
 ```
 
-Default hub: `http://curator.localhost:41737/` (all goals) or `http://curator.localhost:41737/<slug>/` (single board). Share as a Markdown link so it is clickable.
+Default hub: `http://curator.localhost:41737/` (all objectives) or `http://curator.localhost:41737/<slug>/` (single board). Share as a Markdown link so it is clickable.
+
+## Shared libraries (`cursor-curator/scripts/lib/`)
+
+| Module | Role |
+|--------|------|
+| `objective-state.mjs` | Validate `state.yaml` |
+| `objective-receipt.mjs` | Parse/validate `cursor_curator_receipt_v1` |
+| `objective-completion.mjs` | Readiness for `objective.status: done` |
+| `objective-verify.mjs` | Cross-check Worker receipts vs `task.verify` |
+| `objective-session.mjs` | `notes/SESSION.md` digest + resume handoff |
+| `objective-stale.mjs` | Stale objective detection |
+| `objective-hub.mjs` | Multi-objective hub payload |
+| `objective-misfire.mjs` | Intake misfire audit scheduling |
+| `objective-blocked.mjs` | Blocked task triage |
+| `objective-subgoal.mjs` | Depth-1 rollup checks |
+| `objective-state-write.mjs` | Receipt application helpers (PM-owned writes) |
 
 ## CLI reference
 
@@ -170,7 +183,12 @@ Default hub: `http://curator.localhost:41737/` (all goals) or `http://curator.lo
 | `parallel-plan <slug>` | Parallel safety report |
 | `receipt <file\|json>` | Validate `cursor_curator_receipt_v1` JSON |
 | `completion-check <slug>` | Check readiness for `objective.status: done` |
-| `stale [--days 7]` | List stale goals under `docs/objectives/` |
+| `resume <slug>` | Turn-0 session/validation handoff digest |
+| `verify-receipt <slug>` | Cross-check Worker receipt vs `task.verify` |
+| `blocked <slug>` | List blocked tasks + triage hints |
+| `misfire-audit <slug>` | Intake misfire audit due / recommendation |
+| `subgoal-rollup <slug>` | Pending child rollups when subobjective is done |
+| `stale [--days 7]` | List stale objectives under `docs/objectives/` |
 | `hub [--json]` | Multi-objective hub summary |
 | `board <slug>` | Start local board server |
 
@@ -185,7 +203,7 @@ Copy from `templates/` when scaffolding manually:
 ## Pitfalls
 
 1. **Wrong skill directory** — use `~/.cursor/skills/cursor-curator/`, not `skills-cursor/`.
-2. **Subagent lag** — new `~/.cursor/agents/goal-*.md` files may require a Cursor restart before `Task` recognizes them.
+2. **Subagent lag** — new `~/.cursor/agents/objective-*.md` files may require a Cursor restart before `Task` recognizes them.
 3. **MCP disabled** — `/objective` stops without `validate_state`; run `curator install` and enable MCP in Cursor settings.
 
 ## License

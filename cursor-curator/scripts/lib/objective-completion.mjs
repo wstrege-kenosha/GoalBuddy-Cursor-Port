@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
-import { isWeakProof, validateGoalState } from "./goal-state.mjs";
-import { misfireAuditOverdueAtCompletion } from "./goal-misfire.mjs";
+import { isWeakProof, validateGoalState } from "./objective-state.mjs";
+import { misfireAuditOverdueAtCompletion } from "./objective-misfire.mjs";
 
 export function checkCompletionReadiness(statePath) {
   const resolved = resolve(statePath);

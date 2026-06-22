@@ -20,7 +20,7 @@ https://github.com/wstrege-kenosha/Cursor-Curator/wiki — can you create a wiki
 - Blind spots considered: wiki enabled on repo vs empty; edit via `Cursor-Curator.wiki.git` vs GitHub UI; wiki-only vs also adding `docs/wiki/` in main repo as source of truth
 - Existing plan facts: Public repo published; README has install/verify/usage; local `docs/PARITY.md` exists; publish goal largely complete
 
-## Goal Oracle
+## Success criteria
 
 The wiki home page is live at the repo wiki URL with cross-linked pages (Install, Usage, Cursor Curator loop, Upstream/parity) derived from README and PARITY; a task receipt records how pages were published (git push to wiki remote or documented UI steps) and a spot-check that install commands use the real clone URL `wstrege-kenosha/Cursor-Curator`.
 
@@ -30,7 +30,7 @@ The wiki home page is live at the repo wiki URL with cross-linked pages (Install
 
 ## Current Tranche
 
-Scout wiki mechanics and current wiki state → Judge picks content + publish slice → Worker authors pages and publishes → final audit.
+Scout wiki mechanics and current wiki state → Approval Gate picks content + publish slice → Worker authors pages and publishes → final audit.
 
 ## Non-Negotiable Constraints
 

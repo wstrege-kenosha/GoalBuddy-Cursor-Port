@@ -20,7 +20,7 @@
 - Blind spots considered: <risks, unstated choices, or success dimensions surfaced during diagnostic intake>
 - Existing plan facts: <user-provided steps/files/constraints/sequencing to preserve and validate, or none>
 
-## Goal Oracle
+## Success criteria
 
 The success criteria for this goal is:
 
@@ -44,11 +44,11 @@ The PM must keep comparing task receipts to these success criteria. Planning, di
 
 Stop only when a final audit proves the full original outcome is complete.
 
-Do not stop after planning, discovery, or Judge selection if the user asked for working software or automation and a safe Worker task can be activated.
+Do not stop after planning, discovery, or Approval Gate selection if the user asked for working software or automation and a safe Worker task can be activated.
 
 Do not stop after a single verified Worker package when the broader owner outcome still has safe local follow-up work. Advance the board to the next highest-leverage safe Worker package and continue unless a phase, risk, rejected-verification, ambiguity, or final-completion review is due.
 
-Do not create one Worker/Judge pair per repeated file, table, route, or helper. Put repeated same-shape work into one Worker package and review the package as a whole.
+Do not create one Worker/Approval Gate pair per repeated file, table, route, or helper. Put repeated same-shape work into one Worker package and review the package as a whole.
 
 ## Slice Sizing
 
@@ -87,7 +87,7 @@ On every `/objective` continuation:
 3. Run the bundled Cursor Curator update checker when available and mention a newer version without blocking.
 4. Re-check the intake: original request, input shape, authority, proof, blind spots, existing plan facts, and likely misfire.
 5. Work only on the active board task.
-6. Assign Scout, Judge, Worker, or PM according to the task.
+6. Assign Scout, Approval Gate, Worker, or PM according to the task.
 7. Write a compact task receipt.
 8. Update the board.
 9. If safe local work remains, choose the next largest reversible Worker package and continue unless blocked.

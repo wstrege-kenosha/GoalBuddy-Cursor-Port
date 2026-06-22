@@ -108,7 +108,7 @@ const phaseBTestFile = join(repoRoot, "cursor-curator", "scripts", "test", "phas
 if (!runNodeTests(phaseBTestFile, "phase-b mcp tests")) failed = true;
 
 const verifyTestFile = join(repoRoot, "cursor-curator", "scripts", "test", "goal-verify.test.mjs");
-if (!runNodeTests(verifyTestFile, "goal-verify tests")) failed = true;
+if (!runNodeTests(verifyTestFile, "objective-verify tests")) failed = true;
 
 const doctor = spawnSync(
   process.execPath,

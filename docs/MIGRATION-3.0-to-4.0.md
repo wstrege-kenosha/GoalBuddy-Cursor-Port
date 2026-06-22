@@ -13,9 +13,10 @@
 | `/goal-board` | `/objective-board` |
 | MCP `list_goals`, `get_goal_state` | `list_objectives`, `get_objective_state` |
 | MCP param `goal` | `objective` |
-| `check-goal-state.mjs` | `check-objective-state.mjs` |
+| `check-objective-state.mjs` | `check-objective-state.mjs` |
 | `/curator doctor --goal-ready` | `curator doctor --objective-ready` |
 | `goal-scout` / `goal-approval-gate` / `goal-worker` | `objective-scout` / `objective-approval-gate` / `objective-worker` |
+| `scripts/lib/goal-*.mjs` shared libs | `scripts/lib/objective-*.mjs` (`objective-state`, `objective-receipt`, …) |
 | `/curator-prep`, `curator-prep/` | `/objective-prep`, `objective-prep/` |
 
 **Unchanged:** YAML `subgoal:`, upstream `tolibear/goalbuddy` attribution.
@@ -47,7 +48,7 @@ Enable MCP server `cursor-curator` in Cursor Settings → MCP.
 3. In `state.yaml`, change top-level `goal:` to `objective:` (leave `subgoal:` as-is).
 4. Update charter references: `/objective Follow docs/objectives/<slug>/objective.md`.
 5. Update PM/agent prompts to pass MCP `"objective": "<slug>"` instead of `"goal"`.
-6. Reinstall agents so `~/.cursor/agents/objective-*.md` replace legacy `goal-*.md`.
+6. Reinstall agents so `~/.cursor/agents/objective-*.md` replace legacy `objective-*.md`.
 7. Run `npm run check` and `node cursor-curator/scripts/curator.mjs doctor --objective-ready`.
 
 ## Fresh install

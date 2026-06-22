@@ -5,7 +5,7 @@ import {
   formatLastVerificationYaml,
   readLastVerificationFromState,
   verifyWorkerReceiptForTask,
-} from "../lib/goal-verify.mjs";
+} from "../lib/objective-verify.mjs";
 
 test("crossCheckWorkerReceipt matches verify commands with pass status", () => {
   const result = crossCheckWorkerReceipt(

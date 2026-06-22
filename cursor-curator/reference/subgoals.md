@@ -7,7 +7,7 @@ Use subgoals for bounded child work that belongs to a parent task.
 - **Depth 1 only** — child boards live under `subgoals/<task-id>-<slug>/`
 - **Non-recursive** — no subgoals inside subgoals
 - **Single parent link** — exactly one parent task references the child
-- Judge must approve via `approve_subgoal` before PM promotes
+- Approval Gate must approve via `approve_subgoal` before PM promotes
 
 ## Layout
 

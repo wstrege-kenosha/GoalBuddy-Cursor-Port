@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { isWeakProof } from "./goal-state.mjs";
+import { isWeakProof } from "./objective-state.mjs";
 
 const DEFAULT_WORKERS_BETWEEN_AUDITS = 3;
 const MISFIRE_MARKERS = ["misfire", "interpreted_outcome", "original_request", "wrong thing", "intake"];
