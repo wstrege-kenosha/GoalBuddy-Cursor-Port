@@ -2,11 +2,11 @@ import assert from "node:assert/strict";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { test } from "node:test";
-import { checkCompletionReadiness } from "../lib/objective-completion.mjs";
-import { buildHubPayload } from "../lib/objective-hub.mjs";
-import { validateReceipt } from "../lib/objective-receipt.mjs";
-import { findStaleGoals } from "../lib/objective-stale.mjs";
-import { createParallelPlan } from "../parallel-plan.mjs";
+import { checkCompletionReadiness } from "../../dist/completion/objective-completion.mjs";
+import { buildHubPayload } from "../../dist/hub/objective-hub.mjs";
+import { validateReceipt } from "../../dist/receipt/objective-receipt.mjs";
+import { findStaleObjectives } from "../../dist/stale/objective-stale.mjs";
+import { createParallelPlan } from "../../dist/prompt/parallel-plan.mjs";
 
 const __dirname = fileURLToPath(new URL(".", import.meta.url));
 const repoRoot = resolve(__dirname, "../../..");
@@ -17,7 +17,7 @@ test("validateReceipt accepts worker receipt shape", () => {
     cursor_curator_receipt_v1: {
       result: "done",
       task_id: "T003",
-      board_path: "docs/objectives/sample/state.yaml",
+      board_path: "docs/objectives/sample/state.json",
       changed_files: ["README.md"],
       commands: [{ cmd: "npm run check", status: "pass" }],
       summary: "Updated readme.",
@@ -26,24 +26,26 @@ test("validateReceipt accepts worker receipt shape", () => {
   assert.equal(result.ok, true);
 });
 
-test("checkCompletionReadiness is not ready for active smoke objective", () => {
-  const result = checkCompletionReadiness(join(smokeGoal, "state.yaml"));
-  assert.equal(result.ready, false);
-  assert.equal(result.validation_ok, true);
+test("checkCompletionReadiness reports ready for completed sample-cursor-smoke objective", async () => {
+  const statePath = join(smokeGoal, "state.json");
+  const result = checkCompletionReadiness(statePath);
+  assert.equal(result.ready, true);
+  const { validateObjectiveStateFile } = await import("../../dist/mcp/validate-state-bridge.mjs");
+  assert.equal(validateObjectiveStateFile(statePath).ok, true);
 });
 
-test("buildHubPayload discovers repo goals", () => {
+test("buildHubPayload discovers repo objectives", () => {
   const payload = buildHubPayload({ roots: [repoRoot] });
-  assert.ok(payload.objective_count >= 2);
-  assert.ok(payload.goals.some((goal) => goal.slug === "sample-cursor-smoke"));
+  assert.ok(payload.objective_count >= 1);
+  assert.ok(payload.objectives.some((objective) => objective.slug === "sample-cursor-smoke"));
   assert.equal(payload.repo?.portLabel, "wstrege-kenosha/Cursor-Curator");
   assert.equal(payload.repo?.upstreamLabel, "tolibear/goalbuddy");
   assert.equal(payload.repo?.cursorPortVersion, "4.0.0");
 });
 
-test("findStaleGoals returns structured report", () => {
-  const result = findStaleGoals({ days: 0, roots: [repoRoot] });
-  assert.ok(Array.isArray(result.goals));
+test("findStaleObjectives returns structured report", () => {
+  const result = findStaleObjectives({ days: 0, roots: [repoRoot] });
+  assert.ok(Array.isArray(result.objectives));
 });
 
 test("parallel-plan includes spawn_plan array", () => {

@@ -9,10 +9,10 @@
 
 0. `session_resume_digest` — turn-0 handoff; use `list_objectives` with `stale_days: 7` when objectives may be idle
 1. `get_active_task` → `validate_state` (stop if errors)
-2. `misfire_audit_check` / `subgoal_rollup_check` when rules require them
+2. `misfire_audit_check` / `subobjective_rollup_check` when rules require them
 3. `render_task_prompt` → spawn Task subagent (`objective-scout` | `objective-approval-gate` | `objective-worker`)
 4. `validate_receipt` → `verify_worker_receipt` for done Workers (writes `checks.last_verification` patch)
-5. PM updates `state.yaml`
+5. PM updates `state.json`
 6. `validate_state` again → `append_session_note`
 
 ## CLI (after install)
@@ -27,7 +27,7 @@ curator resume docs/objectives/<slug> --json
 curator verify-receipt docs/objectives/<slug> --task T003 --receipt-file notes/T003-worker.md
 curator blocked docs/objectives/<slug> --json
 curator misfire-audit docs/objectives/<slug>
-curator subgoal-rollup docs/objectives/<slug>
+curator subobjective-rollup docs/objectives/<slug>
 curator prompt docs/objectives/<slug> --task T001 --json
 curator completion-check docs/objectives/<slug>
 curator stale --days 7
@@ -37,7 +37,7 @@ curator receipt notes/T003-worker.md --role worker
 Or use the full path:
 
 ```bash
-node ~/.cursor/skills/cursor-curator/scripts/curator.mjs doctor --objective-ready
+node ~/.cursor/skills/cursor-curator/dist/cli/curator.mjs doctor --objective-ready
 ```
 
 ## Local board and hub
@@ -51,9 +51,10 @@ Use http://127.0.0.1:41737/ if `curator.localhost` does not resolve.
 
 | Path | Purpose |
 |------|---------|
-| `cursor-curator/` | Main skill (scripts, MCP, agents, board) |
-| `cursor-curator/scripts/lib/objective-*.mjs` | Shared validators and PM helpers |
+| `cursor-curator/src/` | TypeScript sources (state, CLI, MCP, board) |
+| `cursor-curator/dist/` | Compiled ESM for CLI, MCP, and board |
+| `cursor-curator/scripts/lib/objective-*.mjs` | PM helper shims (import `dist/`; dual-read via `loadState`) |
 | `objective-prep/` | Prep skill |
-| `scripts/install-from-repo.mjs` | Install into `~/.cursor/skills` |
+| `scripts/install-from-repo.mjs` | Install into `~/.cursor/skills` + skill runtime deps |
 
-Shared implementation modules live under `cursor-curator/scripts/lib/objective-*.mjs` (for example `objective-state.mjs`, `objective-verify.mjs`, `objective-session.mjs`).
+Canonical board truth is **`state.json`** (v3, Zod-validated in `cursor-curator/src/state/` → `dist/state/`). `loadState()` resolves JSON first, then legacy `state.yaml` v2 with a deprecation warning. Board UI and hub code live in `cursor-curator/src/board/` → `dist/board/`.

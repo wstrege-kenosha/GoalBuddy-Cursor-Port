@@ -10,16 +10,16 @@ The user message after this command is the objective path or charter reference, 
 Follow docs/objectives/<slug>/objective.md.
 ```
 
-Resolve `docs/objectives/<slug>/state.yaml` relative to the workspace root.
+Resolve `docs/objectives/<slug>/state.json` relative to the workspace root.
 
 ## MCP required (Phase B)
 
-Use the **cursor-curator** MCP server for every turn. Do not advance `state.yaml` or spawn Task subagents until the mandatory tool sequence below succeeds.
+Use the **cursor-curator** MCP server for every turn. Do not advance `state.json` or spawn Task subagents until the mandatory tool sequence below succeeds.
 
 If MCP tools are unavailable, stop and tell the user to run:
 
 ```bash
-node ~/.cursor/skills/cursor-curator/scripts/curator.mjs install
+node ~/.cursor/skills/cursor-curator/dist/cli/curator.mjs install
 ```
 
 Then enable the `curator` server in Cursor MCP settings and retry.
@@ -30,7 +30,7 @@ Then enable the `curator` server in Cursor MCP settings and retry.
 1. **get_active_task** `{ "objective": "<slug>" }` — confirm `active_task` and task type.
 2. **validate_state** `{ "objective": "<slug>" }` — if `ok` is false, report errors and **stop**; do not advance.
 2b. **misfire_audit_check** `{ "objective": "<slug>" }` — if `due`, queue an Approval Gate misfire audit before spawning a new Worker.
-2c. **subgoal_rollup_check** `{ "objective": "<slug>" }` — if pending rollups, PM writes `rollup_receipt` on the parent task.
+2c. **subobjective_rollup_check** `{ "objective": "<slug>" }` — if pending rollups, PM writes `rollup_receipt` on the parent task.
 3. If task type is **pm**, execute directly (no Task spawn). After edits, call **validate_state** again before reporting done.
 4. For scout | approval_gate | worker:
    - **render_task_prompt** `{ "objective": "<slug>", "task_id": "<T###>" }`
@@ -42,7 +42,7 @@ Then enable the `curator` server in Cursor MCP settings and retry.
 6. **validate_receipt** with the parsed JSON, `role`, and `task_id`. If `ok` is false, **stop**; do not write to state.
 6b. For Worker + `result: done`, **verify_worker_receipt** — cross-check `receipt.commands` against `task.verify`; PM writes `checks.last_verification` (receipt cross-check only; no shell re-run).
 7. Write receipt notes under `docs/objectives/<slug>/notes/<task_id>-<role>.md` when useful.
-8. Update `state.yaml` (PM-owned):
+8. Update `state.json` (PM-owned):
    - Set task `receipt` summary and `status` (done | blocked)
    - Advance `active_task` when done and rules allow
    - Apply Approval Gate `required_board_updates` as PM-owned edits
@@ -76,7 +76,7 @@ Only mark full outcome complete when `ready` is true and Approval Gate/PM audit 
 If Task fails with unknown `subagent_type`:
 
 ```bash
-node ~/.cursor/skills/cursor-curator/scripts/curator.mjs install
+node ~/.cursor/skills/cursor-curator/dist/cli/curator.mjs install
 ```
 
 Then ask the user to restart Cursor and retry.

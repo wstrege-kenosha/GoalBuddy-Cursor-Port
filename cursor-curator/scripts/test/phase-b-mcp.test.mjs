@@ -4,8 +4,8 @@ import { homedir, tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { test } from "node:test";
-import { buildMcpServerEntry, buildMcpServerEntryForProject, checkMcpConfig, installMcpConfig, mergeMcpConfig, readPortConfig, resolveMcpRepoRoot } from "../install-mcp.mjs";
-import { resolveObjectiveStatePath, getWorkspaceRoot, resolveWorkspaceForObjective, registerKnownWorkspace } from "../../mcp/path-utils.mjs";
+import { buildMcpServerEntry, buildMcpServerEntryForProject, checkMcpConfig, installMcpConfig, mergeMcpConfig, readPortConfig, resolveMcpRepoRoot } from "../../dist/install/install-mcp.mjs";
+import { resolveObjectiveStatePath, getWorkspaceRoot, resolveWorkspaceForObjective, registerKnownWorkspace } from "../../dist/mcp/path-utils.mjs";
 import {
   runMcpSmokeTest,
   toolCompletionCheck,
@@ -14,11 +14,11 @@ import {
   toolMisfireAuditCheck,
   toolRenderTaskPrompt,
   toolSessionResumeDigest,
-  toolSubgoalRollupCheck,
+  toolSubobjectiveRollupCheck,
   toolValidateReceipt,
   toolValidateState,
   toolBlockedTasks,
-} from "../../mcp/tools.mjs";
+} from "../../dist/mcp/tools.mjs";
 
 const __dirname = fileURLToPath(new URL(".", import.meta.url));
 const repoRoot = resolve(__dirname, "../../..");
@@ -31,7 +31,7 @@ process.env.CURATOR_WORKSPACE = repoRoot;
 
 test("resolveObjectiveStatePath stays under docs/objectives", () => {
   const statePath = resolveObjectiveStatePath(smokeSlug, repoRoot);
-  assert.match(statePath, /docs[/\\]objectives[/\\]sample-cursor-smoke[/\\]state\.yaml$/);
+  assert.match(statePath, /docs[/\\]objectives[/\\]sample-cursor-smoke[/\\]state\.json$/);
 });
 
 test("resolveObjectiveStatePath rejects escape attempts", () => {
@@ -87,7 +87,7 @@ test("getWorkspaceRoot prefers WORKSPACE_FOLDER_PATHS over stale home CURATOR_WO
   }
 });
 
-test("resolveWorkspaceForObjective finds goal in registered workspace when cwd is home", () => {
+test("resolveWorkspaceForObjective finds objective in registered workspace when cwd is home", () => {
   const previousGoalWorkspace = process.env.CURATOR_WORKSPACE;
   const configPath = join(skillRoot, "known-workspaces.json");
   const previousConfig = existsSync(configPath) ? readFileSync(configPath, "utf8") : null;
@@ -96,7 +96,7 @@ test("resolveWorkspaceForObjective finds goal in registered workspace when cwd i
   try {
     assert.equal(resolveWorkspaceForObjective(smokeSlug), repoRoot);
     const statePath = resolveObjectiveStatePath(smokeSlug);
-    assert.match(statePath, /sample-cursor-smoke[/\\]state\.yaml$/);
+    assert.match(statePath, /sample-cursor-smoke[/\\]state\.json$/);
   } finally {
     if (previousGoalWorkspace === undefined) {
       delete process.env.CURATOR_WORKSPACE;
@@ -158,16 +158,16 @@ test("toolValidateReceipt rejects malformed receipt", () => {
   assert.equal(result.ok, false);
 });
 
-test("toolCompletionCheck reports not ready for active smoke objective", () => {
+test("toolCompletionCheck reports ready for completed sample-cursor-smoke objective", () => {
   const result = toolCompletionCheck({ objective: smokeSlug });
-  assert.equal(result.ready, false);
+  assert.equal(result.ready, true);
   assert.equal(result.validation_ok, true);
 });
 
 test("toolListObjectives discovers repo objectives", () => {
   const result = toolListObjectives({});
-  assert.ok(result.objective_count >= 2);
-  assert.ok(result.objectives.some((entry) => entry.slug === smokeSlug));
+  assert.ok(result.objective_count >= 1);
+  assert.ok(result.objectives.some((entry) => entry.slug === "sample-cursor-smoke"));
 });
 
 test("toolSessionResumeDigest returns handoff fields", () => {
@@ -183,8 +183,8 @@ test("toolMisfireAuditCheck returns audit status", () => {
   assert.ok(result.recommendation);
 });
 
-test("toolSubgoalRollupCheck returns pending rollups list", () => {
-  const result = toolSubgoalRollupCheck({ objective: smokeSlug });
+test("toolSubobjectiveRollupCheck returns pending rollups list", () => {
+  const result = toolSubobjectiveRollupCheck({ objective: smokeSlug });
   assert.equal(typeof result.pending_count, "number");
   assert.ok(Array.isArray(result.pending_rollups));
 });
@@ -195,7 +195,7 @@ test("toolBlockedTasks returns blocked task array", () => {
   assert.ok(result.triage);
 });
 
-test("runMcpSmokeTest passes on sample goal", () => {
+test("runMcpSmokeTest passes on sample objective", () => {
   const result = runMcpSmokeTest({ workspaceRoot: repoRoot, objective: smokeSlug });
   assert.equal(result.ok, true);
   assert.equal(result.validation_ok, true);
@@ -207,31 +207,31 @@ test("mergeMcpConfig preserves other servers", () => {
   assert.ok(merged.mcpServers["cursor-curator"]);
 });
 
-test("buildMcpServerEntry points at launcher script with workspace cwd", () => {
+test("buildMcpServerEntry points at dist MCP server", () => {
   const entry = buildMcpServerEntry(skillRoot);
   assert.equal(entry.command, "node");
   assert.equal(entry.cwd, ".");
   assert.equal(
     resolve(String(entry.args[0])),
-    resolve(skillRoot, "scripts", "run-mcp-server.mjs"),
+    resolve(skillRoot, "dist", "mcp", "server.mjs"),
   );
 });
 
-test("buildMcpServerEntryForProject uses launcher for external repos", () => {
+test("buildMcpServerEntryForProject uses dist launcher for external repos", () => {
   const externalRoot = resolve(repoRoot, "..", "external-goal-project");
   const entry = buildMcpServerEntryForProject(externalRoot, skillRoot);
   assert.equal(entry.command, "node");
   assert.equal(entry.cwd, ".");
   assert.equal(
     resolve(String(entry.args[0])),
-    resolve(skillRoot, "scripts", "run-mcp-server.mjs"),
+    resolve(skillRoot, "dist", "mcp", "server.mjs"),
   );
 });
 
-test("buildMcpServerEntryForProject uses portable repo-relative paths", () => {
+test("buildMcpServerEntryForProject uses portable repo-relative dist path", () => {
   const entry = buildMcpServerEntryForProject(repoRoot, skillRoot);
   assert.equal(entry.command, "node");
-  assert.deepEqual(entry.args, ["cursor-curator/mcp/server.mjs"]);
+  assert.deepEqual(entry.args, ["cursor-curator/dist/mcp/server.mjs"]);
   assert.equal(entry.cwd, ".");
   assert.equal(entry.args.some((arg) => arg.includes("Users")), false);
 });
@@ -258,7 +258,7 @@ test("installMcpConfig writes user-level and project configs", () => {
   assert.ok(userConfig.mcpServers["cursor-curator"]);
   assert.equal(
     resolve(String(userConfig.mcpServers["cursor-curator"].args[0])),
-    resolve(skillRoot, "scripts", "run-mcp-server.mjs"),
+    resolve(skillRoot, "dist", "mcp", "server.mjs"),
   );
   assert.equal(readPortConfig(skillRoot)?.repoRoot, repoRoot);
 });

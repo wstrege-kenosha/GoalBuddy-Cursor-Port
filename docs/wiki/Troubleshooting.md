@@ -26,7 +26,7 @@ npm run install:cursor
 
 User-level MCP uses a launcher script that loads the server from your cloned repo (where `npm install` put `@modelcontextprotocol/sdk`). If MCP fails to start, confirm you ran `npm install` in Cursor-Curator and that `~/.cursor/skills/cursor-curator/.cursor-curator-port.json` points at that clone.
 
-## MCP resolves the wrong workspace (EISDIR / state.yaml not found)
+## MCP resolves the wrong workspace (EISDIR / state.json not found)
 
 Global `~/.cursor/mcp.json` used to launch Cursor Curator with `cwd` at your user home directory and cache that path as `CURATOR_WORKSPACE` at MCP startup. Cursor Curator 2.0+ re-reads Cursor's `WORKSPACE_FOLDER_PATHS` (and related editor env vars) on **every tool call**, so the open project wins even when a stale home path was cached earlier.
 
@@ -57,28 +57,28 @@ If `/objective` still fails:
    ```
 
 4. Restart Cursor and confirm **Settings → MCP → cursor-curator** is enabled (disable duplicate entries if both global and project configs appear).
-5. Run `node curator/scripts/curator.mjs doctor` **from the objective's repo root**, not from `$HOME`.
+5. Run `node cursor-curator/dist/cli/curator.mjs doctor` **from the objective's repo root**, not from `$HOME`.
 
 When MCP tools run, check `workspace_root` in `list_objectives` output — it should match the repo that contains `docs/objectives/<slug>/`, not `C:\Users\...`.
 
-Doctor `mcp:smoke` must pass against `docs/objectives/sample-cursor-smoke/state.yaml` in the repo you have open.
+Doctor `mcp:smoke` must pass against `docs/objectives/sample-cursor-smoke/state.json` in the repo you have open.
 
 ## Board URL does not open
 
 - Use http://127.0.0.1:41737/ (hub) or http://127.0.0.1:41737/<slug>/ if `curator.localhost` does not resolve.
-- Start the board: `node curator/scripts/curator.mjs board docs/objectives/<slug>`
+- Start the board: `node cursor-curator/dist/cli/curator.mjs board docs/objectives/<slug>`
 
 ## Task subagents missing
 
 ```bash
-node ~/.cursor/skills/cursor-curator/scripts/curator.mjs install
+node ~/.cursor/skills/cursor-curator/dist/cli/curator.mjs install
 ```
 
 Restart Cursor.
 
 ## `check-objective-state` / `validate_state` errors
 
-- Done tasks need structured `receipt` blocks in `state.yaml`.
+- Done tasks need structured `receipt` blocks in `state.json`.
 - Worker receipts need `changed_files`, `commands` with `status: pass`.
 - `active_task` must point to the one task with `status: active`.
 
@@ -98,4 +98,4 @@ Add `%USERPROFILE%\.cursor\bin` (Windows) or `~/.cursor/bin` (macOS/Linux) to PA
 
 ## Publish this wiki from the repo
 
-See `docs/objectives/github-wiki/notes/publish-wiki-operator.md` or run `node scripts/publish-wiki.mjs` after the GitHub wiki git repo exists (create the first page in the GitHub wiki UI if `git push` fails).
+Run `node scripts/publish-wiki.mjs` after the GitHub wiki git repo exists (create the first page in the GitHub wiki UI if `git push` fails). Source pages live in `docs/wiki/`.

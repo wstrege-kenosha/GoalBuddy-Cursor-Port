@@ -14,7 +14,7 @@ When the **cursor-curator** MCP server is available:
 1. **get_active_task** `{ "objective": "<slug>" }` — confirm task id and objective.
 2. **validate_state** `{ "objective": "<slug>" }` — note validation warnings; do not mutate state.
 
-Prefer MCP over ad hoc shell reads of `state.yaml`.
+Prefer MCP over ad hoc shell reads of `state.json`.
 
 ## Hard contract
 
@@ -49,7 +49,7 @@ Return exactly one parseable JSON receipt object:
   "cursor_curator_receipt_v1": {
     "result": "done | blocked",
     "task_id": "<T###>",
-    "board_path": "<path to state.yaml>",
+    "board_path": "<path to state.json>",
     "summary": "<=120 words>",
     "evidence": [],
     "facts": [],

@@ -2,12 +2,12 @@ import assert from "node:assert/strict";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { test } from "node:test";
-import { isWeakProof, validateGoalState } from "../lib/objective-state.mjs";
+import { isWeakProof, validateObjectiveState } from "../../dist/state/objective-state.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(__dirname, "../../..");
 const fixturesDir = join(__dirname, "fixtures");
-const smokeState = join(repoRoot, "docs/objectives/sample-cursor-smoke/state.yaml");
+const smokeState = join(repoRoot, "docs/objectives/sample-cursor-smoke/state.json");
 
 test("isWeakProof flags placeholders", () => {
   assert.equal(isWeakProof("<placeholder>"), true);
@@ -15,74 +15,55 @@ test("isWeakProof flags placeholders", () => {
   assert.equal(isWeakProof("npm run check exits 0"), false);
 });
 
-test("validateGoalState passes sample-cursor-smoke", () => {
-  const result = validateGoalState(smokeState);
+test("validateObjectiveState passes sample-cursor-smoke state.json via dist validator", async () => {
+  const { readFileSync } = await import("node:fs");
+  const { validateStateV3 } = await import("../../dist/state/objective-state.mjs");
+  const parsed = JSON.parse(readFileSync(smokeState, "utf8"));
+  const result = validateStateV3(parsed);
   assert.equal(result.ok, true);
-  assert.equal(result.version, 2);
+  assert.equal(result.version, 3);
+});
+
+test("validateObjectiveState passes sample-cursor-smoke state.json file via bridge", async () => {
+  const { validateObjectiveStateFile } = await import("../../dist/mcp/validate-state-bridge.mjs");
+  const result = validateObjectiveStateFile(smokeState);
+  assert.equal(result.ok, true);
+  assert.equal(result.version, 3);
   assert.equal(result.errors.length, 0);
 });
 
-test("validateGoalState warns on weak success criteria", () => {
-  const result = validateGoalState(join(fixturesDir, "weak-success-criteria/state.yaml"));
+test("validateObjectiveState warns on weak success criteria", () => {
+  const result = validateObjectiveState(join(fixturesDir, "weak-success-criteria/state.json"));
   assert.equal(result.ok, true);
   assert.ok(result.warnings.some((warning) => warning.includes("objective.success_criteria.signal")));
   assert.ok(result.warnings.some((warning) => warning.includes("objective.success_criteria.final_proof")));
 });
 
-test("validateGoalState errors on active worker without contract fields", () => {
-  const result = validateGoalState(join(fixturesDir, "invalid-active-worker/state.yaml"));
+test("validateObjectiveState errors on active worker without contract fields", () => {
+  const result = validateObjectiveState(join(fixturesDir, "invalid-active-worker/state.json"));
   assert.equal(result.ok, false);
   assert.ok(result.errors.some((error) => error.includes("allowed_files")));
   assert.ok(result.errors.some((error) => error.includes("verify")));
   assert.ok(result.errors.some((error) => error.includes("stop_if")));
 });
 
-test("validateGoalState returns not found for missing path", () => {
-  const result = validateGoalState(join(fixturesDir, "missing/state.yaml"));
+test("validateObjectiveState returns not found for missing path", () => {
+  const result = validateObjectiveState(join(fixturesDir, "missing/state.json"));
   assert.equal(result.ok, false);
   assert.ok(result.errors[0].includes("not found"));
 });
 
-test("agent warnings reference curator.mjs install not npx curator agents", async () => {
-  const fixtureDir = join(fixturesDir, "agent-warning");
-  const statePath = join(fixtureDir, "state.yaml");
-  const { mkdirSync, writeFileSync } = await import("node:fs");
-  mkdirSync(join(fixtureDir, "notes"), { recursive: true });
-  writeFileSync(join(fixtureDir, "objective.md"), "# fixture\n");
-  writeFileSync(statePath, `version: 2
+test("validateObjectiveState rejects state.yaml paths", () => {
+  const result = validateObjectiveState(join(fixturesDir, "weak-success-criteria/state.yaml"));
+  assert.equal(result.ok, false);
+  assert.ok(result.errors[0].includes("state.yaml is deprecated"));
+});
 
-objective:
-  title: Agent warning
-  slug: agent-warning
-  status: active
-  success_criteria:
-    signal: npm run check exits 0
-    final_proof: check passes
-  intake:
-    completion_proof: npm run check exits 0
-
-rules:
-  pm_owns_state: true
-
-agents:
-  scout: bundled_not_installed
-  worker: installed
-  approval_gate: installed
-
-active_task: T001
-
-tasks:
-  - id: T001
-    type: scout
-    assignee: Scout
-    status: active
-    objective: "Fixture"
-    receipt: null
-`);
-
-  const result = validateGoalState(statePath);
+test("agent warnings reference curator install not npx curator agents", () => {
+  const statePath = join(fixturesDir, "agent-warning/state.json");
+  const result = validateObjectiveState(statePath);
   const scoutWarning = result.warnings.find((warning) => warning.includes("agents.scout"));
   assert.ok(scoutWarning);
-  assert.ok(scoutWarning.includes("curator.mjs install"));
+  assert.ok(scoutWarning.includes("curator.mjs install") || scoutWarning.includes("curator install"));
   assert.ok(!scoutWarning.includes("npx curator agents"));
 });

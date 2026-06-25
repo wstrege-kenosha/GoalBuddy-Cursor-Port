@@ -2,26 +2,7 @@
 
 Git-installable Cursor port of [tolibear/goalbuddy](https://github.com/tolibear/goalbuddy) for Cursor (`cursorPortVersion` **4.0.0**, `upstreamVersion` **0.3.8**).
 
-Upstream parity matrix: [docs/PARITY.md](docs/PARITY.md). **Wiki:** [Cursor Curator wiki](https://github.com/wstrege-kenosha/Cursor-Curator/wiki).
-
-**Upgrading from 2.1.0?** See [docs/MIGRATION-2.1-to-3.0.md](docs/MIGRATION-2.1-to-3.0.md). **From 2.0.0?** See [docs/MIGRATION-2.0-to-2.1.md](docs/MIGRATION-2.0-to-2.1.md). **From 1.0.0?** See [docs/MIGRATION-1.0-to-2.0.md](docs/MIGRATION-1.0-to-2.0.md).
-
-## What's in 4.0.0
-
-- **Structural Objective paths:** `docs/objectives/`, `objective.md`, YAML `objective:`, `/objective`, `/objective-board`
-- MCP tools `list_objectives`, `get_objective_state`; param `objective`
-- Migration: [docs/MIGRATION-3.0-to-4.0.md](docs/MIGRATION-3.0-to-4.0.md)
-
-## What's in 3.0.0
-
-- **Cursor Curator rebrand** — skill tree `cursor-curator/`, CLI `curator`, MCP key `cursor-curator`
-- **Success criteria** — replaces GoalBuddy “oracle” (`objective.success_criteria` in `state.yaml`)
-- **Approval Gate** — replaces Judge subagent (`objective-approval-gate`, `type: approval_gate`)
-- **Manual PM loop** — `/objective-prep` and `/objective` with **cursor-curator MCP tools** each turn
-- **Multi-objective hub** at `http://curator.localhost:41737/` with objective discovery
-- **MCP server** (`cursor-curator`) — validate state, render prompts, validate receipts, completion gates
-- **CLI** — `doctor`, `board`, `hub`, `prompt`, `receipt`, `completion-check`, `resume`, `verify-receipt`, `blocked`, `misfire-audit`, `subgoal-rollup`, `stale`, `migrate`
-- **Global `curator` command** — after install, add `~/.cursor/bin` to PATH
+**Documentation:** [Cursor Curator wiki](https://github.com/wstrege-kenosha/Cursor-Curator/wiki) (source in [`docs/wiki/`](docs/wiki/)). Upstream parity and migrations live there — e.g. [Upstream parity](docs/wiki/Upstream-Parity.md), [Migration 5.0](docs/wiki/Migration-5.0.md) (YAML → JSON v3).
 
 ## Install
 
@@ -29,69 +10,57 @@ Upstream parity matrix: [docs/PARITY.md](docs/PARITY.md). **Wiki:** [Cursor Cura
 git clone https://github.com/wstrege-kenosha/Cursor-Curator.git
 cd Cursor-Curator
 npm install
+npm run build
 node scripts/install-from-repo.mjs
 ```
 
-Or:
+Or `npm run install:cursor`.
 
-```bash
-npm run install:cursor
-```
+The installer copies skills to `~/.cursor/skills`, builds `cursor-curator/dist/` when needed, registers agents/commands, and merges the **cursor-curator** MCP entry into `.cursor/mcp.json`. Enable the MCP server in Cursor settings after install.
 
-The installer copies `cursor-curator/` and `objective-prep/` into your Cursor skills directory (`~/.cursor/skills` on macOS/Linux, `%USERPROFILE%\.cursor\skills` on Windows), runs `curator.mjs install` to register agents and slash commands, and merges the **cursor-curator** MCP entry into `.cursor/mcp.json`.
-
-Enable the `cursor-curator` MCP server in Cursor settings after install.
+See [docs/wiki/Install.md](docs/wiki/Install.md) for full steps.
 
 ## Verify
 
 ```bash
+npm run build
+npm run test:dev
 npm run check
-node cursor-curator/scripts/curator.mjs doctor
-node cursor-curator/scripts/curator.mjs doctor --objective-ready
+node cursor-curator/dist/cli/curator.mjs doctor
+node cursor-curator/dist/cli/curator.mjs doctor --objective-ready
 ```
 
 ## Smoke objective
 
 ```bash
-node cursor-curator/scripts/check-objective-state.mjs docs/objectives/sample-cursor-smoke/state.yaml
-node cursor-curator/scripts/curator.mjs board docs/objectives/sample-cursor-smoke
+node cursor-curator/dist/cli/curator.mjs check-state docs/objectives/sample-cursor-smoke/state.json
+node cursor-curator/dist/cli/curator.mjs board docs/objectives/sample-cursor-smoke
 ```
 
-**Canonical port board:** `docs/objectives/cursor-curator/` (ported from [tolibear/goalbuddy](https://github.com/tolibear/goalbuddy)).
-
-Open the hub: http://curator.localhost:41737/ — see `docs/objectives/sample-cursor-smoke/objective.md`.
+Hub: http://curator.localhost:41737/
 
 ## Usage
 
-### PM loop (chat)
+1. `/objective-prep` — scaffold `docs/objectives/<slug>/` in your workspace
+2. `/objective Follow docs/objectives/<slug>/objective.md.` — PM loop with **cursor-curator MCP tools**
 
-1. `/objective-prep` — scaffold `docs/objectives/<slug>/`
-2. `/objective Follow docs/objectives/<slug>/objective.md.` — PM uses **cursor-curator MCP tools** each turn
-
-### CLI (after install)
-
-Add `%USERPROFILE%\.cursor\bin` (Windows) or `~/.cursor/bin` (macOS/Linux) to PATH, then from any repo with an objective:
-
-```bash
-curator doctor --objective-ready
-curator hub --json
-curator board docs/objectives/<slug>
-curator resume docs/objectives/<slug>
-curator verify-receipt docs/objectives/<slug> --task T003 --receipt-file notes/T003-worker.md
-curator completion-check docs/objectives/<slug>
-```
+After install, add `~/.cursor/bin` to PATH for the global `curator` CLI (`doctor`, `board`, `hub`, `resume`, `verify-receipt`, …). See [docs/wiki/Usage.md](docs/wiki/Usage.md).
 
 ## Layout
 
 | Path | Purpose |
 |------|---------|
-| `cursor-curator/` | Main skill (scripts, MCP server, agents, board) |
+| `cursor-curator/src/` | TypeScript sources (state schema, CLI, MCP, board) |
+| `cursor-curator/dist/` | Compiled ESM (build output; gitignored) |
+| `cursor-curator/templates/state.json` | v3 board template |
 | `objective-prep/` | `/objective-prep` skill |
-| `.cursor/mcp.json` | Project MCP config (cursor-curator server) |
-| `scripts/install-from-repo.mjs` | Copy skills + run Cursor install |
+| `scripts/install-from-repo.mjs` | Install skills + MCP from a clone |
+| `scripts/migrate-5.0.mts` | One-time YAML v2 → JSON v3 migration |
+| `docs/wiki/` | Operator documentation (wiki source) |
+| `docs/objectives/sample-cursor-smoke/` | CI/doctor smoke board only |
+
+**Board state:** runtime is **JSON v3 only** (`state.json`). Migrate legacy YAML with `node scripts/migrate-5.0.mts docs/objectives/<slug>`.
 
 ## Publishing
 
-Public repo: [github.com/wstrege-kenosha/Cursor-Curator](https://github.com/wstrege-kenosha/Cursor-Curator).
-
-Re-run [Verify](#verify) from a fresh clone. Not on npm; upstream [tolibear/goalbuddy](https://github.com/tolibear/goalbuddy).
+Public repo: [github.com/wstrege-kenosha/Cursor-Curator](https://github.com/wstrege-kenosha/Cursor-Curator). Not on npm; install from git.

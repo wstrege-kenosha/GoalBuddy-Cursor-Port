@@ -6,12 +6,12 @@ Start or refresh the Cursor Curator local board for an objective in this workspa
 
 1. Determine the objective directory:
    - If the user named `docs/objectives/<slug>`, use that path.
-   - Else find the most recently modified `docs/objectives/*/state.yaml` in the workspace, or ask which slug.
+   - Else find the most recently modified `docs/objectives/*/state.json` in the workspace, or ask which slug.
 
 2. Run the board server (background if long-running):
 
    ```bash
-   node ~/.cursor/skills/cursor-curator/scripts/curator.mjs board docs/objectives/<slug>
+   node ~/.cursor/skills/cursor-curator/dist/cli/curator.mjs board docs/objectives/<slug>
    ```
 
 3. Tell the user the board URL as a clickable Markdown link:
@@ -22,4 +22,4 @@ Start or refresh the Cursor Curator local board for an objective in this workspa
 
 ## Reference
 
-`~/.cursor/skills/cursor-curator/surfaces/local-goal-board/README.md`
+`~/.cursor/skills/cursor-curator/surfaces/local-objective-board/README.md`

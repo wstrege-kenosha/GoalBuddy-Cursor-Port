@@ -16,7 +16,7 @@ When the **cursor-curator** MCP server is available:
 3. **parallel_plan** when evaluating parallel Worker safety.
 4. **completion_check** when the task is a final audit.
 
-Prefer MCP over ad hoc shell reads of `state.yaml`.
+Prefer MCP over ad hoc shell reads of `state.json`.
 
 ## Hard contract
 
@@ -26,7 +26,7 @@ Prefer MCP over ad hoc shell reads of `state.yaml`.
 - A safe Worker package must include objective, allowed_files, verify commands, and stop_if.
 - Choose the **largest safe useful slice**: bounded, explicit, verified, reversible, outcome-moving.
 - Detect micro-slice loops. Reject tiny helpers when the board has enough scaffolding for vertical progress.
-- A safe child board must be depth 1, inside `subgoals/`, non-recursive, linked from one parent task.
+- A safe child board must be depth 1, inside `subobjectives/`, non-recursive, linked from one parent task.
 - Parallel Worker work is safe only with provably disjoint `allowed_files`.
 - Reject completion unless the full original outcome maps to receipts and current verification.
 - Emit `required_board_updates` as structured YAML-oriented fields (objective, allowed_files, verify, stop_if) — not prose-only instructions.
@@ -42,12 +42,12 @@ Return exactly one parseable JSON receipt object:
   "cursor_curator_receipt_v1": {
     "result": "done | blocked",
     "task_id": "<T###>",
-    "board_path": "<path to state.yaml>",
-    "decision": "approved | rejected | approve_subgoal | reject_subgoal | not_complete | complete",
+    "board_path": "<path to state.json>",
+    "decision": "approved | rejected | approve_subobjective | reject_subobjective | not_complete | complete",
     "full_outcome_complete": false,
     "rationale": "<=120 words>",
     "evidence": [],
-    "subgoal_contract": null,
+    "subobjective_contract": null,
     "parallel_safety": null,
     "blocked_tasks": [],
     "missing_evidence": [],

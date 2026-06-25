@@ -2,8 +2,6 @@
 
 Upgrade guide for existing Cursor Curator installs.
 
-**Full doc in repo:** `docs/MIGRATION-1.0-to-2.0.md`
-
 > **Upgrading from 2.0.0?** SDK auto-loop was removed in **2.1.0**. See [Migration 2.0 → 2.1](Migration-2.0-to-2.1).
 
 ## Quick steps
@@ -17,7 +15,7 @@ npm run install:cursor
 
 1. **Cursor Settings → MCP** — enable `curator`
 2. **Restart Cursor**
-3. Verify: `node curator/scripts/curator.mjs doctor --objective-ready`
+3. Verify: `node cursor-curator/dist/cli/curator.mjs doctor --objective-ready`
 
 ## What you must do differently
 

@@ -15,9 +15,11 @@ jobs:
           node-version: "22"
           cache: npm
       - run: npm ci
+      - name: npm run build
+        run: npm run build
       - name: install Cursor surfaces for doctor
-        run: node cursor-curator/scripts/curator.mjs install
+        run: node cursor-curator/dist/cli/curator.mjs install
       - name: npm run check
         run: npm run check
       - name: doctor --objective-ready
-        run: node cursor-curator/scripts/curator.mjs doctor --objective-ready
+        run: node cursor-curator/dist/cli/curator.mjs doctor --objective-ready

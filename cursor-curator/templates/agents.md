@@ -43,7 +43,7 @@ cp .codex/skills/cursor-curator/agents/objective_*.toml .codex/agents/
 Rules:
 
 - Only the PM loop chooses active tasks, marks tasks done, or completes the objective.
-- Keep at most one write-capable Worker active unless disjoint write scopes are explicit in `state.yaml`.
+- Keep at most one write-capable Worker active unless disjoint write scopes are explicit in `state.json`.
 - Worker defaults to medium reasoning for implementation tasks and should complete the whole assigned slice.
 - Scout and Approval Gate are read-only and safe to parallelize when their board inputs are clear.
 - Approval Gate is high thinking and should choose the largest safe useful slice, not the narrowest helper.

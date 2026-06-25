@@ -4,6 +4,7 @@ Git-installable [Cursor Curator](https://github.com/tolibear/cursor-curator) for
 
 | Page | Topic |
 |------|--------|
+| [Migration 5.0](Migration-5.0) | YAML v2 → JSON v3 (fork) |
 | [Migration 2.0 → 2.1](Migration-2.0-to-2.1) | SDK auto-loop removed |
 | [Migration 1.0 → 2.0](Migration-1.0-to-2.0) | Upgrade from 1.0.0 |
 | [Install](Install) | Clone, install skills, MCP, verify |

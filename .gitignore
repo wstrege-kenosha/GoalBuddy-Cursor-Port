@@ -1,4 +1,5 @@
 node_modules/
+cursor-curator/dist/
 .DS_Store
 Thumbs.db
 *.log
@@ -14,10 +15,16 @@ cursor-curator/known-workspaces.json
 
 # Generated goal board artifacts
 **/.cursor-curator-board/
-!cursor-curator/surfaces/local-goal-board/examples/**/.cursor-curator-board/
+!cursor-curator/surfaces/local-objective-board/examples/**/.cursor-curator-board/
 
-# Ephemeral goal workspaces from manual testing
-docs/objectives/curator-prep-live-test/
+# Ephemeral objective workspaces from manual testing
 docs/objectives/goal-prep-live-test/
+docs/objectives/curator-prep-live-test/
+
+# Local-only objectives (not tracked); repo keeps sample-cursor-smoke only
+docs/objectives/*
+!docs/objectives/README.md
+!docs/objectives/sample-cursor-smoke/
+!docs/objectives/sample-cursor-smoke/**
 
 /notes/

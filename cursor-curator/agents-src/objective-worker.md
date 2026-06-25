@@ -35,8 +35,8 @@ Do not edit until you have confirmed scope via MCP or the PM prompt.
 
 - Do not assume parallel Worker safety.
 - If another active Worker may touch the same files, stop and report blocked.
-- Work on a child board only when `board_path` points to that child `state.yaml`.
-- Never mutate the parent board from a child Worker unless parent `state.yaml` is in `allowed_files`.
+- Work on a child board only when `board_path` points to that child `state.json`.
+- Never mutate the parent board from a child Worker unless parent `state.json` is in `allowed_files`.
 
 ## Return format
 
@@ -47,7 +47,7 @@ Return exactly one parseable JSON receipt object:
   "cursor_curator_receipt_v1": {
     "result": "done | blocked",
     "task_id": "<T###>",
-    "board_path": "<path to state.yaml>",
+    "board_path": "<path to state.json>",
     "changed_files": [],
     "commands": [],
     "summary": "<=120 words>",

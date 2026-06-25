@@ -1,0 +1,424 @@
+{
+  "generatedAt": "2026-06-22T16:10:55.343Z",
+  "repo": {
+    "portUrl": "https://github.com/wstrege-kenosha/Cursor-Curator",
+    "portLabel": "wstrege-kenosha/Cursor-Curator",
+    "portApiSlug": "wstrege-kenosha/Cursor-Curator",
+    "upstreamUrl": "https://github.com/tolibear/goalbuddy",
+    "upstreamLabel": "tolibear/goalbuddy",
+    "cursorPortVersion": "4.0.0",
+    "upstreamVersion": "0.3.8"
+  },
+  "source": {
+    "objectiveDir": "W:\\Experimental\\Cursor-Curator\\docs\\objectives\\sample-cursor-smoke",
+    "statePath": "W:\\Experimental\\Cursor-Curator\\docs\\objectives\\sample-cursor-smoke\\state.yaml",
+    "stateMtimeMs": 1782142243348.6233,
+    "notesDir": "W:\\Experimental\\Cursor-Curator\\docs\\objectives\\sample-cursor-smoke\\notes"
+  },
+  "objective": {
+    "title": "Sample Cursor smoke",
+    "slug": "sample-cursor-smoke",
+    "kind": "specific",
+    "status": "active",
+    "tranche": "Validate Scout/Approval Gate/Worker receipts and check-objective-state",
+    "activeTask": "T999",
+    "success_criteria": {
+      "signal": "check-objective-state.mjs exits ok on this state.yaml",
+      "cadence": "after scaffold and at T999 audit",
+      "final_proof": "check-objective-state pass + board URL captured in notes"
+    },
+    "intake": {
+      "original_request": "Smoke-test Cursor port objective board",
+      "interpreted_outcome": "Minimal valid v2 board with T001–T003 done",
+      "input_shape": "specific",
+      "audience": "port operators",
+      "authority": "requested",
+      "proof_type": "artifact",
+      "completion_proof": "check-objective-state ok; board hub reachable",
+      "likely_misfire": "Placeholder receipts that fail validation",
+      "blind_spots_considered": [
+        "agent install state on fresh machine"
+      ],
+      "existing_plan_facts": []
+    }
+  },
+  "validation": {
+    "ok": true,
+    "errors": [],
+    "warnings": []
+  },
+  "completion": {
+    "ready": false,
+    "blockers": [
+      "active tasks remain: T999",
+      "missing final Approval Gate/PM audit with decision complete and full_outcome_complete: true"
+    ],
+    "success_criteria_ready": true,
+    "audit_ready": false
+  },
+  "lastVerification": {
+    "result": "pass",
+    "task": "T003",
+    "commands": []
+  },
+  "activeTaskDetail": {
+    "id": "T999",
+    "objective": "Audit whether smoke board satisfies success criteria (check-objective-state + board URL).",
+    "assignee": "Approval Gate",
+    "type": "approval_gate",
+    "verify": []
+  },
+  "progress": {
+    "total": 4,
+    "done": 3,
+    "blocked": 0,
+    "queued": 0,
+    "active": 1,
+    "pct": 75
+  },
+  "sessionPreview": null,
+  "counts": {
+    "total": 4,
+    "todo": 0,
+    "inProgress": 1,
+    "blocked": 0,
+    "completed": 3
+  },
+  "columns": [
+    {
+      "id": "todo",
+      "title": "Todo",
+      "description": "Queued work ready to pull",
+      "tasks": []
+    },
+    {
+      "id": "in-progress",
+      "title": "In Progress",
+      "description": "The active task",
+      "tasks": [
+        {
+          "id": "T999",
+          "title": "Audit whether smoke board satisfies success criteria (check-objective-state + board URL)",
+          "objective": "Audit whether smoke board satisfies success criteria (check-objective-state + board URL).",
+          "status": "active",
+          "column": "in-progress",
+          "type": "approval_gate",
+          "assignee": "Approval Gate",
+          "active": true,
+          "inputs": [
+            "T001–T003 receipts",
+            "objective.md success criteria"
+          ],
+          "constraints": [
+            "Do not implement."
+          ],
+          "expectedOutput": [
+            "complete | not_complete"
+          ],
+          "allowedFiles": [],
+          "verify": [],
+          "stopIf": [],
+          "subgoal": null,
+          "receipt": {
+            "present": false,
+            "summary": "",
+            "result": "",
+            "note": ""
+          }
+        }
+      ]
+    },
+    {
+      "id": "blocked",
+      "title": "Blocked",
+      "description": "Needs unblock or a smaller slice",
+      "tasks": []
+    },
+    {
+      "id": "completed",
+      "title": "Completed",
+      "description": "Receipted work",
+      "tasks": [
+        {
+          "id": "T003",
+          "title": "Add notes/T003-worker.md documenting smoke receipt validation",
+          "objective": "Add notes/T003-worker.md documenting smoke receipt validation.",
+          "status": "done",
+          "column": "completed",
+          "type": "worker",
+          "assignee": "Worker",
+          "active": false,
+          "inputs": [],
+          "constraints": [],
+          "expectedOutput": [],
+          "allowedFiles": [
+            "notes/**"
+          ],
+          "verify": [
+            "node curator/scripts/check-objective-state.mjs docs/objectives/sample-cursor-smoke/state.yaml"
+          ],
+          "stopIf": [
+            "Needs files outside allowed_files"
+          ],
+          "subgoal": null,
+          "receipt": {
+            "present": true,
+            "result": "done",
+            "summary": "Added smoke worker note; check-objective-state passes.",
+            "decision": "",
+            "note": "",
+            "changedFiles": [
+              "notes/T003-worker.md"
+            ],
+            "commands": [
+              {
+                "cmd": "node curator/scripts/check-objective-state.mjs docs/objectives/sample-cursor-smoke/state.yaml",
+                "status": "pass"
+              }
+            ],
+            "evidence": []
+          }
+        },
+        {
+          "id": "T002",
+          "title": "Approve a single-file Worker slice to",
+          "objective": "Approve a single-file Worker slice to add notes/T003-worker.md under this goal.",
+          "status": "done",
+          "column": "completed",
+          "type": "approval_gate",
+          "assignee": "Approval Gate",
+          "active": false,
+          "inputs": [
+            "T001 receipt"
+          ],
+          "constraints": [
+            "Do not implement."
+          ],
+          "expectedOutput": [
+            "allowed_files and verify for Worker"
+          ],
+          "allowedFiles": [],
+          "verify": [],
+          "stopIf": [],
+          "subgoal": null,
+          "receipt": {
+            "present": true,
+            "result": "done",
+            "summary": "Approved notes-only Worker; verify check-objective-state on this board.",
+            "decision": "approved",
+            "note": "",
+            "changedFiles": [],
+            "commands": [],
+            "evidence": []
+          }
+        },
+        {
+          "id": "T001",
+          "title": "Confirm smoke objective paths and verification commands for the Cursor port repo",
+          "objective": "Confirm smoke objective paths and verification commands for the Cursor port repo.",
+          "status": "done",
+          "column": "completed",
+          "type": "scout",
+          "assignee": "Scout",
+          "active": false,
+          "inputs": [
+            "README.md",
+            "package.json",
+            "cursor-curator/scripts/check-objective-state.mjs"
+          ],
+          "constraints": [
+            "Read-only."
+          ],
+          "expectedOutput": [
+            "Verification command list"
+          ],
+          "allowedFiles": [],
+          "verify": [],
+          "stopIf": [],
+          "subgoal": null,
+          "receipt": {
+            "present": true,
+            "result": "done",
+            "summary": "Mapped smoke paths; verify uses check-objective-state and doctor --objective-ready.",
+            "decision": "",
+            "note": "notes/T001-scout.md",
+            "changedFiles": [],
+            "commands": [],
+            "evidence": [
+              "README.md",
+              "docs/PARITY.md"
+            ]
+          },
+          "note": {
+            "path": "notes/T001-scout.md",
+            "title": "T001 Scout — sample-cursor-smoke",
+            "content": "# T001 Scout — sample-cursor-smoke\r\n\r\nSmoke objective: validate Cursor port without editing `cursor-curator`.\r\n\r\n**Verify commands:**\r\n\r\n- `npm run check`\r\n- `node curator/scripts/curator.mjs doctor --objective-ready`\r\n- `node curator/scripts/check-objective-state.mjs docs/objectives/sample-cursor-smoke/state.yaml`\r\n- `node curator/scripts/curator.mjs board docs/objectives/sample-cursor-smoke`\r\n",
+            "mtimeMs": 1782142243328.6233
+          }
+        }
+      ]
+    }
+  ],
+  "tasks": [
+    {
+      "id": "T001",
+      "title": "Confirm smoke objective paths and verification commands for the Cursor port repo",
+      "objective": "Confirm smoke objective paths and verification commands for the Cursor port repo.",
+      "status": "done",
+      "column": "completed",
+      "type": "scout",
+      "assignee": "Scout",
+      "active": false,
+      "inputs": [
+        "README.md",
+        "package.json",
+        "cursor-curator/scripts/check-objective-state.mjs"
+      ],
+      "constraints": [
+        "Read-only."
+      ],
+      "expectedOutput": [
+        "Verification command list"
+      ],
+      "allowedFiles": [],
+      "verify": [],
+      "stopIf": [],
+      "subgoal": null,
+      "receipt": {
+        "present": true,
+        "result": "done",
+        "summary": "Mapped smoke paths; verify uses check-objective-state and doctor --objective-ready.",
+        "decision": "",
+        "note": "notes/T001-scout.md",
+        "changedFiles": [],
+        "commands": [],
+        "evidence": [
+          "README.md",
+          "docs/PARITY.md"
+        ]
+      },
+      "note": {
+        "path": "notes/T001-scout.md",
+        "title": "T001 Scout — sample-cursor-smoke",
+        "content": "# T001 Scout — sample-cursor-smoke\r\n\r\nSmoke objective: validate Cursor port without editing `cursor-curator`.\r\n\r\n**Verify commands:**\r\n\r\n- `npm run check`\r\n- `node curator/scripts/curator.mjs doctor --objective-ready`\r\n- `node curator/scripts/check-objective-state.mjs docs/objectives/sample-cursor-smoke/state.yaml`\r\n- `node curator/scripts/curator.mjs board docs/objectives/sample-cursor-smoke`\r\n",
+        "mtimeMs": 1782142243328.6233
+      }
+    },
+    {
+      "id": "T002",
+      "title": "Approve a single-file Worker slice to",
+      "objective": "Approve a single-file Worker slice to add notes/T003-worker.md under this goal.",
+      "status": "done",
+      "column": "completed",
+      "type": "approval_gate",
+      "assignee": "Approval Gate",
+      "active": false,
+      "inputs": [
+        "T001 receipt"
+      ],
+      "constraints": [
+        "Do not implement."
+      ],
+      "expectedOutput": [
+        "allowed_files and verify for Worker"
+      ],
+      "allowedFiles": [],
+      "verify": [],
+      "stopIf": [],
+      "subgoal": null,
+      "receipt": {
+        "present": true,
+        "result": "done",
+        "summary": "Approved notes-only Worker; verify check-objective-state on this board.",
+        "decision": "approved",
+        "note": "",
+        "changedFiles": [],
+        "commands": [],
+        "evidence": []
+      }
+    },
+    {
+      "id": "T003",
+      "title": "Add notes/T003-worker.md documenting smoke receipt validation",
+      "objective": "Add notes/T003-worker.md documenting smoke receipt validation.",
+      "status": "done",
+      "column": "completed",
+      "type": "worker",
+      "assignee": "Worker",
+      "active": false,
+      "inputs": [],
+      "constraints": [],
+      "expectedOutput": [],
+      "allowedFiles": [
+        "notes/**"
+      ],
+      "verify": [
+        "node curator/scripts/check-objective-state.mjs docs/objectives/sample-cursor-smoke/state.yaml"
+      ],
+      "stopIf": [
+        "Needs files outside allowed_files"
+      ],
+      "subgoal": null,
+      "receipt": {
+        "present": true,
+        "result": "done",
+        "summary": "Added smoke worker note; check-objective-state passes.",
+        "decision": "",
+        "note": "",
+        "changedFiles": [
+          "notes/T003-worker.md"
+        ],
+        "commands": [
+          {
+            "cmd": "node curator/scripts/check-objective-state.mjs docs/objectives/sample-cursor-smoke/state.yaml",
+            "status": "pass"
+          }
+        ],
+        "evidence": []
+      }
+    },
+    {
+      "id": "T999",
+      "title": "Audit whether smoke board satisfies success criteria (check-objective-state + board URL)",
+      "objective": "Audit whether smoke board satisfies success criteria (check-objective-state + board URL).",
+      "status": "active",
+      "column": "in-progress",
+      "type": "approval_gate",
+      "assignee": "Approval Gate",
+      "active": true,
+      "inputs": [
+        "T001–T003 receipts",
+        "objective.md success criteria"
+      ],
+      "constraints": [
+        "Do not implement."
+      ],
+      "expectedOutput": [
+        "complete | not_complete"
+      ],
+      "allowedFiles": [],
+      "verify": [],
+      "stopIf": [],
+      "subgoal": null,
+      "receipt": {
+        "present": false,
+        "summary": "",
+        "result": "",
+        "note": ""
+      }
+    }
+  ],
+  "notes": [
+    {
+      "path": "notes/T001-scout.md",
+      "title": "T001 Scout — sample-cursor-smoke",
+      "mtimeMs": 1782142243328.6233
+    },
+    {
+      "path": "notes/T003-worker.md",
+      "title": "T003 Worker — sample-cursor-smoke",
+      "mtimeMs": 1780587748137.313
+    }
+  ],
+  "sessionLog": null
+}

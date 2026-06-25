@@ -3,7 +3,7 @@
     "cursor-curator": {
       "command": "node",
       "args": [
-        "cursor-curator/mcp/server.mjs"
+        "cursor-curator/dist/mcp/server.mjs"
       ],
       "cwd": "."
     }

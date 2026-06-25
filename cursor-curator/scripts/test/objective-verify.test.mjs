@@ -2,10 +2,9 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
   crossCheckWorkerReceipt,
-  formatLastVerificationYaml,
   readLastVerificationFromState,
   verifyWorkerReceiptForTask,
-} from "../lib/objective-verify.mjs";
+} from "../../dist/verify/objective-verify.mjs";
 
 test("crossCheckWorkerReceipt matches verify commands with pass status", () => {
   const result = crossCheckWorkerReceipt(
@@ -28,23 +27,24 @@ test("crossCheckWorkerReceipt fails when verify command missing", () => {
   assert.match(result.errors.join(" "), /Missing receipt command/);
 });
 
-test("readLastVerificationFromState parses checks.last_verification", () => {
-  const text = `version: 2
-checks:
-  last_verification:
-    result: pass
-    task: T003
-    commands:
-      - cmd: "npm run check"
-        status: pass
-`;
+test("readLastVerificationFromState parses JSON checks.last_verification", () => {
+  const text = JSON.stringify({
+    version: 3,
+    checks: {
+      last_verification: {
+        result: "pass",
+        task: "T003",
+        commands: [{ cmd: "npm run check", status: "pass" }],
+      },
+    },
+  });
   const parsed = readLastVerificationFromState(text);
-  assert.equal(parsed.result, "pass");
-  assert.equal(parsed.task, "T003");
-  assert.equal(parsed.commands[0].cmd, "npm run check");
+  assert.equal(parsed?.result, "pass");
+  assert.equal(parsed?.task, "T003");
+  assert.equal(parsed?.commands[0].cmd, "npm run check");
 });
 
-test("verifyWorkerReceiptForTask emits yaml patch", () => {
+test("verifyWorkerReceiptForTask returns structured last_verification patch", () => {
   const result = verifyWorkerReceiptForTask(
     { id: "T003", verify: ["npm run check"] },
     {
@@ -53,6 +53,6 @@ test("verifyWorkerReceiptForTask emits yaml patch", () => {
     },
   );
   assert.equal(result.ok, true);
-  assert.match(result.last_verification_yaml, /last_verification:/);
-  assert.match(formatLastVerificationYaml(result.last_verification), /result: pass/);
+  assert.equal(result.last_verification.result, "pass");
+  assert.equal(result.last_verification.task, "T003");
 });

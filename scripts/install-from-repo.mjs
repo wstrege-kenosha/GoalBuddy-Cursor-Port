@@ -15,6 +15,34 @@ const trees = [
   { name: "objective-prep", src: join(repoRoot, "objective-prep") },
 ];
 
+function run(command, args, options = {}) {
+  const result = spawnSync(command, args, {
+    stdio: "inherit",
+    shell: process.platform === "win32",
+    ...options,
+  });
+  return result.status ?? 1;
+}
+
+function ensureRepoDeps() {
+  const sdkPath = join(repoRoot, "node_modules", "@modelcontextprotocol", "sdk");
+  const zodPath = join(repoRoot, "node_modules", "zod");
+  if (existsSync(sdkPath) && existsSync(zodPath)) {
+    return 0;
+  }
+  console.log("Installing repo dependencies (npm install)...");
+  return run("npm", ["install"], { cwd: repoRoot });
+}
+
+function ensureDistBuild() {
+  const distCli = join(repoRoot, "cursor-curator", "dist", "cli", "curator.mjs");
+  if (existsSync(distCli)) {
+    return 0;
+  }
+  console.log("Building TypeScript dist (npm run build)...");
+  return run("npm", ["run", "build"], { cwd: repoRoot });
+}
+
 mkdirSync(skillsDir, { recursive: true });
 
 const legacyPrepSkill = join(skillsDir, "curator-prep");
@@ -22,6 +50,12 @@ if (existsSync(legacyPrepSkill)) {
   rmSync(legacyPrepSkill, { recursive: true, force: true });
   console.log(`removed legacy skill ${legacyPrepSkill}`);
 }
+
+let status = ensureRepoDeps();
+if (status !== 0) process.exit(status);
+
+status = ensureDistBuild();
+if (status !== 0) process.exit(status);
 
 for (const { name, src } of trees) {
   if (!existsSync(src)) {
@@ -33,7 +67,18 @@ for (const { name, src } of trees) {
   console.log(`copied ${name} -> ${dest}`);
 }
 
-const curatorCli = join(skillsDir, "cursor-curator", "scripts", "curator.mjs");
+const skillRoot = join(skillsDir, "cursor-curator");
+const skillPackageJson = join(skillRoot, "package.json");
+if (existsSync(skillPackageJson)) {
+  console.log("Installing skill-only dependencies (zod, MCP SDK)...");
+  status = run("npm", ["install", "--omit=dev"], { cwd: skillRoot });
+  if (status !== 0) {
+    console.error("Skill dependency install failed. Ensure npm is on PATH.");
+    process.exit(status);
+  }
+}
+
+const curatorCli = join(skillRoot, "dist", "cli", "curator.mjs");
 if (!existsSync(curatorCli)) {
   console.error(`Install copy incomplete: ${curatorCli}`);
   process.exit(1);
