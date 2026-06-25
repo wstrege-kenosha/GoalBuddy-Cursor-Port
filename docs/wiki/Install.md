@@ -74,6 +74,25 @@ Doctor checks Node, skill files, installed agents/commands, MCP config, and runs
 
 Add `%USERPROFILE%\.cursor\bin` to PATH (once) so `curator doctor` and `curator board` work from any repo with `docs/objectives/`.
 
+## Clean reinstall
+
+When skills, MCP, or board code look stale after an upgrade:
+
+```bash
+npm run build
+node cursor-curator/dist/cli/curator.mjs reinstall --clean
+```
+
+Or, after the global CLI is on PATH:
+
+```bash
+curator reinstall --clean
+```
+
+This removes installed skill copies under `~/.cursor/skills`, legacy `curator-prep` / `goalbuddy` artifacts, re-copies from your clone, and re-runs install. **Restart Cursor** afterward and confirm MCP is enabled.
+
+Requires a Cursor-Curator clone with `npm install` (repo root resolved via `CURATOR_REPO_ROOT`, `.cursor-curator-port.json`, or cwd).
+
 ## Smoke objective
 
 ```bash

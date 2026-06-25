@@ -24,6 +24,15 @@ npm install
 npm run install:cursor
 ```
 
+For a full wipe and fresh copy of skills (fixes stale board/MCP code):
+
+```bash
+npm run build
+node cursor-curator/dist/cli/curator.mjs reinstall --clean
+```
+
+Restart Cursor after reinstall.
+
 User-level MCP uses a launcher script that loads the server from your cloned repo (where `npm install` put `@modelcontextprotocol/sdk`). If MCP fails to start, confirm you ran `npm install` in Cursor-Curator and that `~/.cursor/skills/cursor-curator/.cursor-curator-port.json` points at that clone.
 
 ## MCP resolves the wrong workspace (EISDIR / state.json not found)

@@ -30,6 +30,7 @@ import { loadBoard, selectTask } from "../prompt/render-task-prompt.mjs";
 import { createParallelPlan, formatPlan } from "../prompt/parallel-plan.mjs";
 import { buildUpdateReport, runCheckUpdate } from "./check-update.mjs";
 import { main as boardMain } from "../board/local-objective-board.mjs";
+import { runReinstallClean } from "../install/reinstall-clean.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const skillRoot = resolve(__dirname, "../..");
@@ -64,6 +65,9 @@ async function main(): Promise<void> {
       break;
     case "reset":
       runReset();
+      break;
+    case "reinstall":
+      runReinstall();
       break;
     case "doctor":
       await runDoctor();
@@ -138,6 +142,7 @@ function usage(): void {
 Usage:
   node dist/cli/curator.mjs [install] [--force]
   curator [install] [--force]   (after install-cli-bin)
+  node dist/cli/curator.mjs reinstall --clean [--json]
   node dist/cli/curator.mjs reset
   node dist/cli/curator.mjs doctor [--objective-ready] [--json]
   node dist/cli/curator.mjs update [--json]
@@ -241,6 +246,21 @@ function runWorkspace(subcommand: string): void {
 function runReset(): void {
   const { removed } = resetCursorSurfaces();
   console.log(`Reset removed ${removed.length} file(s). Skill payload kept at ${skillRoot}`);
+}
+
+function runReinstall(): void {
+  if (!hasFlag("--clean")) {
+    console.error("Usage: node dist/cli/curator.mjs reinstall --clean [--json]");
+    console.error("Removes installed skills under ~/.cursor/skills, re-copies from the clone, and re-runs install.");
+    console.error("Does not delete the Cursor-Curator source tree in your clone.");
+    process.exit(2);
+  }
+
+  runReinstallClean({
+    skillRoot,
+    cursorHome,
+    json: hasFlag("--json"),
+  });
 }
 
 async function runDoctor(): Promise<void> {

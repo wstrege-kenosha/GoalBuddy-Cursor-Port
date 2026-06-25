@@ -101,7 +101,14 @@ export function installCursorSurfaces({ force = false, quiet = false } = {}): In
   return installed;
 }
 
-export function resetCursorSurfaces({ quiet = false } = {}) {
+export function resetCursorSurfaces({
+  quiet = false,
+  manifestRoot = skillRoot,
+}: {
+  quiet?: boolean;
+  manifestRoot?: string;
+} = {}) {
+  const manifestPath = join(resolve(manifestRoot), "install.json");
   if (!existsSync(manifestPath)) {
     if (!quiet) console.log("No install.json manifest; nothing to reset.");
     return { removed: [] as string[], manifest: null };
