@@ -10,15 +10,35 @@ function receiptValue(receipt: StateV3Task["receipt"], key: string): unknown {
   return (receipt as Record<string, unknown>)[key];
 }
 
+function validationStateForCompletionCheck(state: StateV3): StateV3 {
+  const goalStatus = state.objective.status;
+  const activeTasks = state.tasks.filter((task) => task.status === "active");
+  const unfinishedWorkers = state.tasks.filter(
+    (task) => task.type === "worker" && ["queued", "active"].includes(task.status),
+  );
+  const completingFinalAudit =
+    goalStatus === "active"
+    && activeTasks.length === 0
+    && unfinishedWorkers.length === 0;
+
+  if (!completingFinalAudit) return state;
+
+  return {
+    ...state,
+    objective: { ...state.objective, status: "done" },
+    active_task: null,
+  };
+}
+
 export function checkCompletionReadinessFromState(
   state: StateV3,
   context: { slug?: string; workspaceRoot?: string } = {},
 ) {
-  const validation = validateStateV3(state, { slug: context.slug });
-  const blockers = [...validation.errors];
-  const warnings = [...validation.warnings];
   const slug = context.slug ?? state.objective.slug;
   const boardPath = logicalBoardPath(slug);
+  const validation = validateStateV3(validationStateForCompletionCheck(state), { slug });
+  const blockers = [...validation.errors];
+  const warnings = [...validation.warnings];
 
   const goalStatus = state.objective.status;
   const successCriteriaSignal = state.objective.success_criteria?.signal;

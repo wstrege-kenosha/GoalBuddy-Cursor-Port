@@ -18,14 +18,21 @@ import {
   toolValidateReceipt,
   toolValidateState,
   toolBlockedTasks,
+  toolGetUsageSummary,
 } from "../../dist/mcp/tools.mjs";
 
 import { importObjectiveFixture } from "../../dist/db/state-repository.mjs";
+import { createBoardPayload } from "../../dist/board/objective-board.mjs";
 
 const __dirname = fileURLToPath(new URL(".", import.meta.url));
 const repoRoot = resolve(__dirname, "../../..");
 const skillRoot = join(repoRoot, "cursor-curator");
 const smokeSlug = "sample-cursor-smoke";
+const subobjectiveParentSlug = "subobjective-parent-board";
+const subobjectiveParentDir = join(
+  repoRoot,
+  "cursor-curator/surfaces/local-objective-board/examples/subobjective-parent",
+);
 
 process.env.CURATOR_SKILL_ROOT = skillRoot;
 const previousGoalWorkspace = process.env.CURATOR_WORKSPACE;
@@ -33,6 +40,28 @@ process.env.CURATOR_WORKSPACE = repoRoot;
 const previousWorkspacePaths = process.env.WORKSPACE_FOLDER_PATHS;
 process.env.WORKSPACE_FOLDER_PATHS = repoRoot;
 importObjectiveFixture(repoRoot, "sample-cursor-smoke");
+importObjectiveFixture(repoRoot, "board-examples/subobjective-parent", {
+  dirPath: subobjectiveParentDir,
+});
+
+test("registerKnownWorkspace skips write when workspace list is unchanged", () => {
+  const configPath = join(skillRoot, "known-workspaces.json");
+  const previous = existsSync(configPath) ? readFileSync(configPath, "utf8") : null;
+  try {
+    registerKnownWorkspace(repoRoot);
+    const afterFirst = readFileSync(configPath, "utf8");
+    const first = registerKnownWorkspace(repoRoot);
+    assert.equal(first.reason, "unchanged");
+    const afterSecond = readFileSync(configPath, "utf8");
+    assert.equal(afterFirst, afterSecond);
+  } finally {
+    if (previous === null) {
+      if (existsSync(configPath)) unlinkSync(configPath);
+    } else {
+      writeFileSync(configPath, previous, "utf8");
+    }
+  }
+});
 
 test("resolveObjectiveStatePath returns logical db board path", () => {
   const statePath = resolveObjectiveStatePath(smokeSlug, repoRoot);
@@ -139,6 +168,78 @@ test("getWorkspaceRoot uses WORKSPACE_FOLDER_PATHS when cwd is home", () => {
   }
 });
 
+test("getWorkspaceRoot splits comma-separated WORKSPACE_FOLDER_PATHS", () => {
+  const previousWorkspace = process.env.WORKSPACE_FOLDER_PATHS;
+  const previousGoalWorkspace = process.env.CURATOR_WORKSPACE;
+  delete process.env.CURATOR_WORKSPACE;
+  process.env.WORKSPACE_FOLDER_PATHS = `${join(tmpdir(), "missing-root")},${repoRoot},${join(tmpdir(), "other-missing")}`;
+  try {
+    assert.equal(getWorkspaceRoot(), repoRoot);
+    const result = toolSessionResumeDigest({ objective: smokeSlug });
+    assert.equal(result.slug, smokeSlug);
+    assert.equal(result.validation.ok, true);
+  } finally {
+    if (previousWorkspace === undefined) {
+      delete process.env.WORKSPACE_FOLDER_PATHS;
+    } else {
+      process.env.WORKSPACE_FOLDER_PATHS = previousWorkspace;
+    }
+    if (previousGoalWorkspace === undefined) {
+      delete process.env.CURATOR_WORKSPACE;
+    } else {
+      process.env.CURATOR_WORKSPACE = previousGoalWorkspace;
+    }
+  }
+});
+
+test("toolSessionResumeDigest resolves objectives when WORKSPACE_FOLDER_PATHS uses lowercase drive letter", () => {
+  const previousWorkspace = process.env.WORKSPACE_FOLDER_PATHS;
+  const previousGoalWorkspace = process.env.CURATOR_WORKSPACE;
+  delete process.env.CURATOR_WORKSPACE;
+  const lowerDriveRoot = repoRoot.replace(/^([A-Z]):/, (_, drive) => `${drive.toLowerCase()}:`);
+  process.env.WORKSPACE_FOLDER_PATHS = lowerDriveRoot;
+  try {
+    const result = toolSessionResumeDigest({ objective: smokeSlug });
+    assert.equal(result.slug, smokeSlug);
+    assert.equal(result.validation.ok, true);
+  } finally {
+    if (previousWorkspace === undefined) {
+      delete process.env.WORKSPACE_FOLDER_PATHS;
+    } else {
+      process.env.WORKSPACE_FOLDER_PATHS = previousWorkspace;
+    }
+    if (previousGoalWorkspace === undefined) {
+      delete process.env.CURATOR_WORKSPACE;
+    } else {
+      process.env.CURATOR_WORKSPACE = previousGoalWorkspace;
+    }
+  }
+});
+
+test("resolveWorkspaceForObjective finds objective slug across comma-separated WORKSPACE_FOLDER_PATHS", () => {
+  const previousWorkspace = process.env.WORKSPACE_FOLDER_PATHS;
+  const previousGoalWorkspace = process.env.CURATOR_WORKSPACE;
+  delete process.env.CURATOR_WORKSPACE;
+  process.env.WORKSPACE_FOLDER_PATHS = `${join(tmpdir(), "missing-root")},${repoRoot},${join(tmpdir(), "other-missing")}`;
+  try {
+    assert.equal(resolveWorkspaceForObjective(smokeSlug), repoRoot);
+    const result = toolSessionResumeDigest({ objective: smokeSlug });
+    assert.equal(result.slug, smokeSlug);
+    assert.equal(result.validation.ok, true);
+  } finally {
+    if (previousWorkspace === undefined) {
+      delete process.env.WORKSPACE_FOLDER_PATHS;
+    } else {
+      process.env.WORKSPACE_FOLDER_PATHS = previousWorkspace;
+    }
+    if (previousGoalWorkspace === undefined) {
+      delete process.env.CURATOR_WORKSPACE;
+    } else {
+      process.env.CURATOR_WORKSPACE = previousGoalWorkspace;
+    }
+  }
+});
+
 test("toolValidateState passes smoke objective", () => {
   const result = toolValidateState({ objective: smokeSlug });
   assert.equal(result.ok, true);
@@ -173,6 +274,51 @@ test("toolListObjectives discovers repo objectives", () => {
   const result = toolListObjectives({});
   assert.ok(result.objective_count >= 1);
   assert.ok(result.objectives.some((entry) => entry.slug === "sample-cursor-smoke"));
+});
+
+test("toolListObjectives include_usage adds usage fields", () => {
+  const base = toolListObjectives({});
+  const smokeBase = base.objectives.find((entry) => entry.slug === smokeSlug);
+  assert.ok(smokeBase);
+  assert.equal(smokeBase.usage_summary, undefined);
+
+  const withUsage = toolListObjectives({ include_usage: true });
+  const smokeWithUsage = withUsage.objectives.find((entry) => entry.slug === smokeSlug);
+  assert.ok(smokeWithUsage);
+  assert.ok(smokeWithUsage.usage_summary);
+  assert.ok(smokeWithUsage.usage_rollup);
+  assert.equal(typeof smokeWithUsage.usage_has_unattributed, "boolean");
+});
+
+test("toolGetUsageSummary returns usage board view for smoke objective", () => {
+  const result = toolGetUsageSummary({ objective: smokeSlug });
+  assert.equal(result.objective_slug, smokeSlug);
+  assert.ok(result.usage);
+  assert.equal(result.usage.visible, true);
+  assert.match(result.usage.summary, /agent time/);
+  assert.equal(result.include_subobjectives, true);
+});
+
+test("toolGetUsageSummary respects include_subobjectives false", () => {
+  const result = toolGetUsageSummary({ objective: smokeSlug, include_subobjectives: false });
+  assert.equal(result.include_subobjectives, false);
+  assert.equal(result.rollup_includes_subobjectives, false);
+  assert.deepEqual(result.children, {});
+});
+
+test("board createBoardPayload rollup matches get_usage_summary for subobjective parent", () => {
+  const boardPayload = createBoardPayload(subobjectiveParentDir);
+  const mcpSummary = toolGetUsageSummary({ objective: subobjectiveParentSlug });
+
+  assert.equal(mcpSummary.rollup_includes_subobjectives, true);
+  assert.equal(boardPayload.usage.rollup.duration_ms, mcpSummary.usage.rollup.duration_ms);
+  assert.equal(boardPayload.usage.rollup.session_count, mcpSummary.usage.rollup.session_count);
+  assert.equal(boardPayload.usage.rollup.input_tokens, mcpSummary.usage.rollup.input_tokens);
+  assert.equal(boardPayload.usage.rollup.output_tokens, mcpSummary.usage.rollup.output_tokens);
+  assert.equal(boardPayload.usage.summary, mcpSummary.usage.summary);
+  assert.equal(boardPayload.usage.visible, mcpSummary.usage.visible);
+  assert.equal(boardPayload.usage.rollup.duration_ms, 150_000);
+  assert.equal(boardPayload.usage.rollup.session_count, 2);
 });
 
 test("toolSessionResumeDigest returns handoff fields", () => {

@@ -95,6 +95,24 @@ Doctor `mcp:smoke` must pass against `sample-cursor-smoke` in `.cursor-curator/c
 
 Unattributed sessions (board warning) usually mean `active_task` was not `active` when the hook fired — common during PM planning turns.
 
+## Parent board shows parent-only time; child time missing
+
+Usage for subobjectives lives in **separate files**, not in the parent rollup on disk:
+
+| File | Scope |
+|------|--------|
+| `docs/objectives/<slug>/notes/usage.json` | Parent objective sessions |
+| `docs/objectives/<slug>/subobjectives/<child>/notes/usage.json` | Child objective sessions |
+
+The parent board, hub card, `get_usage_summary`, and `curator usage` **merge child rollups at read time** when state lists a depth-1 `subobjective.path`. If the parent shows only parent agent time:
+
+1. Confirm hooks ran inside the **child** workspace path (child objective dir), not only the parent.
+2. Check that `subobjectives/<name>/notes/usage.json` exists and `rollup.session_count` grows after child Task runs.
+3. Re-open or refresh the board — totals are computed on each payload build, not cached into the parent file.
+4. Compare surfaces: `curator usage <slug> --json` and the board progress rail should report the same merged `duration_ms` and `session_count`.
+
+A missing child file is treated as zero usage for that subobjective; the parent file alone still displays.
+
 ## Task subagents missing
 
 ```bash

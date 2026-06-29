@@ -70,6 +70,10 @@ registerJsonTool(
   "List objectives under docs/objectives/ with status, active task, success criteria health, and optional staleness.",
   {
     stale_days: z.number().int().positive().optional().describe("When set, include stale report for objectives idle this many days."),
+    include_usage: z
+      .boolean()
+      .optional()
+      .describe("When true, include usage_rollup, usage_summary, and usage_has_unattributed per objective."),
     workspace_root: workspaceRootSchema,
   },
   TOOL_HANDLERS.list_objectives,
@@ -234,6 +238,20 @@ registerJsonTool(
     workspace_root: workspaceRootSchema,
   },
   TOOL_HANDLERS.misfire_audit_check,
+);
+
+registerJsonTool(
+  "get_usage_summary",
+  "Read agent time and token usage rollup for an objective (optional subobjective merge).",
+  {
+    objective: z.string().describe("Objective slug or path under docs/objectives/."),
+    include_subobjectives: z
+      .boolean()
+      .optional()
+      .describe("When false, parent usage only (default true)."),
+    workspace_root: workspaceRootSchema,
+  },
+  TOOL_HANDLERS.get_usage_summary,
 );
 
 registerJsonTool(

@@ -6,16 +6,21 @@ import { test } from "node:test";
 import {
   appendUsageEvent,
   attributeTaskId,
+  buildTaskMetricsWithRollup,
   buildUsageBoardView,
+  discoverChildUsageDirs,
   emptyUsageFile,
   formatDuration,
   formatUsageShort,
+  mergeUsageCounters,
   parseHookUsagePayload,
   processHookUsage,
   readUsageSummary,
+  readUsageSummaryForObjective,
 } from "./objective-usage.mjs";
 import { seedObjectiveInDb, removeWorkspaceDir } from "../db/test-helpers.mjs";
 import { resetDatabaseCache } from "../db/connection.mjs";
+import { usageSessionCountInDb } from "../db/usage-repository.mjs";
 
 function scaffoldObjective(root: string, slug: string, activeTask: string | null, activeStatus = "active") {
   resetDatabaseCache();
@@ -124,9 +129,8 @@ test("appendUsageEvent rolls up per task and board totals", () => {
     assert.equal(summary.unattributed.session_count, 1);
     assert.equal(summary.has_unattributed, true);
 
-    const file = JSON.parse(readFileSync(join(objectiveDir, "notes", "usage.json"), "utf8"));
-    assert.equal(file.version, 1);
-    assert.equal(file.sessions.length, 2);
+    assert.equal(usageSessionCountInDb(root, "gamma"), 2);
+    assert.equal(existsSync(join(objectiveDir, "notes", "usage.json")), false);
   } finally {
     removeWorkspaceDir(root);
   }
@@ -146,7 +150,8 @@ test("processHookUsage resolves objectives from workspace roots", () => {
     });
     assert.equal(result.appended.length, 1);
     assert.equal(result.appended[0]?.task_id, "T001");
-    assert.ok(existsSync(join(result.appended[0]!.objective_dir, "notes", "usage.json")));
+    assert.equal(result.appended[0]?.usage_path, "db:delta#usage");
+    assert.equal(usageSessionCountInDb(root, "delta"), 1);
   } finally {
     removeWorkspaceDir(root);
   }
@@ -212,4 +217,163 @@ test("formatUsageShort renders duration and token summary", () => {
     }),
     /42m agent time/,
   );
+});
+
+function writeUsageJson(objectiveDir: string, rollup: {
+  duration_ms: number;
+  input_tokens: number;
+  output_tokens: number;
+  cache_read_tokens?: number;
+  cache_write_tokens?: number;
+  session_count: number;
+}) {
+  const notesDir = join(objectiveDir, "notes");
+  mkdirSync(notesDir, { recursive: true });
+  writeFileSync(join(notesDir, "usage.json"), JSON.stringify({
+    version: 1,
+    rollup: {
+      cache_read_tokens: 0,
+      cache_write_tokens: 0,
+      ...rollup,
+    },
+    tasks: {},
+    unattributed: emptyUsageFile().unattributed,
+    sessions: [],
+  }, null, 2));
+}
+
+function scaffoldParentWithChild(root: string, slug: string) {
+  const { objectiveDir } = scaffoldObjective(root, slug, "T002");
+  const childDir = join(objectiveDir, "subobjectives", "T002-child");
+  mkdirSync(childDir, { recursive: true });
+  return { objectiveDir, childDir, childPath: "subobjectives/T002-child" };
+}
+
+test("mergeUsageCounters is idempotent for repeated empty partials", () => {
+  const base = {
+    duration_ms: 60_000,
+    input_tokens: 10_000,
+    output_tokens: 500,
+    cache_read_tokens: 100,
+    cache_write_tokens: 0,
+    session_count: 2,
+  };
+  const once = mergeUsageCounters(base);
+  const twice = mergeUsageCounters(base, emptyUsageFile().rollup, {});
+  assert.deepEqual(once, twice);
+  assert.deepEqual(mergeUsageCounters(once), once);
+});
+
+test("readUsageSummaryForObjective returns parent-only rollup without child tasks", () => {
+  const root = mkdtempSync(join(tmpdir(), "curator-usage-parent-only-"));
+  try {
+    const { objectiveDir } = scaffoldObjective(root, "parent-only", "T002");
+    writeUsageJson(objectiveDir, {
+      duration_ms: 90_000,
+      input_tokens: 20_000,
+      output_tokens: 1_000,
+      session_count: 1,
+    });
+
+    const summary = readUsageSummaryForObjective(objectiveDir);
+    assert.equal(summary.rollup.duration_ms, 90_000);
+    assert.equal(summary.rollup_includes_subobjectives, false);
+    assert.deepEqual(summary.children, {});
+  } finally {
+    removeWorkspaceDir(root);
+  }
+});
+
+test("readUsageSummaryForObjective merges distinct parent and child rollups", () => {
+  const root = mkdtempSync(join(tmpdir(), "curator-usage-parent-child-"));
+  try {
+    const { objectiveDir, childDir, childPath } = scaffoldParentWithChild(root, "parent-child");
+    writeUsageJson(objectiveDir, {
+      duration_ms: 60_000,
+      input_tokens: 12_000,
+      output_tokens: 800,
+      session_count: 1,
+    });
+    writeUsageJson(childDir, {
+      duration_ms: 30_000,
+      input_tokens: 5_000,
+      output_tokens: 200,
+      session_count: 1,
+    });
+
+    const tasks = [{ id: "T002", subobjective: { path: childPath } }];
+    const summary = readUsageSummaryForObjective(objectiveDir, { tasks });
+    assert.equal(summary.rollup.duration_ms, 90_000);
+    assert.equal(summary.rollup.input_tokens, 17_000);
+    assert.equal(summary.rollup.session_count, 2);
+    assert.equal(summary.rollup_includes_subobjectives, true);
+    assert.equal(summary.children[childPath]?.rollup.duration_ms, 30_000);
+
+    const dirs = discoverChildUsageDirs(objectiveDir, tasks);
+    assert.equal(dirs.length, 1);
+    assert.equal(dirs[0]?.path, childPath);
+    assert.ok(existsSync(dirs[0]!.usage_path));
+  } finally {
+    removeWorkspaceDir(root);
+  }
+});
+
+test("readUsageSummaryForObjective ignores missing child usage file", () => {
+  const root = mkdtempSync(join(tmpdir(), "curator-usage-missing-child-"));
+  try {
+    const { objectiveDir, childDir, childPath } = scaffoldParentWithChild(root, "missing-child");
+    writeUsageJson(objectiveDir, {
+      duration_ms: 45_000,
+      input_tokens: 8_000,
+      output_tokens: 400,
+      session_count: 1,
+    });
+    assert.ok(existsSync(childDir));
+    assert.ok(!existsSync(join(childDir, "notes", "usage.json")));
+
+    const summary = readUsageSummaryForObjective(objectiveDir, {
+      tasks: [{ id: "T002", subobjective: { path: childPath } }],
+    });
+    assert.equal(summary.rollup.duration_ms, 45_000);
+    assert.equal(summary.children[childPath]?.rollup.session_count, 0);
+    assert.equal(summary.children[childPath]?.present, false);
+  } finally {
+    removeWorkspaceDir(root);
+  }
+});
+
+test("buildTaskMetricsWithRollup splits parent and child agent time", () => {
+  const root = mkdtempSync(join(tmpdir(), "curator-usage-metrics-rollup-"));
+  try {
+    const { objectiveDir, childDir, childPath } = scaffoldParentWithChild(root, "metrics-rollup");
+    appendUsageEvent(objectiveDir, {
+      at: "2026-06-25T12:00:00.000Z",
+      task_id: "T002",
+      hook: "subagentStop",
+      model: "composer",
+      duration_ms: 120_000,
+      input_tokens: 40_000,
+      output_tokens: 1_500,
+      cache_read_tokens: 0,
+      cache_write_tokens: 0,
+      status: "completed",
+    });
+    writeUsageJson(childDir, {
+      duration_ms: 30_000,
+      input_tokens: 5_000,
+      output_tokens: 200,
+      session_count: 1,
+    });
+
+    const summary = readUsageSummaryForObjective(objectiveDir, {
+      tasks: [{ id: "T002", subobjective: { path: childPath } }],
+    });
+    const metrics = buildTaskMetricsWithRollup("T002", summary, childPath);
+    assert.equal(metrics.detail?.parent_agent_time, "2m");
+    assert.equal(metrics.detail?.child_agent_time, "30s");
+    assert.equal(metrics.detail?.agent_time, "3m");
+    assert.match(metrics.badge, /3m/);
+  } finally {
+    removeWorkspaceDir(root);
+  }
 });

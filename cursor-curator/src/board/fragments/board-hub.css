@@ -120,11 +120,29 @@
   text-align: center;
 }
 
+.hub-card-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  line-height: 1.4;
+}
+
 .badge.active { background: var(--blue-bg); color: var(--blue-text); }
 .badge.blocked { background: var(--red-bg); color: var(--red-text); }
 .badge.done { background: var(--green-bg); color: var(--green-text); }
 .badge.weak { background: var(--yellow-bg); color: var(--yellow-text); }
 .badge.strong { background: var(--green-bg); color: var(--green-text); }
+.badge.warning { background: var(--yellow-bg); color: var(--yellow-text); }
 
 @media (max-width: 640px) {
   .hub-wrap { width: min(100%, calc(100% - 28px)); padding-top: 20px; }

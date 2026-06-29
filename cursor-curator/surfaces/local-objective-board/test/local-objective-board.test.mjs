@@ -186,6 +186,86 @@ test("loads depth-1 subobjective boards into parent task payloads", () => {
   assert.equal(parentTask.subobjective.board.tasks.find((task) => task.id === "T002").subobjective, null);
 });
 
+test("createBoardPayload merges parent and child usage rollups for subobjectives", () => {
+  const root = mkdtempSync(join(tmpdir(), "cursor-curator-subobjective-usage-"));
+  try {
+    const objectiveDir = join(root, "parent-usage");
+    cpSync(join(examplesRoot, "subobjective-parent"), objectiveDir, { recursive: true });
+    resetDatabaseCache();
+    importObjectiveFixture(root, "board-examples/subobjective-parent", { dirPath: objectiveDir });
+    const childDir = join(objectiveDir, "subobjectives", "T004-board-view");
+    mkdirSync(join(objectiveDir, "notes"), { recursive: true });
+    mkdirSync(join(childDir, "notes"), { recursive: true });
+    writeFileSync(join(objectiveDir, "notes", "usage.json"), `${JSON.stringify({
+      version: 1,
+      rollup: {
+        duration_ms: 120_000,
+        input_tokens: 40_000,
+        output_tokens: 1_500,
+        cache_read_tokens: 0,
+        cache_write_tokens: 0,
+        session_count: 1,
+      },
+      tasks: {
+        T004: {
+          duration_ms: 120_000,
+          input_tokens: 40_000,
+          output_tokens: 1_500,
+          cache_read_tokens: 0,
+          cache_write_tokens: 0,
+          session_count: 1,
+          models: ["composer"],
+        },
+      },
+      unattributed: emptyUsageCounters(),
+      sessions: [],
+    }, null, 2)}\n`, "utf8");
+    writeFileSync(join(childDir, "notes", "usage.json"), `${JSON.stringify({
+      version: 1,
+      rollup: {
+        duration_ms: 30_000,
+        input_tokens: 5_000,
+        output_tokens: 200,
+        cache_read_tokens: 0,
+        cache_write_tokens: 0,
+        session_count: 1,
+      },
+      tasks: {
+        T002: {
+          duration_ms: 30_000,
+          input_tokens: 5_000,
+          output_tokens: 200,
+          cache_read_tokens: 0,
+          cache_write_tokens: 0,
+          session_count: 1,
+          models: ["gpt-4"],
+        },
+      },
+      unattributed: emptyUsageCounters(),
+      sessions: [],
+    }, null, 2)}\n`, "utf8");
+
+    const payload = createBoardPayload(objectiveDir);
+    assert.equal(payload.usage.rollup.duration_ms, 150_000);
+    assert.equal(payload.usage.rollup.session_count, 2);
+    assert.match(payload.usage.summary, /agent time/);
+
+    const parentTask = payload.tasks.find((task) => task.id === "T004");
+    assert.match(parentTask.metrics_badge, /2m|3m/);
+    assert.equal(parentTask.metrics_detail.parent_agent_time, "2m");
+    assert.equal(parentTask.metrics_detail.child_agent_time, "30s");
+    assert.equal(parentTask.subobjective.board.usage.visible, true);
+    assert.match(parentTask.subobjective.board.usage.summary, /agent time/);
+
+    writeBoardApp(objectiveDir);
+    const js = readFileSync(join(objectiveDir, ".cursor-curator-board", "app.js"), "utf8");
+    assert.match(js, /subobjective-usage/);
+    assert.match(js, /renderSubobjectiveTask[\s\S]*metrics_badge/);
+  } finally {
+    removeWorkspaceDir(root);
+  }
+});
+
 test("uses readable card titles while preserving full objectives", () => {
   const root = mkdtempSync(join(tmpdir(), "cursor-curator-readable-titles-"));
   try {
@@ -899,6 +979,17 @@ async function readUntil(reader, pattern, timeoutMs = 8000) {
   }
 
   assert.fail(`Timed out waiting for ${pattern}. Received:\n${text}`);
+}
+
+function emptyUsageCounters() {
+  return {
+    duration_ms: 0,
+    input_tokens: 0,
+    output_tokens: 0,
+    cache_read_tokens: 0,
+    cache_write_tokens: 0,
+    session_count: 0,
+  };
 }
 
 function writeStateJson(workspaceRoot, objectiveDir, state) {

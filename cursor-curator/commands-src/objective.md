@@ -14,15 +14,17 @@ Resolve `docs/objectives/<slug>/` and the workspace database `.cursor-curator/cu
 
 ## MCP required (Phase B)
 
-Use the **cursor-curator** MCP server for every turn. Do not advance board state or spawn Task subagents until the mandatory tool sequence below succeeds.
+Use the **cursor-curator** MCP server for every turn. MCP stays warm in the Cursor session — **do not substitute CLI commands** (`curator resume`, `check-objective`, etc.) for MCP tools during `/objective` turns; CLI respawns Bun and reloads the full module graph on every invocation.
 
-If MCP tools are unavailable, stop and tell the user to run:
+Do not advance board state or spawn Task subagents until the mandatory tool sequence below succeeds.
+
+If MCP tools are unavailable, **stop** and tell the user to run:
 
 ```bash
 bun ~/.cursor/skills/cursor-curator/dist/cli/curator.mjs install
 ```
 
-Then enable the `curator` server in Cursor MCP settings and retry.
+Then enable the `cursor-curator` server in Cursor Settings → MCP, **restart Cursor** (or toggle the MCP server off/on), and retry. Do not fall back to CLI for the mandatory sequence — fix MCP first.
 
 ## Each turn (mandatory sequence)
 

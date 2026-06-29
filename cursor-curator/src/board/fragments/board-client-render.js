@@ -392,6 +392,8 @@ function renderTaskDetail(task) {
     const metricsRows = [
       ["Sessions", task.metrics_detail.sessions],
       ["Agent time", task.metrics_detail.agent_time],
+      ...(task.metrics_detail.parent_agent_time ? [["Parent agent time", task.metrics_detail.parent_agent_time]] : []),
+      ...(task.metrics_detail.child_agent_time ? [["Child agent time", task.metrics_detail.child_agent_time]] : []),
       ["Input", task.metrics_detail.input],
       ["Output", task.metrics_detail.output],
       ["Models", task.metrics_detail.models],
@@ -475,6 +477,10 @@ function renderSubobjective(subobjective) {
   header.append(titleWrap, subobjectiveBadge(subobjective));
   section.append(header);
 
+  if (board?.usage?.visible && board.usage.summary) {
+    section.append(el("p", "subobjective-usage", board.usage.summary));
+  }
+
   if (!board?.columns?.length) {
     section.append(el("p", "", "No child board payload."));
     return section;
@@ -512,6 +518,7 @@ function renderSubobjectiveTask(task) {
   const footer = el("div", "card-footer");
   footer.append(el("span", "badge role", task.assignee || task.type || "PM"));
   if (task.receipt?.present) footer.append(el("span", "badge status-done", "Receipt"));
+  if (task.metrics_badge) footer.append(el("span", "badge usage-badge", task.metrics_badge));
   card.append(topline, el("h4", "subobjective-task-title", task.title), footer);
   return card;
 }

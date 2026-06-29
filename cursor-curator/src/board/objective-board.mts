@@ -6,7 +6,12 @@ import { readBoardRepoLinks } from "./port-metadata.mjs";
 import { checkCompletionReadiness } from "../completion/objective-completion.mjs";
 import { readLastVerificationFromLoadedState } from "../verify/objective-verify.mjs";
 import { readSessionDigest } from "../session/objective-session.mjs";
-import { buildTaskMetricsView, buildUsageBoardView, readUsageSummary } from "../usage/objective-usage.mjs";
+import {
+  buildTaskMetricsView,
+  buildTaskMetricsWithRollup,
+  buildUsageBoardView,
+  readUsageSummaryForObjective,
+} from "../usage/objective-usage.mjs";
 import { loadState, resolveStatePath } from "../state/objective-state.mjs";
 import { validateObjectiveStateFile } from "../mcp/validate-state-bridge.mjs";
 import { listObjectives, objectiveExistsInDb, resolveChildObjectiveSlug } from "../db/state-repository.mjs";
@@ -69,13 +74,19 @@ export function createBoardPayload(objectiveDir, options = {}) {
 
   const board = normalizeObjectiveBoard(document, root);
   const noteIndex = loadNotes(root);
-  const usageSummary = readUsageSummary(root);
+  const usageSummary = readUsageSummaryForObjective(root, {
+    include_subobjectives: includeSubobjectives,
+    tasks: board.tasks,
+  });
   const usage = buildUsageBoardView(usageSummary);
   const tasks = board.tasks
     .map((task) => attachTaskNote(task, noteIndex))
     .map((task) => includeSubobjectives ? attachTaskSubobjective(task, root, workspaceRoot) : task)
     .map((task) => {
-      const metricsView = buildTaskMetricsView(usageSummary.tasks[task.id] ?? null);
+      const childPath = task.subobjective?.path;
+      const metricsView = childPath && includeSubobjectives
+        ? buildTaskMetricsWithRollup(task.id, usageSummary, childPath)
+        : buildTaskMetricsView(usageSummary.tasks[task.id] ?? null);
       return {
         ...task,
         metrics: metricsView.raw,

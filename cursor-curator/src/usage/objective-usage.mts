@@ -14,6 +14,13 @@ import {
   discoverAllObjectiveDirsFromHook,
   resolveObjectiveDirsFromHook,
 } from "../hook/objective-hook-resolve.mjs";
+import {
+  appendUsageSessionToDb,
+  importUsageFileToDb,
+  loadUsageFileFromDb,
+  logicalUsagePath,
+} from "../db/usage-repository.mjs";
+import { findObjectiveSlugByDirPath } from "../db/state-repository.mjs";
 
 export interface UsageCounters {
   duration_ms: number;
@@ -73,6 +80,31 @@ export interface TaskMetricsDetail {
   input: string;
   output: string;
   models: string;
+  parent_agent_time?: string;
+  child_agent_time?: string;
+}
+
+export interface SubobjectiveTaskRef {
+  id?: string;
+  subobjective?: {
+    path?: string;
+  };
+}
+
+export interface ChildUsageDir {
+  path: string;
+  dir: string;
+  usage_path: string;
+}
+
+export interface UsageSummaryWithChildren extends UsageSummary {
+  children: Record<string, UsageSummary>;
+  rollup_includes_subobjectives: boolean;
+}
+
+export interface ReadUsageSummaryForObjectiveOptions {
+  include_subobjectives?: boolean;
+  tasks?: SubobjectiveTaskRef[];
 }
 
 export interface TaskMetricsView {
@@ -208,6 +240,66 @@ function addCounters(target: UsageCounters, source: Partial<UsageCounters>): voi
   target.session_count += num(source.session_count);
 }
 
+export function mergeUsageCounters(...sources: Partial<UsageCounters>[]): UsageCounters {
+  const merged = emptyCounters();
+  for (const source of sources) {
+    addCounters(merged, source);
+  }
+  return merged;
+}
+
+function childDirSegmentFromRelative(childRelative: string): string {
+  const normalized = String(childRelative || "").replace(/\\/g, "/");
+  const match = normalized.match(/subobjectives\/([^/]+)/);
+  return match?.[1] ?? "";
+}
+
+function normalizeSubobjectivePath(childRelative: string): string {
+  const segment = childDirSegmentFromRelative(childRelative);
+  if (segment) {
+    return `subobjectives/${segment}`;
+  }
+  return String(childRelative || "").replace(/\\/g, "/").replace(/\/state\.json$/, "");
+}
+
+function resolveChildObjectiveDir(objectiveDir: string, childRelative: string): string | null {
+  const segment = childDirSegmentFromRelative(childRelative);
+  if (!segment) {
+    return null;
+  }
+  return join(resolve(objectiveDir), "subobjectives", segment);
+}
+
+export function discoverChildUsageDirs(
+  objectiveDir: string,
+  tasks: SubobjectiveTaskRef[],
+): ChildUsageDir[] {
+  const resolvedObjectiveDir = resolve(objectiveDir);
+  const seen = new Set<string>();
+  const entries: ChildUsageDir[] = [];
+
+  for (const task of tasks) {
+    const childRelative = task.subobjective?.path;
+    if (!childRelative) {
+      continue;
+    }
+
+    const dir = resolveChildObjectiveDir(resolvedObjectiveDir, childRelative);
+    if (!dir || seen.has(dir)) {
+      continue;
+    }
+    seen.add(dir);
+
+    entries.push({
+      path: normalizeSubobjectivePath(childRelative),
+      dir,
+      usage_path: join(dir, USAGE_RELATIVE_PATH),
+    });
+  }
+
+  return entries;
+}
+
 function countersFromSession(session: UsageSession): UsageCounters {
   return {
     duration_ms: session.duration_ms,
@@ -219,7 +311,7 @@ function countersFromSession(session: UsageSession): UsageCounters {
   };
 }
 
-function readUsageFile(objectiveDir: string): UsageFile {
+function readUsageFileFromJson(objectiveDir: string): UsageFile {
   const path = usageFilePath(objectiveDir);
   if (!existsSync(path)) {
     return emptyUsageFile();
@@ -242,6 +334,29 @@ function readUsageFile(objectiveDir: string): UsageFile {
   }
 }
 
+function readUsageFile(objectiveDir: string): UsageFile {
+  const resolvedDir = resolve(objectiveDir);
+  const workspaceRoot = workspaceRootFromObjectiveDir(resolvedDir);
+  const slug = findObjectiveSlugByDirPath(workspaceRoot, resolvedDir);
+
+  if (slug) {
+    const fromDb = loadUsageFileFromDb(workspaceRoot, slug);
+    if (fromDb) {
+      return fromDb;
+    }
+
+    const legacy = readUsageFileFromJson(resolvedDir);
+    if (legacy.sessions.length > 0 || legacy.rollup.session_count > 0) {
+      importUsageFileToDb(workspaceRoot, slug, legacy);
+      return legacy;
+    }
+
+    return emptyUsageFile();
+  }
+
+  return readUsageFileFromJson(resolvedDir);
+}
+
 function writeUsageFile(objectiveDir: string, data: UsageFile): string {
   const notesDir = join(resolve(objectiveDir), "notes");
   mkdirSync(notesDir, { recursive: true });
@@ -256,7 +371,14 @@ export function appendUsageEvent(
   objectiveDir: string,
   event: UsageSession,
 ): { path: string; task_id: string } {
-  const data = readUsageFile(objectiveDir);
+  const resolvedDir = resolve(objectiveDir);
+  const workspaceRoot = workspaceRootFromObjectiveDir(resolvedDir);
+  const dbResult = appendUsageSessionToDb(workspaceRoot, { objectiveDir: resolvedDir }, event);
+  if (dbResult) {
+    return { path: dbResult.usage_path, task_id: dbResult.task_id };
+  }
+
+  const data = readUsageFileFromJson(resolvedDir);
   const counters = countersFromSession(event);
 
   addCounters(data.rollup, counters);
@@ -280,7 +402,7 @@ export function appendUsageEvent(
     data.sessions = data.sessions.slice(-MAX_SESSIONS);
   }
 
-  const path = writeUsageFile(objectiveDir, data);
+  const path = writeUsageFile(resolvedDir, data);
   return { path, task_id: event.task_id };
 }
 
@@ -297,6 +419,43 @@ export function readUsageSummary(objectiveDir: string): UsageSummary {
   };
 }
 
+export function readUsageSummaryForObjective(
+  objectiveDir: string,
+  options: ReadUsageSummaryForObjectiveOptions = {},
+): UsageSummaryWithChildren {
+  const includeSubobjectives = options.include_subobjectives !== false;
+  const parentSummary = readUsageSummary(objectiveDir);
+  const children: Record<string, UsageSummary> = {};
+
+  if (!includeSubobjectives || !options.tasks?.length) {
+    return {
+      ...parentSummary,
+      children,
+      rollup_includes_subobjectives: false,
+    };
+  }
+
+  const childDirs = discoverChildUsageDirs(objectiveDir, options.tasks);
+  const childRollups: UsageCounters[] = [];
+
+  for (const entry of childDirs) {
+    const childSummary = readUsageSummary(entry.dir);
+    children[entry.path] = childSummary;
+    childRollups.push(childSummary.rollup);
+  }
+
+  const mergedRollup = mergeUsageCounters(parentSummary.rollup, ...childRollups);
+  const hasChildData = childRollups.some((rollup) => usageRollupVisible(rollup));
+
+  return {
+    ...parentSummary,
+    rollup: mergedRollup,
+    present: parentSummary.present || hasChildData,
+    children,
+    rollup_includes_subobjectives: childDirs.length > 0,
+  };
+}
+
 export function usageRollupVisible(rollup: UsageCounters): boolean {
   return rollup.session_count > 0
     || rollup.duration_ms > 0
@@ -308,7 +467,7 @@ export function buildUsageBoardView(summary: UsageSummary): UsageBoardView {
   const visible = summary.present && usageRollupVisible(summary.rollup);
   const tokenTotal = summary.rollup.input_tokens + summary.rollup.output_tokens;
   const usageWarning = summary.has_unattributed
-    ? `${summary.unattributed.session_count} agent session(s) could not be attributed to a task (see unattributed usage in notes/usage.json).`
+    ? `${summary.unattributed.session_count} agent session(s) could not be attributed to a task (see unattributed usage in curator.db usage_sessions).`
     : "";
 
   return {
@@ -357,6 +516,69 @@ export function buildTaskMetricsView(taskUsage: TaskUsage | null | undefined): T
       output: taskUsage.output_tokens > 0 ? formatTokenCount(taskUsage.output_tokens) : "—",
       models: (taskUsage.models || []).join(", ") || "—",
     },
+  };
+}
+
+export function buildTaskMetricsWithRollup(
+  taskId: string,
+  summary: UsageSummaryWithChildren,
+  childPath?: string,
+): TaskMetricsView {
+  const taskUsage = summary.tasks[taskId] ?? null;
+  const baseView = buildTaskMetricsView(taskUsage);
+  const normalizedChildPath = childPath ? normalizeSubobjectivePath(childPath) : undefined;
+  const childSummary = normalizedChildPath ? summary.children[normalizedChildPath] : undefined;
+
+  if (!normalizedChildPath || !childSummary) {
+    return baseView;
+  }
+
+  const parentDuration = taskUsage?.duration_ms ?? 0;
+  const childDuration = childSummary.rollup.duration_ms;
+  const parentSessions = taskUsage?.session_count ?? 0;
+  const childSessions = childSummary.rollup.session_count;
+
+  if (parentSessions === 0 && childSessions === 0) {
+    return baseView;
+  }
+
+  const combinedDuration = parentDuration + childDuration;
+  const combinedInput = (taskUsage?.input_tokens ?? 0) + childSummary.rollup.input_tokens;
+  const combinedOutput = (taskUsage?.output_tokens ?? 0) + childSummary.rollup.output_tokens;
+  const parentModels = taskUsage?.models ?? [];
+  const childModels = Object.values(childSummary.tasks)
+    .flatMap((entry) => entry.models || []);
+  const models = [...new Set([...parentModels, ...childModels])];
+
+  const detail: TaskMetricsDetail = {
+    sessions: String(parentSessions + childSessions),
+    agent_time: combinedDuration > 0 ? formatDuration(combinedDuration) : "—",
+    input: combinedInput > 0 ? formatTokenCount(combinedInput) : "—",
+    output: combinedOutput > 0 ? formatTokenCount(combinedOutput) : "—",
+    models: models.join(", ") || "—",
+  };
+
+  if (parentDuration > 0) {
+    detail.parent_agent_time = formatDuration(parentDuration);
+  }
+  if (childDuration > 0) {
+    detail.child_agent_time = formatDuration(childDuration);
+  }
+
+  const badgeSource: TaskUsage = {
+    duration_ms: combinedDuration,
+    input_tokens: combinedInput,
+    output_tokens: combinedOutput,
+    cache_read_tokens: (taskUsage?.cache_read_tokens ?? 0) + childSummary.rollup.cache_read_tokens,
+    cache_write_tokens: (taskUsage?.cache_write_tokens ?? 0) + childSummary.rollup.cache_write_tokens,
+    session_count: parentSessions + childSessions,
+    models,
+  };
+
+  return {
+    raw: taskUsage,
+    badge: formatTaskMetricsBadge(badgeSource),
+    detail,
   };
 }
 

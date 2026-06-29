@@ -1,0 +1,31 @@
+{
+  "version": 1,
+  "rollup": {
+    "duration_ms": 30000,
+    "input_tokens": 5000,
+    "output_tokens": 200,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0,
+    "session_count": 1
+  },
+  "tasks": {
+    "T002": {
+      "duration_ms": 30000,
+      "input_tokens": 5000,
+      "output_tokens": 200,
+      "cache_read_tokens": 0,
+      "cache_write_tokens": 0,
+      "session_count": 1,
+      "models": ["gpt-4"]
+    }
+  },
+  "unattributed": {
+    "duration_ms": 0,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0,
+    "session_count": 0
+  },
+  "sessions": []
+}

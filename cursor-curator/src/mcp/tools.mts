@@ -3,6 +3,7 @@ import { basename, dirname, join, resolve } from "node:path";
 import { checkCompletionReadiness } from "../completion/objective-completion.mjs";
 import { buildBlockedTriagePlan, listBlockedTasks } from "../blocked/objective-blocked.mjs";
 import { buildHubPayload } from "../hub/objective-hub.mjs";
+import type { HubObjectiveEntry } from "../hub/objective-hub.mjs";
 import { misfireAuditStatus } from "../misfire/objective-misfire.mjs";
 import { validateReceipt } from "../receipt/objective-receipt.mjs";
 import { buildResumeDigest, appendSessionNote } from "../session/objective-session.mjs";
@@ -13,6 +14,7 @@ import { verifyWorkerReceiptForTask } from "../verify/objective-verify.mjs";
 import { createParallelPlan } from "../prompt/parallel-plan.mjs";
 import { loadBoard, renderTaskPrompt, selectTask } from "../prompt/render-task-prompt.mjs";
 import { resolveDbPath } from "../db/connection.mjs";
+import { logicalUsagePath } from "../db/usage-repository.mjs";
 import {
   applyReceipt,
   importLegacyObjectives,
@@ -29,6 +31,11 @@ import {
   resolveWorkspaceForObjective,
 } from "./path-utils.mjs";
 import { validateObjectiveStateFile } from "./validate-state-bridge.mjs";
+import {
+  buildUsageBoardView,
+  readUsageSummaryForObjective,
+  type SubobjectiveTaskRef,
+} from "../usage/objective-usage.mjs";
 
 function workspaceForArgs(args: Record<string, unknown> = {}): string {
   if (args.workspace_root) {
@@ -68,22 +75,35 @@ export function toolListObjectives(args: Record<string, unknown> = {}) {
   const stale = days > 0 ? findStaleObjectives({ days, roots }) : null;
   const staleSlugs = new Set((stale?.objectives || []).map((entry) => entry.slug).filter(Boolean));
 
+  const includeUsage = args.include_usage === true;
+
   return {
     workspace_root: workspaceRoot,
     scanned_roots: roots,
     objective_count: payload.objective_count,
-    objectives: payload.objectives.map((entry: Record<string, unknown>) => ({
-      slug: entry.slug,
-      title: entry.title,
-      status: entry.status,
-      active_task: entry.active_task,
-      active_task_type: entry.active_task_type,
-      success_criteria_health: entry.success_criteria_health,
-      validation_ok: entry.validation_ok,
-      stale: staleSlugs.has(entry.slug as string),
-      state_path: entry.state_path,
-      url: entry.url,
-    })),
+    objectives: payload.objectives.map((entry: HubObjectiveEntry) => {
+      const base = {
+        slug: entry.slug,
+        title: entry.title,
+        status: entry.status,
+        active_task: entry.active_task,
+        active_task_type: entry.active_task_type,
+        success_criteria_health: entry.success_criteria_health,
+        validation_ok: entry.validation_ok,
+        stale: staleSlugs.has(entry.slug as string),
+        state_path: entry.state_path,
+        url: entry.url,
+      };
+      if (!includeUsage) {
+        return base;
+      }
+      return {
+        ...base,
+        usage_rollup: entry.usage_rollup,
+        usage_summary: entry.usage_summary,
+        usage_has_unattributed: entry.usage_has_unattributed,
+      };
+    }),
     stale_report: stale,
   };
 }
@@ -386,6 +406,39 @@ export function toolMisfireAuditCheck(args: Record<string, unknown> = {}) {
   };
 }
 
+export function toolGetUsageSummary(args: Record<string, unknown> = {}) {
+  const workspaceRoot = workspaceForArgs(args);
+  const objective = String(args.objective);
+  const objectiveDir = resolveObjectiveDir(objective, workspaceRoot);
+  const statePath = resolveObjectiveStatePath(objective, workspaceRoot);
+  const includeSubobjectives = args.include_subobjectives !== false;
+
+  let tasks: SubobjectiveTaskRef[] | undefined;
+  if (includeSubobjectives) {
+    const board = loadBoard(statePath, workspaceRoot);
+    tasks = (board.document.tasks || []) as SubobjectiveTaskRef[];
+  }
+
+  const summary = readUsageSummaryForObjective(objectiveDir, {
+    include_subobjectives: includeSubobjectives,
+    tasks,
+  });
+  const usage = buildUsageBoardView(summary);
+
+  const slug = basename(objectiveDir);
+  return {
+    workspace_root: workspaceRoot,
+    objective_slug: slug,
+    objective_dir: objectiveDir,
+    state_path: statePath,
+    usage_path: logicalUsagePath(slug),
+    include_subobjectives: includeSubobjectives,
+    rollup_includes_subobjectives: summary.rollup_includes_subobjectives,
+    usage,
+    children: includeSubobjectives ? summary.children : {},
+  };
+}
+
 export function toolSubobjectiveRollupCheck(args: Record<string, unknown> = {}) {
   const workspaceRoot = workspaceForArgs(args);
   const objective = String(args.objective);
@@ -467,6 +520,7 @@ export const TOOL_HANDLERS = {
   verify_worker_receipt: toolVerifyWorkerReceipt,
   blocked_tasks: toolBlockedTasks,
   misfire_audit_check: toolMisfireAuditCheck,
+  get_usage_summary: toolGetUsageSummary,
   subobjective_rollup_check: toolSubobjectiveRollupCheck,
   apply_receipt: toolApplyReceipt,
   patch_task: toolPatchTask,

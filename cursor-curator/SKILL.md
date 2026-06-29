@@ -131,7 +131,7 @@ Prompt scripts emit `objective_scout` (underscore). Map to hyphenated Cursor nam
 
 ## PM loop (each /objective turn)
 
-**Use cursor-curator MCP tools** — see [commands-src/objective.md](commands-src/objective.md). Mandatory sequence:
+**Use cursor-curator MCP tools only** — see [commands-src/objective.md](commands-src/objective.md). Do not substitute CLI commands during `/objective` turns (CLI respawns Bun each call; MCP stays warm). Mandatory sequence:
 
 0. `session_resume_digest` (turn 0) — optional `list_objectives` with `stale_days`
 1. `get_active_task` → `validate_state` (stop if errors)
@@ -141,11 +141,11 @@ Prompt scripts emit `objective_scout` (underscore). Map to hyphenated Cursor nam
 5. `validate_receipt` → `verify_worker_receipt` per board (serial merge)
 6. PM writes via `apply_receipt` / `patch_task` / `patch_objective` → `validate_state` → `append_session_note`
 
-CLI equivalents (fallback only):
+CLI is for install/doctor/board smoke and human debugging — **not** for the PM loop above. If MCP is down, fix MCP (install + restart Cursor); do not run `resume` / `check-objective` as a substitute inside `/objective`.
 
 ```bash
-bun ~/.cursor/skills/cursor-curator/dist/cli/curator.mjs prompt docs/objectives/<slug> --task <T###> --json
-bun ~/.cursor/skills/cursor-curator/dist/cli/curator.mjs check-objective <slug>
+bun ~/.cursor/skills/cursor-curator/dist/cli/curator.mjs doctor --json
+bun ~/.cursor/skills/cursor-curator/dist/cli/curator.mjs check-objective <slug>   # human/debug only
 ```
 
 ## Parallel work (default PM batching)

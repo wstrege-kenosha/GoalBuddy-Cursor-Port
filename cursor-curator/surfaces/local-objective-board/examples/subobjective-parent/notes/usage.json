@@ -1,0 +1,31 @@
+{
+  "version": 1,
+  "rollup": {
+    "duration_ms": 120000,
+    "input_tokens": 40000,
+    "output_tokens": 1500,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0,
+    "session_count": 1
+  },
+  "tasks": {
+    "T004": {
+      "duration_ms": 120000,
+      "input_tokens": 40000,
+      "output_tokens": 1500,
+      "cache_read_tokens": 0,
+      "cache_write_tokens": 0,
+      "session_count": 1,
+      "models": ["composer"]
+    }
+  },
+  "unattributed": {
+    "duration_ms": 0,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0,
+    "session_count": 0
+  },
+  "sessions": []
+}

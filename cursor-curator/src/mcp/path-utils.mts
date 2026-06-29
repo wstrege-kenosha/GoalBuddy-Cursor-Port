@@ -1,7 +1,7 @@
 import { existsSync, readFileSync, writeFileSync, mkdirSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, dirname, join, resolve, sep } from "node:path";
-import { logicalBoardPath } from "../db/connection.mjs";
+import { logicalBoardPath, normalizeWorkspaceRoot } from "../db/connection.mjs";
 import { objectiveExistsInDb, findObjectiveSlugByDirPath } from "../db/state-repository.mjs";
 import { resolveObjectiveDirectory, resolveObjectiveSlug } from "../state/objective-state.mjs";
 
@@ -34,6 +34,7 @@ function splitWorkspacePaths(value: unknown): string[] {
   return text
     .split(/[;\n]/)
     .flatMap((chunk) => chunk.split("|"))
+    .flatMap((chunk) => chunk.split(","))
     .map((part) => part.trim())
     .filter(Boolean);
 }
@@ -53,7 +54,7 @@ function isForcedWorkspaceOverride(): boolean {
 }
 
 function normalizeCandidatePath(path: unknown): string {
-  return resolve(String(path || "").trim());
+  return normalizeWorkspaceRoot(String(path || "").trim());
 }
 
 function addCandidate(seen: Set<string>, candidates: string[], path: unknown): void {
@@ -88,14 +89,19 @@ export function registerKnownWorkspace(workspaceRoot: string): {
   reason?: string;
   configPath?: string;
 } {
-  const root = resolve(workspaceRoot);
+  const root = normalizeWorkspaceRoot(workspaceRoot);
   if (!hasObjectivesDir(root)) {
     return { ok: false, path: root, reason: "missing docs/objectives/" };
   }
 
-  const existing = readKnownWorkspaces();
+  const existing = readKnownWorkspaces().map((entry) => normalizeWorkspaceRoot(entry));
   const merged = [root, ...existing.filter((entry) => entry.toLowerCase() !== root.toLowerCase())];
   const configPath = knownWorkspacesPath();
+
+  if (knownWorkspaceListUnchanged(merged, existing)) {
+    return { ok: true, path: root, configPath, reason: "unchanged" };
+  }
+
   try {
     mkdirSync(dirname(configPath), { recursive: true });
     writeFileSync(
@@ -111,6 +117,13 @@ export function registerKnownWorkspace(workspaceRoot: string): {
     return { ok: true, path: root, configPath, reason: "known_workspaces_not_writable" };
   }
   return { ok: true, path: root, configPath };
+}
+
+function knownWorkspaceListUnchanged(merged: string[], existing: string[]): boolean {
+  if (merged.length !== existing.length) {
+    return false;
+  }
+  return merged.every((path, index) => path.toLowerCase() === existing[index].toLowerCase());
 }
 
 export function collectWorkspaceCandidates(): string[] {
@@ -199,10 +212,8 @@ function workspaceRootFromCuratorDb(startPath: string): string | null {
     cursor = dirname(cursor);
   }
   const resolvedStart = resolve(startPath);
-  let fallback: string | null = null;
   while (true) {
     if (existsSync(join(cursor, ".cursor-curator", "curator.db"))) {
-      fallback = cursor;
       if (findObjectiveSlugByDirPath(cursor, resolvedStart)) {
         return cursor;
       }
@@ -212,7 +223,7 @@ function workspaceRootFromCuratorDb(startPath: string): string | null {
     }
     const parent = dirname(cursor);
     if (parent === cursor) {
-      return fallback;
+      return null;
     }
     cursor = parent;
   }

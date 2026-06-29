@@ -25,6 +25,7 @@ import {
   type TaskListItemRow,
   type TaskRow,
 } from "./state-mapper.mjs";
+import { invalidateHubPayloadCache } from "../hub/objective-hub.mjs";
 
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 
@@ -558,7 +559,7 @@ export function saveStateV3(
     options.dirPath ?? join(root, "docs", "objectives", parsed.data.objective.slug);
   const db = getDb(root);
 
-  return withTransaction(db, () => {
+  const result = withTransaction(db, () => {
     const workspaceId = ensureWorkspace(db, root);
     const existing = objectiveRowBySlug(db, workspaceId, parsed.data.objective.slug);
     const objectiveId = insertObjectiveGraph(
@@ -597,6 +598,8 @@ export function saveStateV3(
 
     return loadStateV3(root, parsed.data.objective.slug);
   });
+  invalidateHubPayloadCache();
+  return result;
 }
 
 export function importStateJsonFile(
@@ -759,7 +762,10 @@ export function applyReceipt(
       const nextTask = state.tasks.find((entry) => entry.id === nextActiveTask);
       if (nextTask) nextTask.status = "active";
     } else if (role === "approval_gate" && isCompletionDecision(receipt)) {
-      const completion = checkCompletionReadinessFromState(state);
+      const completion = checkCompletionReadinessFromState(state, {
+        slug,
+        workspaceRoot,
+      });
       if (!completion.ready) {
         return {
           ok: false,

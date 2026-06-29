@@ -35,6 +35,7 @@ curator prompt docs/objectives/<slug> --task T001 --json
 curator completion-check docs/objectives/<slug>
 curator stale --days 7
 curator receipt notes/T003-worker.md --role worker
+curator usage docs/objectives/<slug> [--json] [--no-subobjectives]
 ```
 
 Or use the full path:
@@ -48,7 +49,48 @@ bun ~/.cursor/skills/cursor-curator/dist/cli/curator.mjs doctor --objective-read
 - **Hub** (all objectives): http://curator.localhost:41737/
 - **Single objective**: http://curator.localhost:41737/<slug>/
 
-Boards show **agent time and token usage** per task when Cursor hooks are installed (`curator install` writes `~/.cursor/hooks.json`). Metrics accumulate in `docs/objectives/<slug>/notes/usage.json` and appear on the board progress rail, task cards, and hub cards.
+Boards show **agent time and token usage** per task when Cursor hooks are installed (`curator install` writes `~/.cursor/hooks.json`). Metrics accumulate in **`.cursor-curator/curator.db`** (`usage_sessions` table, logical path `db:<slug>#usage`) and appear on the board progress rail, task cards, and hub cards. Legacy `docs/objectives/<slug>/notes/usage.json` files are imported into SQLite on first read when present.
+
+### Hub card layout
+
+The hub (`curator hub` or http://curator.localhost:41737/) renders one **hub-card** per objective in a responsive grid. Each card shows:
+
+- **Title** (links to the objective board) and slug
+- **Badges**: objective status (`active` / `blocked` / `done`), success-criteria health (`strong` / `weak`), validation state, and an **Unattributed usage** warning when hooks recorded sessions that could not be tied to a task
+- **Definition list**: active task id, then (when usage is visible) **Agent time** and **Tokens** preformatted from the merged rollup
+
+Hub usage totals use the same read-time rollup as the board and MCP (parent SQLite usage plus depth-1 child objectives when subobjectives exist). Pass `include_usage: true` to `list_objectives` for the same fields in JSON.
+
+### MCP `get_usage_summary`
+
+PM or scripts can read usage without opening the board:
+
+```json
+{ "objective": "<slug>", "include_subobjectives": true }
+```
+
+Returns `usage` (preformatted `summary`, `agent_time`, `tokens`, `visible`, `usage_warning`), raw `usage.rollup` counters, `rollup_includes_subobjectives`, and per-child entries under `children` keyed by subobjective path. Set `include_subobjectives: false` for parent-only totals.
+
+### `curator usage` CLI
+
+```bash
+curator usage docs/objectives/<slug>
+curator usage <slug> --json
+curator usage <slug> --no-subobjectives
+```
+
+Human output prints the one-line summary (or agent time · tokens). `--json` emits the full `get_usage_summary` payload. `--no-subobjectives` skips child rollup merge.
+
+### Subobjective usage rollup (read-time)
+
+Child agent time is **not copied** into the parent usage store. At display time, board, hub, MCP, and CLI all call `readUsageSummaryForObjective`, which:
+
+1. Reads the parent usage from SQLite (imports legacy `notes/usage.json` once if needed)
+2. Discovers depth-1 subobjective dirs from task `subobjective.path` in state
+3. Reads each child objective's usage from SQLite when registered (legacy child `usage.json` imported on read)
+4. Merges rollups for totals; missing child data contributes zero
+
+Parent task cards with an active subobjective show **split metrics** (parent agent time vs child agent time) via `metrics_detail`. The embedded child board shows its own usage block. Receipt rollup (`rollup_receipt` on the parent task) is separate from usage metrics — it records PM acknowledgment that the child objective finished, not token totals.
 
 Use http://127.0.0.1:41737/ if `curator.localhost` does not resolve.
 
