@@ -131,9 +131,10 @@ Prompt scripts emit `objective_scout` (underscore). Map to hyphenated Cursor nam
 0. `session_resume_digest` (turn 0) — optional `list_objectives` with `stale_days`
 1. `get_active_task` → `validate_state` (stop if errors)
 2. `misfire_audit_check` / `subobjective_rollup_check` when applicable
-3. `render_task_prompt` → spawn Task subagent (scout/approval_gate/worker)
-4. `validate_receipt` → `verify_worker_receipt` for done Workers
-5. PM updates `state.json` (or legacy `state.yaml`) → `validate_state` → `append_session_note`
+3. `parallel_plan` (mandatory before Task spawn for scout/approval_gate/worker)
+4. If `spawn_plan.length >= 1`: batch-spawn all Task subagents in one turn using each entry's `task_prompt`; else `render_task_prompt` → single Task spawn
+5. `validate_receipt` → `verify_worker_receipt` per board (serial merge)
+6. PM updates each affected `state.json` → `validate_state` → `append_session_note`
 
 CLI equivalents (fallback only):
 
@@ -142,13 +143,15 @@ node ~/.cursor/skills/cursor-curator/dist/cli/curator.mjs prompt docs/objectives
 node ~/.cursor/skills/cursor-curator/scripts/check-objective-state.mjs docs/objectives/<slug>
 ```
 
-## Parallel work (read-only recommendations)
+## Parallel work (default PM batching)
+
+Each `/objective` turn calls `parallel_plan` before spawning subagents. When `spawn_mode` is `parallel`, PM batch-spawns every entry in `spawn_plan` in one assistant turn (multiple Task tool calls). Workers run in parallel only when parent + subobjective boards have disjoint `allowed_files` and `rules.max_write_workers >= 2`.
 
 ```bash
 node ~/.cursor/skills/cursor-curator/dist/cli/curator.mjs parallel-plan docs/objectives/<slug> --json
 ```
 
-Reports safe parallel Scout or disjoint Worker scopes; does not mutate state or spawn agents.
+Inspect `spawn_plan`, `spawn_mode`, `max_write_workers`, and `worker_candidate_count`. PM still merges receipts per board and owns state.
 
 ## Local board
 

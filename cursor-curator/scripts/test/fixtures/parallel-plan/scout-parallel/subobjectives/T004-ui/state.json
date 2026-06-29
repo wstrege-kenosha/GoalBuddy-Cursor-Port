@@ -1,0 +1,38 @@
+{
+  "version": 3,
+  "objective": {
+    "title": "Parallel Scout Child",
+    "slug": "parallel-scout-child",
+    "kind": "specific",
+    "tranche": "Child Scout runs in parallel with parent Scout.",
+    "status": "active",
+    "success_criteria": {
+      "signal": "child scout receipt done",
+      "final_proof": "child scout receipt"
+    }
+  },
+  "agents": {
+    "scout": "installed",
+    "worker": "installed",
+    "approval_gate": "installed"
+  },
+  "active_task": "T002",
+  "tasks": [
+    {
+      "id": "T002",
+      "type": "scout",
+      "assignee": "Scout",
+      "status": "active",
+      "objective": "Map child repo scope.",
+      "receipt": null
+    }
+  ],
+  "checks": {
+    "dirty_fingerprint": "unknown",
+    "last_verification": {
+      "result": "unknown",
+      "task": null,
+      "commands": []
+    }
+  }
+}

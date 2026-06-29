@@ -1,0 +1,60 @@
+{
+  "version": 3,
+  "objective": {
+    "title": "Single Worker",
+    "slug": "single-worker",
+    "kind": "specific",
+    "tranche": "One active Worker with no subobjective peer.",
+    "status": "active",
+    "success_criteria": {
+      "signal": "worker tests pass",
+      "final_proof": "worker receipt"
+    }
+  },
+  "rules": {
+    "pm_owns_state": true,
+    "one_active_task": true,
+    "max_write_workers": 1
+  },
+  "agents": {
+    "scout": "installed",
+    "worker": "installed",
+    "approval_gate": "installed"
+  },
+  "active_task": "T002",
+  "tasks": [
+    {
+      "id": "T002",
+      "type": "worker",
+      "assignee": "Worker",
+      "status": "active",
+      "objective": "Implement a single slice.",
+      "allowed_files": [
+        "src/feature/**"
+      ],
+      "verify": [
+        "npm run test"
+      ],
+      "stop_if": [
+        "Need files outside allowed_files."
+      ],
+      "receipt": null
+    },
+    {
+      "id": "T003",
+      "type": "approval_gate",
+      "assignee": "Approval Gate",
+      "status": "queued",
+      "objective": "Audit the slice.",
+      "receipt": null
+    }
+  ],
+  "checks": {
+    "dirty_fingerprint": "unknown",
+    "last_verification": {
+      "result": "unknown",
+      "task": null,
+      "commands": []
+    }
+  }
+}

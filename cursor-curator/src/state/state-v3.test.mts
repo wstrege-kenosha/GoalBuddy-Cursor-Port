@@ -185,3 +185,16 @@ test("migrate-5.0 dry-run reports conversion without writing", () => {
   assert.match(result.stdout, /state\.yaml -> state\.json/);
   assert.throws(() => readFileSync(join(dir, "state.json")), /ENOENT/);
 });
+
+test("validateStateV3 warns when parallel parent+child Workers exceed max_write_workers", () => {
+  const fixtureRoot = join(
+    repoRoot,
+    "cursor-curator/scripts/test/fixtures/parallel-plan/max-workers-blocked",
+  );
+  const statePath = join(fixtureRoot, "state.json");
+  const loaded = loadState(statePath);
+  assert.equal(loaded.validation.ok, true);
+  assert.ok(
+    loaded.validation.warnings.some((warning) => warning.includes("max_write_workers")),
+  );
+});

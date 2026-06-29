@@ -26,7 +26,7 @@ export interface BoardDocument {
   tasks?: TaskRow[];
   active_task?: string;
   objective?: Record<string, unknown>;
-  rules?: { slice_policy?: unknown; intake_misfire_must_be_audited?: boolean };
+  rules?: { slice_policy?: unknown; intake_misfire_must_be_audited?: boolean; max_write_workers?: number };
   checks?: { dirty_fingerprint?: string | null };
   agents?: Record<string, unknown>;
 }

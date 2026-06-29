@@ -9,6 +9,9 @@ import {
   resolveBoardPath,
   selectTask,
 } from "./render-task-prompt.mjs";
+import { areAllowedFilesDisjoint } from "./allowed-files-overlap.mjs";
+
+export { areAllowedFilesDisjoint } from "./allowed-files-overlap.mjs";
 
 if (isDirectRun()) {
   try {
@@ -39,28 +42,35 @@ interface ParallelCandidate {
 
 export function createParallelPlan(options: Parameters<typeof parseArgs>[0] extends infer _T ? ReturnType<typeof parseArgs> : never) {
   const rootBoardPath = resolveBoardPath(options);
-  const boards = [loadBoard(rootBoardPath)];
-  for (const childPath of childBoardPaths(boards[0])) {
+  const rootBoard = loadBoard(rootBoardPath);
+  const boards = [rootBoard];
+  for (const childPath of childBoardPaths(rootBoard)) {
     if (existsSync(childPath)) boards.push(loadBoard(childPath));
   }
 
+  const maxWriteWorkers = readMaxWriteWorkers(rootBoard);
   const candidates = boards.map((board) => candidateForBoard(board));
   const workerCandidates = candidates.filter((candidate) => candidate.role === "worker");
   const enriched = candidates.map((candidate) => ({
     ...candidate,
-    safe_to_parallelize: isSafeCandidate(candidate, workerCandidates),
-    reason: safetyReason(candidate, workerCandidates),
+    safe_to_parallelize: isSafeCandidate(candidate, workerCandidates, maxWriteWorkers),
+    reason: safetyReason(candidate, workerCandidates, maxWriteWorkers),
     render_prompt_command: promptCommand(candidate),
   }));
+  const spawnPlan = enriched
+    .filter((candidate) => candidate.safe_to_parallelize)
+    .map((candidate) => buildSpawnPlanEntry(candidate, options));
+  const spawnMode: "parallel" | "serial" = spawnPlan.length >= 2 ? "parallel" : "serial";
 
   return {
     root_board_path: rootBoardPath,
     mutated: false,
     spawned_agents: false,
+    max_write_workers: maxWriteWorkers,
+    worker_candidate_count: workerCandidates.length,
+    spawn_mode: spawnMode,
     candidates: enriched,
-    spawn_plan: enriched
-      .filter((candidate) => candidate.safe_to_parallelize)
-      .map((candidate) => buildSpawnPlanEntry(candidate, options)),
+    spawn_plan: spawnPlan,
   };
 }
 
@@ -101,24 +111,44 @@ function candidateForBoard(board: ReturnType<typeof loadBoard>): ParallelCandida
   };
 }
 
-function isSafeCandidate(candidate: ParallelCandidate, workers: ParallelCandidate[]): boolean {
+function readMaxWriteWorkers(board: ReturnType<typeof loadBoard>): number {
+  const value = board.document.rules?.max_write_workers;
+  if (typeof value === "number" && Number.isFinite(value) && value >= 1) {
+    return Math.floor(value);
+  }
+  return 1;
+}
+
+function isSafeCandidate(
+  candidate: ParallelCandidate,
+  workers: ParallelCandidate[],
+  maxWriteWorkers: number,
+): boolean {
   if (candidate.role === "scout" || candidate.role === "approval_gate") return true;
   if (candidate.role !== "worker") return false;
   if (workers.length < 2) return false;
+  if (workers.length > maxWriteWorkers) return false;
   if (candidate.allowed_files.length === 0) return false;
   return workers
     .filter((worker) => worker !== candidate)
-    .every((worker) => worker.allowed_files.length > 0 && areDisjoint(candidate.allowed_files, worker.allowed_files));
+    .every((worker) => worker.allowed_files.length > 0 && areAllowedFilesDisjoint(candidate.allowed_files, worker.allowed_files));
 }
 
-function safetyReason(candidate: ParallelCandidate, workers: ParallelCandidate[]): string {
+function safetyReason(
+  candidate: ParallelCandidate,
+  workers: ParallelCandidate[],
+  maxWriteWorkers: number,
+): string {
   if (candidate.role === "scout") return "Scout is read-only.";
   if (candidate.role === "approval_gate") return "Approval Gate is read-only.";
   if (candidate.role !== "worker") return "PM tasks mutate board truth and should stay serial.";
+  if (workers.length > maxWriteWorkers) {
+    return `rules.max_write_workers is ${maxWriteWorkers} but ${workers.length} active Worker candidates exist; raise max_write_workers or serialize Workers.`;
+  }
   if (candidate.allowed_files.length === 0) return "Worker has no allowed_files, so write scope is unknown.";
   const overlapping = workers
     .filter((worker) => worker !== candidate)
-    .filter((worker) => worker.allowed_files.length === 0 || !areDisjoint(candidate.allowed_files, worker.allowed_files));
+    .filter((worker) => worker.allowed_files.length === 0 || !areAllowedFilesDisjoint(candidate.allowed_files, worker.allowed_files));
   if (overlapping.length === 0) {
     return workers.length > 1
       ? "Worker write scope is disjoint from other active Workers."
@@ -129,72 +159,6 @@ function safetyReason(candidate: ParallelCandidate, workers: ParallelCandidate[]
 
 function promptCommand(candidate: ParallelCandidate): string {
   return `curator prompt --board ${quote(candidate.board_path)} --task ${candidate.task_id}`;
-}
-
-function areDisjoint(left: string[], right: string[]): boolean {
-  return left.every((leftPattern) => right.every((rightPattern) => !patternsOverlap(leftPattern, rightPattern)));
-}
-
-function patternsOverlap(left: string, right: string): boolean {
-  const a = normalizePattern(left);
-  const b = normalizePattern(right);
-  const aHasGlob = hasGlob(a);
-  const bHasGlob = hasGlob(b);
-  if (a === b) return true;
-  if (a.endsWith("/**") && b.startsWith(a.slice(0, -3))) return true;
-  if (b.endsWith("/**") && a.startsWith(b.slice(0, -3))) return true;
-  if (!aHasGlob && !bHasGlob) return false;
-  if (!aHasGlob) return globToRegExp(b).test(a);
-  if (!bHasGlob) return globToRegExp(a).test(b);
-  if (hasUnsupportedGlob(a) || hasUnsupportedGlob(b)) return literalPrefixesMayOverlap(a, b);
-  return literalPrefixesMayOverlap(a, b);
-}
-
-function literalPrefixesMayOverlap(left: string, right: string): boolean {
-  const a = literalPrefix(left);
-  const b = literalPrefix(right);
-  if (!a || !b) return true;
-  return a.startsWith(b) || b.startsWith(a);
-}
-
-function literalPrefix(pattern: string): string {
-  const match = /[*?[\]]/.exec(pattern);
-  return match ? pattern.slice(0, match.index) : pattern;
-}
-
-function hasUnsupportedGlob(pattern: string): boolean {
-  return /[\[\]]/.test(pattern);
-}
-
-function globToRegExp(pattern: string): RegExp {
-  let source = "";
-  for (let index = 0; index < pattern.length; index += 1) {
-    const char = pattern[index];
-    const next = pattern[index + 1];
-    if (char === "*" && next === "*") {
-      source += ".*";
-      index += 1;
-    } else if (char === "*") {
-      source += "[^/]*";
-    } else if (char === "?") {
-      source += "[^/]";
-    } else {
-      source += escapeRegExp(char);
-    }
-  }
-  return new RegExp(`^${source}$`);
-}
-
-function escapeRegExp(value: string): string {
-  return value.replace(/[\\^$.*+?()[\]{}|]/g, "\\$&");
-}
-
-function hasGlob(pattern: string): boolean {
-  return /[*?[\]]/.test(pattern);
-}
-
-function normalizePattern(pattern: string): string {
-  return String(pattern || "").replace(/\\/g, "/").replace(/^\.\//, "");
 }
 
 function normalizeRole(value: string | undefined): string {
@@ -215,6 +179,9 @@ function quote(value: string): string {
 
 export function formatPlan(plan: {
   root_board_path: string;
+  max_write_workers?: number;
+  worker_candidate_count?: number;
+  spawn_mode?: "parallel" | "serial";
   candidates: ParallelCandidate[];
   spawn_plan?: Array<{
     board_path: string;
@@ -227,6 +194,9 @@ export function formatPlan(plan: {
     "Cursor Curator parallel plan",
     "",
     `Root board: ${plan.root_board_path}`,
+    `max_write_workers: ${plan.max_write_workers ?? 1}`,
+    `worker_candidate_count: ${plan.worker_candidate_count ?? 0}`,
+    `spawn_mode: ${plan.spawn_mode ?? "serial"}`,
     "Mutates state: no",
     "Spawns agents: no",
     "",

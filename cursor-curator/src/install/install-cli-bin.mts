@@ -50,6 +50,6 @@ export function installCliBin({ cursorHome, skillRoot }: { cursorHome: string; s
     shPath,
     cmdPath,
     cliPath,
-    pathHint: `Add ${binDir} to your PATH, then run: curator doctor | curator board docs/objectives/<slug>`,
+    pathHint: `curator is installed at ${binDir}. Re-run npm run install:cursor (or node dist/cli/curator.mjs install) with --no-add-to-path to skip automatic PATH updates.`,
   };
 }

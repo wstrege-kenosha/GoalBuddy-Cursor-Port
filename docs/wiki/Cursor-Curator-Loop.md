@@ -48,7 +48,7 @@ After install:
 | `misfire_audit_check` / `subobjective_rollup_check` | Intake audit / child rollup when due |
 | `blocked_tasks` | When tasks are blocked — triage hints |
 | `completion_check` | Before `objective.status: done` |
-| `parallel_plan` | Before parallel Workers |
+| `parallel_plan` | **Every turn** before Task spawn — batch-spawn `spawn_plan` when safe; Workers need disjoint parent/subobjective `allowed_files` and `max_write_workers >= 2` |
 | `list_objectives` / `hub` | Multi-objective visibility |
 
 ## Proof loop

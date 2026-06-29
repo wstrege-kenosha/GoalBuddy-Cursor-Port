@@ -1,10 +1,11 @@
 import { existsSync, readFileSync } from "node:fs";
-import { basename, join, resolve } from "node:path";
+import { basename, dirname, join, resolve } from "node:path";
 import {
   StateV3Schema,
   type StateV3,
   type StateV3Task,
 } from "../schema/state-v3.js";
+import { areAllowedFilesDisjoint } from "../prompt/allowed-files-overlap.mjs";
 
 export type StateFileFormat = "json";
 
@@ -116,6 +117,59 @@ function validateProofWarnings(state: StateV3, warnings: string[]): void {
     const status = state.agents[agent];
     if (status !== "installed") {
       warnings.push(agentStatusWarning(agent, status));
+    }
+  }
+}
+
+function readMaxWriteWorkers(state: StateV3): number {
+  const value = state.rules?.max_write_workers;
+  if (typeof value === "number" && Number.isFinite(value) && value >= 1) {
+    return Math.floor(value);
+  }
+  return 1;
+}
+
+function readChildState(statePath: string, childRelativePath: string): StateV3 | null {
+  const childStatePath = resolve(dirname(statePath), childRelativePath);
+  if (!existsSync(childStatePath)) return null;
+  try {
+    const parsed = StateV3Schema.safeParse(JSON.parse(readFileSync(childStatePath, "utf8")));
+    return parsed.success ? parsed.data : null;
+  } catch {
+    return null;
+  }
+}
+
+function validateParallelWorkerWarnings(state: StateV3, statePath: string | undefined, warnings: string[]): void {
+  if (!statePath) return;
+
+  const maxWriteWorkers = readMaxWriteWorkers(state);
+
+  for (const task of state.tasks) {
+    if (task.type !== "worker" || task.status !== "active" || !task.subobjective?.path) continue;
+    const childState = readChildState(statePath, task.subobjective.path);
+    if (!childState) continue;
+
+    const childWorker = childState.tasks.find((entry) => entry.type === "worker" && entry.status === "active");
+    if (!childWorker) continue;
+
+    const parentFiles = task.allowed_files || [];
+    const childFiles = childWorker.allowed_files || [];
+
+    if (maxWriteWorkers < 2) {
+      warnings.push(
+        `active parent Worker ${task.id} and active child Worker ${childWorker.id} are both live but rules.max_write_workers is ${maxWriteWorkers}; set max_write_workers to 2 for parallel Workers or serialize one board.`,
+      );
+    }
+
+    if (
+      parentFiles.length > 0
+      && childFiles.length > 0
+      && !areAllowedFilesDisjoint(parentFiles, childFiles)
+    ) {
+      warnings.push(
+        `active parent Worker ${task.id} and active child Worker ${childWorker.id} have overlapping allowed_files; parallel_plan will not spawn both Workers until scopes are disjoint.`,
+      );
     }
   }
 }
@@ -278,7 +332,7 @@ export function loadState(
       `invalid JSON in ${statePath}: ${error instanceof Error ? error.message : String(error)}`,
     );
   }
-  const validation = validateStateV3(raw);
+  const validation = validateStateV3(raw, { statePath });
 
   return {
     statePath,
@@ -292,7 +346,7 @@ export function loadState(
 
 export { validateObjectiveStateFile as validateObjectiveState } from "../mcp/validate-state-bridge.mjs";
 
-export function validateStateV3(input: unknown): ValidateStateV3Result {
+export function validateStateV3(input: unknown, context: { statePath?: string } = {}): ValidateStateV3Result {
   const errors: string[] = [];
   const warnings: string[] = [];
 
@@ -320,6 +374,7 @@ export function validateStateV3(input: unknown): ValidateStateV3Result {
   const state = parsed.data;
   validateTaskSemantics(state, errors);
   validateProofWarnings(state, warnings);
+  validateParallelWorkerWarnings(state, context.statePath, warnings);
   validateDoneCompletionRules(state, errors);
 
   return {

@@ -84,7 +84,8 @@ if (!existsSync(curatorCli)) {
   process.exit(1);
 }
 
-const install = spawnSync(process.execPath, [curatorCli, "install"], {
+const installArgs = ["install", ...process.argv.slice(2)];
+const install = spawnSync(process.execPath, [curatorCli, ...installArgs], {
   stdio: "inherit",
   env: { ...process.env, CURSOR_HOME: cursorHome, CURATOR_REPO_ROOT: repoRoot },
 });

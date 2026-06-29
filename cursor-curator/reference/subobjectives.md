@@ -13,18 +13,56 @@ Use subobjectives for bounded child work that belongs to a parent task.
 
 ```
 docs/objectives/<parent-slug>/
-  state.yaml
+  state.json
   subobjectives/
-    T004-board-view/
+    T004-ui/
       objective.md
-      state.yaml
+      state.json
       notes/
 ```
 
 ## When to use
 
 - Parent task is too large for one Worker package but still one outcome branch
-- Parallel read-only Scout work on a child board (never mutate parent from child Worker unless parent `state.yaml` is in `allowed_files`)
+- Parallel read-only Scout work on a child board (never mutate parent from child Worker unless parent `state.json` is in `allowed_files`)
+- Parallel parent + child Workers when write scopes are disjoint and `rules.max_write_workers >= 2`
+
+## Parallel parent + child Workers
+
+Approval Gate (or PM during setup) should structure parallel work like this:
+
+```json
+// Parent state.json (excerpt)
+"rules": { "max_write_workers": 2 },
+"tasks": [{
+  "id": "T004",
+  "type": "worker",
+  "status": "active",
+  "allowed_files": ["src/feature/tests/**"],
+  "subobjective": {
+    "status": "active",
+    "path": "subobjectives/T004-ui/state.json",
+    "depth": 1
+  }
+}]
+
+// Child subobjectives/T004-ui/state.json (excerpt)
+"tasks": [{
+  "id": "T002",
+  "type": "worker",
+  "status": "active",
+  "allowed_files": ["src/feature/ui/**"]
+}]
+```
+
+Requirements:
+
+- Parent and child `allowed_files` must **not** overlap (no shared globs or paths).
+- Parent board sets `rules.max_write_workers: 2` before PM expects parallel Worker spawns.
+- Reject parallel Workers when one slice must finish before the other can verify.
+- PM calls `parallel_plan` each turn; when `spawn_mode` is `parallel`, spawn all `spawn_plan` entries in one turn.
+
+Overlapping scopes (for example, both Workers listing the same module path) are blocked by `parallel_plan` and surface as validation warnings.
 
 ## Multiple boards
 

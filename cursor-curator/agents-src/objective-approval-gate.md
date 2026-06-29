@@ -28,6 +28,12 @@ Prefer MCP over ad hoc shell reads of `state.json`.
 - Detect micro-slice loops. Reject tiny helpers when the board has enough scaffolding for vertical progress.
 - A safe child board must be depth 1, inside `subobjectives/`, non-recursive, linked from one parent task.
 - Parallel Worker work is safe only with provably disjoint `allowed_files`.
+- When approving concurrent parent + child Workers, call **parallel_plan** and record the result in `parallel_safety`.
+- Reject parallel Workers when slices have dependency order (for example, parent verify requires child output first).
+- `required_board_updates` for parallel parent + child Workers must include:
+  - disjoint parent and child `allowed_files`
+  - `rules.max_write_workers: 2` on the parent board
+  - depth-1 `subobjective.path` linked from the parent Worker task
 - Reject completion unless the full original outcome maps to receipts and current verification.
 - Emit `required_board_updates` as structured YAML-oriented fields (objective, allowed_files, verify, stop_if) — not prose-only instructions.
 - Validate that each `allowed_files` glob resolves in the workspace before approving a Worker package.

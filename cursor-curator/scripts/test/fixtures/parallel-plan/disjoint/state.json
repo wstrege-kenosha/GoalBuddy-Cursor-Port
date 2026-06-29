@@ -1,0 +1,68 @@
+{
+  "version": 3,
+  "objective": {
+    "title": "Parallel Disjoint Workers",
+    "slug": "parallel-disjoint-workers",
+    "kind": "specific",
+    "tranche": "Parent and child Workers with disjoint allowed_files.",
+    "status": "active",
+    "success_criteria": {
+      "signal": "parallel-plan tests pass",
+      "final_proof": "spawn_mode parallel with two Workers"
+    }
+  },
+  "rules": {
+    "pm_owns_state": true,
+    "one_active_task": true,
+    "max_write_workers": 2
+  },
+  "agents": {
+    "scout": "installed",
+    "worker": "installed",
+    "approval_gate": "installed"
+  },
+  "active_task": "T004",
+  "tasks": [
+    {
+      "id": "T004",
+      "type": "worker",
+      "assignee": "Worker",
+      "status": "active",
+      "objective": "Implement parent integration tests.",
+      "allowed_files": [
+        "src/feature/tests/**"
+      ],
+      "verify": [
+        "npm run test -- src/feature/tests"
+      ],
+      "stop_if": [
+        "Need files outside allowed_files."
+      ],
+      "subobjective": {
+        "status": "active",
+        "path": "subobjectives/T004-ui/state.json",
+        "owner": "Worker",
+        "created_from": "T004",
+        "depth": 1,
+        "rollup_receipt": null
+      },
+      "receipt": null
+    },
+    {
+      "id": "T999",
+      "type": "approval_gate",
+      "assignee": "Approval Gate",
+      "status": "queued",
+      "objective": "Audit parallel Worker completion.",
+      "receipt": null
+    }
+  ],
+  "checks": {
+    "dirty_fingerprint": "unknown",
+    "last_verification": {
+      "result": "unknown",
+      "task": null,
+      "commands": []
+    }
+  }
+}

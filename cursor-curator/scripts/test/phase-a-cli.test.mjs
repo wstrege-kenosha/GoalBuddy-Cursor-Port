@@ -48,8 +48,11 @@ test("findStaleObjectives returns structured report", () => {
   assert.ok(Array.isArray(result.objectives));
 });
 
-test("parallel-plan includes spawn_plan array", () => {
+test("parallel-plan includes spawn_plan array and spawn metadata", () => {
   const plan = createParallelPlan({ objectiveRoot: smokeGoal, json: true });
   assert.ok(Array.isArray(plan.spawn_plan));
   assert.ok(Array.isArray(plan.candidates));
+  assert.ok(["parallel", "serial"].includes(plan.spawn_mode));
+  assert.equal(typeof plan.max_write_workers, "number");
+  assert.equal(typeof plan.worker_candidate_count, "number");
 });

@@ -1,0 +1,47 @@
+{
+  "version": 3,
+  "objective": {
+    "title": "T004 UI Subobjective",
+    "slug": "t004-ui-subobjective-blocked",
+    "kind": "specific",
+    "tranche": "Child Worker blocked by parent max_write_workers.",
+    "status": "active",
+    "success_criteria": {
+      "signal": "child worker tests pass",
+      "final_proof": "child worker receipt"
+    }
+  },
+  "agents": {
+    "scout": "installed",
+    "worker": "installed",
+    "approval_gate": "installed"
+  },
+  "active_task": "T002",
+  "tasks": [
+    {
+      "id": "T002",
+      "type": "worker",
+      "assignee": "Worker",
+      "status": "active",
+      "objective": "Child Worker slice.",
+      "allowed_files": [
+        "src/feature/ui/**"
+      ],
+      "verify": [
+        "npm run test -- src/feature/ui"
+      ],
+      "stop_if": [
+        "Need files outside allowed_files."
+      ],
+      "receipt": null
+    }
+  ],
+  "checks": {
+    "dirty_fingerprint": "unknown",
+    "last_verification": {
+      "result": "unknown",
+      "task": null,
+      "commands": []
+    }
+  }
+}

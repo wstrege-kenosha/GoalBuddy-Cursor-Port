@@ -29,10 +29,28 @@ The installer:
 3. Runs `npm install --omit=dev` inside the copied `cursor-curator` skill (bundles `zod`, `yaml`, MCP SDK for skill-only use)
 4. Runs `curator.mjs install` to register agents (`objective-scout`, `objective-approval-gate`, `objective-worker`) and slash commands (`/objective-prep`, `/objective`, `/objective-board`)
 5. Merges **Cursor hooks** into `~/.cursor/hooks.json` (`stop` and `subagentStop`) so agent time and token usage are recorded per objective in `notes/usage.json` (requires Cursor 1.7+ with hook token fields)
-6. Installs a global `curator` CLI shim to `~/.cursor/bin`
+6. Installs a global `curator` CLI shim to `~/.cursor/bin` and adds that directory to your **User PATH** (Unix: shell rc marker block; Windows: User `Path` env var). Use `--no-add-to-path` to skip (see below).
 7. Merges the **cursor-curator** MCP server into `~/.cursor/mcp.json` (launcher script + repo path for npm deps) and, when run from this repo, also into the project `.cursor/mcp.json` (portable paths for contributors).
 
 Contributors need `npm install` at the repo root for tests and builds. Skill-only installs after step 3 do not require the clone’s `node_modules` for MCP/board runtime.
+
+### PATH (first install vs global CLI)
+
+First install does **not** require `curator` on PATH — run from the clone:
+
+```bash
+npm run install:cursor                              # adds ~/.cursor/bin to User PATH (default)
+npm run install:cursor -- --no-add-to-path          # skip PATH update
+node cursor-curator/dist/cli/curator.mjs install --no-add-to-path
+node cursor-curator/dist/cli/curator.mjs reinstall --clean --no-add-to-path
+```
+
+After a new terminal picks up PATH, you can use the global shim:
+
+```bash
+curator doctor
+curator reinstall --clean --no-add-to-path
+```
 
 ## Enable MCP
 
@@ -71,9 +89,9 @@ node cursor-curator/dist/cli/curator.mjs doctor
 node cursor-curator/dist/cli/curator.mjs doctor --objective-ready
 ```
 
-Doctor checks Node, skill files, installed agents/commands, MCP config, and runs an MCP smoke test on `sample-cursor-smoke`.
+Doctor checks Node, skill files, installed agents/commands, MCP config, CLI PATH, and runs an MCP smoke test on `sample-cursor-smoke`.
 
-Add `%USERPROFILE%\.cursor\bin` to PATH (once) so `curator doctor` and `curator board` work from any repo with `docs/objectives/`.
+After install, **restart Cursor** (or reload PATH in the current PowerShell session) so `curator doctor` and `curator board` resolve globally. Integrated terminals inherit PATH from when Cursor was launched — a new tab inside Cursor is not enough if install ran while Cursor was open. If PATH was skipped during install, add `%USERPROFILE%\.cursor\bin` (Windows) or `~/.cursor/bin` (macOS/Linux) manually.
 
 ## Clean reinstall
 

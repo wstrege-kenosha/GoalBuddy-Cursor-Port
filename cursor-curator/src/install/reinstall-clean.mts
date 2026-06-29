@@ -16,6 +16,7 @@ import {
   removeMcpServerEntry,
 } from "./install-mcp.mjs";
 import { installCliBin } from "./install-cli-bin.mjs";
+import { ensureCliOnPath } from "./install-cli-path.mjs";
 
 const LEGACY_SKILL_NAMES = ["curator-prep", "goalbuddy"] as const;
 const LEGACY_MCP_SERVER_NAMES = ["curator", "goalbuddy"] as const;
@@ -26,6 +27,7 @@ export interface ReinstallCleanOptions {
   cursorHome: string;
   json?: boolean;
   quiet?: boolean;
+  addToPath?: boolean;
 }
 
 export interface ReinstallCleanResult {
@@ -259,6 +261,16 @@ export function runReinstallClean(options: ReinstallCleanOptions): ReinstallClea
   const cliResult = installCliBin({ cursorHome, skillRoot: newSkillRoot });
   if (!cliResult.ok) {
     errors.push(cliResult.error);
+  } else {
+    const pathResult = ensureCliOnPath(cliResult.binDir, { enabled: options.addToPath !== false });
+    if (!pathResult.ok && !quiet) {
+      log(`PATH: ${pathResult.message}`, quiet);
+    } else if (pathResult.persisted && !quiet) {
+      log(`PATH: ${pathResult.message}`, quiet);
+      log("PATH: open a new terminal for the global curator command.", quiet);
+    } else if (pathResult.skipped && !quiet) {
+      log(pathResult.message, quiet);
+    }
   }
 
   const result: ReinstallCleanResult = {

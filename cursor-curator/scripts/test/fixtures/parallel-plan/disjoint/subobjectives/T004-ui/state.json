@@ -1,0 +1,55 @@
+{
+  "version": 3,
+  "objective": {
+    "title": "T004 UI Subobjective",
+    "slug": "t004-ui-subobjective",
+    "kind": "specific",
+    "tranche": "Child UI module for parallel Worker.",
+    "status": "active",
+    "success_criteria": {
+      "signal": "child worker tests pass",
+      "final_proof": "child worker receipt"
+    }
+  },
+  "agents": {
+    "scout": "installed",
+    "worker": "installed",
+    "approval_gate": "installed"
+  },
+  "active_task": "T002",
+  "tasks": [
+    {
+      "id": "T002",
+      "type": "worker",
+      "assignee": "Worker",
+      "status": "active",
+      "objective": "Implement child UI module.",
+      "allowed_files": [
+        "src/feature/ui/**"
+      ],
+      "verify": [
+        "npm run test -- src/feature/ui"
+      ],
+      "stop_if": [
+        "Need files outside allowed_files."
+      ],
+      "receipt": null
+    },
+    {
+      "id": "T003",
+      "type": "approval_gate",
+      "assignee": "Approval Gate",
+      "status": "queued",
+      "objective": "Audit child UI module.",
+      "receipt": null
+    }
+  ],
+  "checks": {
+    "dirty_fingerprint": "unknown",
+    "last_verification": {
+      "result": "unknown",
+      "task": null,
+      "commands": []
+    }
+  }
+}

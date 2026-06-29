@@ -117,7 +117,7 @@ Re-run install from Cursor-Curator:
 npm run install:cursor
 ```
 
-Add `%USERPROFILE%\.cursor\bin` (Windows) or `~/.cursor/bin` (macOS/Linux) to PATH, then open a **new** terminal. Or invoke directly:
+Install adds `~/.cursor/bin` to User PATH by default; open a **new** terminal so `curator` resolves. If you used `--no-add-to-path`, add `%USERPROFILE%\.cursor\bin` (Windows) or `~/.cursor/bin` (macOS/Linux) manually. Or invoke directly:
 
 ```powershell
 & "$env:USERPROFILE\.cursor\bin\cursor-curator.cmd" doctor

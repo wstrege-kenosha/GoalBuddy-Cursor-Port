@@ -1,0 +1,68 @@
+{
+  "version": 3,
+  "objective": {
+    "title": "Parallel Scout Parent",
+    "slug": "parallel-scout-parent",
+    "kind": "specific",
+    "tranche": "Parent Scout runs in parallel with child Scout.",
+    "status": "active",
+    "success_criteria": {
+      "signal": "scout receipts merged",
+      "final_proof": "both scout receipts done"
+    }
+  },
+  "rules": {
+    "pm_owns_state": true,
+    "one_active_task": true,
+    "max_write_workers": 1
+  },
+  "agents": {
+    "scout": "installed",
+    "worker": "installed",
+    "approval_gate": "installed"
+  },
+  "active_task": "T001",
+  "tasks": [
+    {
+      "id": "T001",
+      "type": "scout",
+      "assignee": "Scout",
+      "status": "active",
+      "objective": "Map parent repo scope.",
+      "receipt": null
+    },
+    {
+      "id": "T004",
+      "type": "worker",
+      "assignee": "Worker",
+      "status": "queued",
+      "objective": "Future parent Worker slice.",
+      "allowed_files": [
+        "src/feature/tests/**"
+      ],
+      "verify": [
+        "npm run test -- src/feature/tests"
+      ],
+      "stop_if": [
+        "Need files outside allowed_files."
+      ],
+      "subobjective": {
+        "status": "active",
+        "path": "subobjectives/T004-ui/state.json",
+        "owner": "Worker",
+        "created_from": "T004",
+        "depth": 1,
+        "rollup_receipt": null
+      },
+      "receipt": null
+    }
+  ],
+  "checks": {
+    "dirty_fingerprint": "unknown",
+    "last_verification": {
+      "result": "unknown",
+      "task": null,
+      "commands": []
+    }
+  }
+}

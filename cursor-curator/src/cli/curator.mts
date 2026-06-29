@@ -11,7 +11,13 @@ import {
   ensureProjectMcpConfig,
   installMcpConfig,
 } from "../install/install-mcp.mjs";
-import { installCliBin } from "../install/install-cli-bin.mjs";
+import { installCliBin, resolveCliBinDir } from "../install/install-cli-bin.mjs";
+import {
+  buildDirectCliInvokeHint,
+  buildWindowsPathSessionRefreshCommand,
+  ensureCliOnPath,
+  isPathEntryPresent,
+} from "../install/install-cli-path.mjs";
 import { getWorkspaceRoot, registerKnownWorkspace } from "../mcp/path-utils.mjs";
 import { runMcpSmokeTest } from "../mcp/tools.mjs";
 import { renderTaskPrompt } from "../prompt/render-task-prompt.mjs";
@@ -140,9 +146,9 @@ function usage(): void {
   console.log(`Cursor Curator for Cursor (port ${versionInfo.cursorPortVersion}, upstream ${versionInfo.upstreamVersion})
 
 Usage:
-  node dist/cli/curator.mjs [install] [--force]
-  curator [install] [--force]   (after install-cli-bin)
-  node dist/cli/curator.mjs reinstall --clean [--json]
+  node dist/cli/curator.mjs [install] [--force] [--no-add-to-path]
+  curator [install] [--force] [--no-add-to-path]   (after install-cli-bin)
+  node dist/cli/curator.mjs reinstall --clean [--json] [--no-add-to-path]
   node dist/cli/curator.mjs reset
   node dist/cli/curator.mjs doctor [--objective-ready] [--json]
   node dist/cli/curator.mjs update [--json]
@@ -193,6 +199,9 @@ function runInstall(): void {
     process.exit(1);
   }
 
+  const pathResult = ensureCliOnPath(cliResult.binDir, { enabled: !hasFlag("--no-add-to-path") });
+  reportCliPathResult(pathResult, cliResult.pathHint);
+
   console.log("Cursor Curator install complete.");
   console.log(`Skills: ${join(cursorHome, "skills", "cursor-curator")}`);
   console.log(`CLI: ${cliResult.cmdPath}`);
@@ -204,7 +213,6 @@ function runInstall(): void {
   for (const entry of mcpResult.installed) {
     console.log(`MCP: ${entry.configPath}`);
   }
-  console.log(cliResult.pathHint);
   console.log("Next: enable the cursor-curator MCP server in Cursor Settings → MCP, then /objective-prep and /objective.");
   console.log("User-level MCP (~/.cursor/mcp.json) works in every workspace; project .cursor/mcp.json is written for repos with docs/objectives/.");
 }
@@ -253,7 +261,7 @@ function runReset(): void {
 
 function runReinstall(): void {
   if (!hasFlag("--clean")) {
-    console.error("Usage: node dist/cli/curator.mjs reinstall --clean [--json]");
+    console.error("Usage: node dist/cli/curator.mjs reinstall --clean [--json] [--no-add-to-path]");
     console.error("Removes installed skills under ~/.cursor/skills, re-copies from the clone, and re-runs install.");
     console.error("Does not delete the Cursor-Curator source tree in your clone.");
     process.exit(2);
@@ -263,6 +271,7 @@ function runReinstall(): void {
     skillRoot,
     cursorHome,
     json: hasFlag("--json"),
+    addToPath: !hasFlag("--no-add-to-path"),
   });
 }
 
@@ -279,6 +288,7 @@ async function runDoctor(): Promise<void> {
   checks.push(nodeVersionCheck());
   checks.push(...requiredFilesCheck());
   checks.push(...installSurfacesCheck());
+  checks.push(cliPathCheck());
   checks.push(...mcpConfigCheck());
   checks.push(mcpSmokeCheck());
   if (goalReady) {
@@ -326,6 +336,7 @@ function requiredFilesCheck() {
     "dist/install/install-agents.mjs",
     "dist/install/install-mcp.mjs",
     "dist/install/install-cli-bin.mjs",
+    "dist/install/install-cli-path.mjs",
     "dist/prompt/render-task-prompt.mjs",
     "dist/prompt/parallel-plan.mjs",
     "dist/cli/check-update.mjs",
@@ -347,6 +358,43 @@ function installSurfacesCheck() {
     results.push({ name: `command:${file}`, ok: existsSync(path), detail: path });
   }
   return results;
+}
+
+function cliPathCheck() {
+  const binDir = resolveCliBinDir(cursorHome);
+  const onPath = isPathEntryPresent(process.env.PATH ?? "", binDir);
+  return {
+    name: "cli:path",
+    ok: onPath,
+    detail: onPath ? binDir : `From clone: npm run install:cursor (or add ${binDir} to PATH)`,
+  };
+}
+
+function reportCliPathResult(
+  pathResult: ReturnType<typeof ensureCliOnPath>,
+  manualHint: string,
+): void {
+  if (pathResult.skipped) {
+    console.log(pathResult.message);
+    console.log(manualHint);
+    return;
+  }
+  if (pathResult.ok) {
+    console.log(`PATH: ${pathResult.message}`);
+    if (pathResult.persisted) {
+      if (process.platform === "win32") {
+        console.log("PATH: restart Cursor so integrated terminals inherit User PATH.");
+        console.log("PATH: or reload this PowerShell session:");
+        console.log(`  ${buildWindowsPathSessionRefreshCommand()}`);
+        console.log(`PATH: invoke now: ${buildDirectCliInvokeHint(pathResult.binDir)}`);
+      } else {
+        console.log("PATH: open a new terminal for the global curator command.");
+      }
+    }
+    return;
+  }
+  console.warn(`PATH: ${pathResult.message}`);
+  console.log(manualHint);
 }
 
 function mcpConfigCheck() {

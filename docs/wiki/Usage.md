@@ -10,14 +10,17 @@
 0. `session_resume_digest` — turn-0 handoff; use `list_objectives` with `stale_days: 7` when objectives may be idle
 1. `get_active_task` → `validate_state` (stop if errors)
 2. `misfire_audit_check` / `subobjective_rollup_check` when rules require them
-3. `render_task_prompt` → spawn Task subagent (`objective-scout` | `objective-approval-gate` | `objective-worker`)
-4. `validate_receipt` → `verify_worker_receipt` for done Workers (writes `checks.last_verification` patch)
-5. PM updates `state.json`
-6. `validate_state` again → `append_session_note`
+3. `parallel_plan` — mandatory before Task spawn; when `spawn_plan.length >= 1`, batch-spawn all entries in one turn using each `task_prompt`
+4. If `spawn_plan` is empty: `render_task_prompt` → single Task spawn
+5. `validate_receipt` → `verify_worker_receipt` per board (serial merge)
+6. PM updates each affected `state.json`
+7. `validate_state` again → `append_session_note`
+
+Parallel Workers require disjoint parent + subobjective `allowed_files` and `rules.max_write_workers >= 2`. See [subobjectives.md](../../cursor-curator/reference/subobjectives.md).
 
 ## CLI (after install)
 
-Add `%USERPROFILE%\.cursor\bin` (Windows) or `~/.cursor/bin` (macOS/Linux) to PATH. Then from any repo with an objective:
+Install adds `~/.cursor/bin` to User PATH by default (open a **new terminal** afterward). From the clone, use `npm run install:cursor` or `node cursor-curator/dist/cli/curator.mjs install`; pass `--no-add-to-path` (or `npm run install:cursor -- --no-add-to-path`) to skip PATH. Once `curator` resolves globally, from any repo with an objective:
 
 ```bash
 curator doctor --objective-ready
