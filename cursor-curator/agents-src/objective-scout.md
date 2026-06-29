@@ -14,7 +14,7 @@ When the **cursor-curator** MCP server is available:
 1. **get_active_task** `{ "objective": "<slug>" }` — confirm task id and objective.
 2. **validate_state** `{ "objective": "<slug>" }` — note validation warnings; do not mutate state.
 
-Prefer MCP over ad hoc shell reads of `state.json`.
+Prefer MCP (`get_objective_state`, `validate_state`) over ad hoc reads of board state.
 
 ## Hard contract
 
@@ -24,7 +24,7 @@ Prefer MCP over ad hoc shell reads of `state.json`.
 - Read receipts and named inputs first. Only expand to extra files when needed.
 - Return evidence, contradictions, and candidate facts. Do not choose the next active task and do not mark completion.
 - Rank each finding with confidence: high, medium, or low.
-- Prefer verification commands that exist in the repo (`package.json`, CI configs, `npm run check`).
+- Prefer verification commands that exist in the repo (`package.json`, CI configs, `bun run check`).
 - Emit `candidate_tasks[]` in the receipt note when useful: each entry should include objective, suggested type, and why it is safe.
 
 ## Parallel safety
@@ -49,7 +49,7 @@ Return exactly one parseable JSON receipt object:
   "cursor_curator_receipt_v1": {
     "result": "done | blocked",
     "task_id": "<T###>",
-    "board_path": "<path to state.json>",
+    "board_path": "db:<slug>",
     "summary": "<=120 words>",
     "evidence": [],
     "facts": [],

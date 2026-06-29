@@ -7,19 +7,23 @@ import { buildHubPayload } from "../../dist/hub/objective-hub.mjs";
 import { validateReceipt } from "../../dist/receipt/objective-receipt.mjs";
 import { findStaleObjectives } from "../../dist/stale/objective-stale.mjs";
 import { createParallelPlan } from "../../dist/prompt/parallel-plan.mjs";
+import { importObjectiveFixture } from "../../dist/db/state-repository.mjs";
 
 const __dirname = fileURLToPath(new URL(".", import.meta.url));
 const repoRoot = resolve(__dirname, "../../..");
 const smokeGoal = join(repoRoot, "docs/objectives/sample-cursor-smoke");
+const previousWorkspacePaths = process.env.WORKSPACE_FOLDER_PATHS;
+process.env.WORKSPACE_FOLDER_PATHS = repoRoot;
+importObjectiveFixture(repoRoot, "sample-cursor-smoke");
 
 test("validateReceipt accepts worker receipt shape", () => {
   const result = validateReceipt({
     cursor_curator_receipt_v1: {
       result: "done",
       task_id: "T003",
-      board_path: "docs/objectives/sample/state.json",
+      board_path: "db:sample",
       changed_files: ["README.md"],
-      commands: [{ cmd: "npm run check", status: "pass" }],
+      commands: [{ cmd: "bun run check", status: "pass" }],
       summary: "Updated readme.",
     },
   }, { role: "worker", expectedTaskId: "T003" });
@@ -27,11 +31,10 @@ test("validateReceipt accepts worker receipt shape", () => {
 });
 
 test("checkCompletionReadiness reports ready for completed sample-cursor-smoke objective", async () => {
-  const statePath = join(smokeGoal, "state.json");
-  const result = checkCompletionReadiness(statePath);
+  const result = checkCompletionReadiness("sample-cursor-smoke", repoRoot);
   assert.equal(result.ready, true);
   const { validateObjectiveStateFile } = await import("../../dist/mcp/validate-state-bridge.mjs");
-  assert.equal(validateObjectiveStateFile(statePath).ok, true);
+  assert.equal(validateObjectiveStateFile("sample-cursor-smoke", repoRoot).ok, true);
 });
 
 test("buildHubPayload discovers repo objectives", () => {
@@ -49,7 +52,7 @@ test("findStaleObjectives returns structured report", () => {
 });
 
 test("parallel-plan includes spawn_plan array and spawn metadata", () => {
-  const plan = createParallelPlan({ objectiveRoot: smokeGoal, json: true });
+  const plan = createParallelPlan({ objectiveRoot: smokeGoal, json: true, workspaceRoot: repoRoot });
   assert.ok(Array.isArray(plan.spawn_plan));
   assert.ok(Array.isArray(plan.candidates));
   assert.ok(["parallel", "serial"].includes(plan.spawn_mode));

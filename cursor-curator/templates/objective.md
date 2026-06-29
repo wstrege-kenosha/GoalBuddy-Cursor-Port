@@ -68,9 +68,9 @@ Do not stop because a slice needs owner input, credentials, production access, d
 
 Machine truth lives at:
 
-`docs/objectives/<slug>/state.json`
+Board state for this objective lives in `.cursor-curator/curator.db` (logical path `db:<slug>`).
 
-If this charter and `state.json` disagree, `state.json` wins for task status, active task, receipts, verification freshness, and completion truth.
+If this charter and the database board disagree, the database wins for task status, active task, receipts, verification freshness, and completion truth.
 
 ## Run Command
 
@@ -83,7 +83,7 @@ If this charter and `state.json` disagree, `state.json` wins for task status, ac
 On every `/objective` continuation:
 
 1. Read this charter.
-2. Read `state.json`.
+2. Load board state via MCP (`get_objective_state`) or `curator check-objective <slug>`.
 3. Run the bundled Cursor Curator update checker when available and mention a newer version without blocking.
 4. Re-check the intake: original request, input shape, authority, proof, blind spots, existing plan facts, and likely misfire.
 5. Work only on the active board task.
@@ -95,4 +95,4 @@ On every `/objective` continuation:
 11. Review at phase, risk, rejected-verification, ambiguity, or final-completion boundaries; do not review every small Worker by habit.
 12. Finish only with a Approval Gate/PM audit receipt that maps receipts and verification back to the original user outcome and records `full_outcome_complete: true`.
 
-Issue and PR handoffs are supporting artifacts. `state.json` remains authoritative, and every external artifact decision must be recorded in a task receipt.
+Issue and PR handoffs are supporting artifacts. The workspace database remains authoritative, and every external artifact decision must be recorded in a task receipt.

@@ -20,6 +20,8 @@ import {
   toolBlockedTasks,
 } from "../../dist/mcp/tools.mjs";
 
+import { importObjectiveFixture } from "../../dist/db/state-repository.mjs";
+
 const __dirname = fileURLToPath(new URL(".", import.meta.url));
 const repoRoot = resolve(__dirname, "../../..");
 const skillRoot = join(repoRoot, "cursor-curator");
@@ -28,10 +30,13 @@ const smokeSlug = "sample-cursor-smoke";
 process.env.CURATOR_SKILL_ROOT = skillRoot;
 const previousGoalWorkspace = process.env.CURATOR_WORKSPACE;
 process.env.CURATOR_WORKSPACE = repoRoot;
+const previousWorkspacePaths = process.env.WORKSPACE_FOLDER_PATHS;
+process.env.WORKSPACE_FOLDER_PATHS = repoRoot;
+importObjectiveFixture(repoRoot, "sample-cursor-smoke");
 
-test("resolveObjectiveStatePath stays under docs/objectives", () => {
+test("resolveObjectiveStatePath returns logical db board path", () => {
   const statePath = resolveObjectiveStatePath(smokeSlug, repoRoot);
-  assert.match(statePath, /docs[/\\]objectives[/\\]sample-cursor-smoke[/\\]state\.json$/);
+  assert.equal(statePath, "db:sample-cursor-smoke");
 });
 
 test("resolveObjectiveStatePath rejects escape attempts", () => {
@@ -96,7 +101,7 @@ test("resolveWorkspaceForObjective finds objective in registered workspace when 
   try {
     assert.equal(resolveWorkspaceForObjective(smokeSlug), repoRoot);
     const statePath = resolveObjectiveStatePath(smokeSlug);
-    assert.match(statePath, /sample-cursor-smoke[/\\]state\.json$/);
+    assert.equal(statePath, "db:sample-cursor-smoke");
   } finally {
     if (previousGoalWorkspace === undefined) {
       delete process.env.CURATOR_WORKSPACE;
@@ -209,7 +214,7 @@ test("mergeMcpConfig preserves other servers", () => {
 
 test("buildMcpServerEntry points at dist MCP server", () => {
   const entry = buildMcpServerEntry(skillRoot);
-  assert.equal(entry.command, "node");
+  assert.equal(entry.command, "bun");
   assert.equal(entry.cwd, ".");
   assert.equal(
     resolve(String(entry.args[0])),
@@ -220,7 +225,7 @@ test("buildMcpServerEntry points at dist MCP server", () => {
 test("buildMcpServerEntryForProject uses dist launcher for external repos", () => {
   const externalRoot = resolve(repoRoot, "..", "external-goal-project");
   const entry = buildMcpServerEntryForProject(externalRoot, skillRoot);
-  assert.equal(entry.command, "node");
+  assert.equal(entry.command, "bun");
   assert.equal(entry.cwd, ".");
   assert.equal(
     resolve(String(entry.args[0])),
@@ -230,7 +235,7 @@ test("buildMcpServerEntryForProject uses dist launcher for external repos", () =
 
 test("buildMcpServerEntryForProject uses portable repo-relative dist path", () => {
   const entry = buildMcpServerEntryForProject(repoRoot, skillRoot);
-  assert.equal(entry.command, "node");
+  assert.equal(entry.command, "bun");
   assert.deepEqual(entry.args, ["cursor-curator/dist/mcp/server.mjs"]);
   assert.equal(entry.cwd, ".");
   assert.equal(entry.args.some((arg) => arg.includes("Users")), false);

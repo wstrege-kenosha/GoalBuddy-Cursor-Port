@@ -10,16 +10,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: oven-sh/setup-bun@v2
         with:
-          node-version: "22"
-          cache: npm
-      - run: npm ci
-      - name: npm run build
-        run: npm run build
+          bun-version: "1.3.14"
+      - run: bun install --frozen-lockfile
+      - name: bun run build
+        run: bun run build
       - name: install Cursor surfaces for doctor
-        run: node cursor-curator/dist/cli/curator.mjs install
-      - name: npm run check
-        run: npm run check
+        run: bun cursor-curator/dist/cli/curator.mjs install
+      - name: bun run check
+        run: bun run check
       - name: doctor --objective-ready
-        run: node cursor-curator/dist/cli/curator.mjs doctor --objective-ready
+        run: bun cursor-curator/dist/cli/curator.mjs doctor --objective-ready

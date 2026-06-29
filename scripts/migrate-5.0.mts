@@ -1,28 +1,7 @@
-#!/usr/bin/env node
-import { spawnSync } from "node:child_process";
+#!/usr/bin/env bun
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
 import { convertStateYamlV2TextToV3 } from "./migrate/yaml-v2.mts";
-
-const scriptPath = fileURLToPath(import.meta.url);
-
-function ensureTsxBootstrap(): void {
-  if (process.env.CURATOR_MIGRATE_50_BOOTSTRAPPED === "1") {
-    return;
-  }
-
-  const result = spawnSync(
-    process.execPath,
-    ["--import", "tsx", scriptPath, ...process.argv.slice(2)],
-    {
-      stdio: "inherit",
-      env: { ...process.env, CURATOR_MIGRATE_50_BOOTSTRAPPED: "1" },
-    },
-  );
-
-  process.exit(result.status ?? 1);
-}
 
 export interface MigrateObjectiveResult {
   objective_dir: string;
@@ -96,11 +75,9 @@ function isDirectExecution(): boolean {
 }
 
 if (isDirectExecution()) {
-  ensureTsxBootstrap();
-
   const { dryRun, paths } = parseArgs(process.argv.slice(2));
   if (paths.length === 0) {
-    console.error("Usage: node scripts/migrate-5.0.mts <objective-dir> [--dry-run]");
+    console.error("Usage: bun scripts/migrate-5.0.mts <objective-dir> [--dry-run]");
     process.exit(2);
   }
 

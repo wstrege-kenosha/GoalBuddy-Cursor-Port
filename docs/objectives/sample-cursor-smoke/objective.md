@@ -14,15 +14,15 @@ Smoke-test Cursor Curator Cursor install and objective-state validation without 
 - Audience: Cursor port operators
 - Authority: `requested`
 - Proof type: `artifact`
-- Completion proof: `check-objective-state.mjs` passes on this board; board URL opens
-- Success criteria: `node curator/scripts/check-objective-state.mjs docs/objectives/sample-cursor-smoke/state.yaml` exits 0
+- Completion proof: `curator check-objective sample-cursor-smoke` passes; board URL opens
+- Success criteria: `bun cursor-curator/dist/cli/curator.mjs check-objective sample-cursor-smoke` exits 0
 - Likely misfire: Board looks complete but receipts or allowed_files are invalid
 - Blind spots considered: Windows path for `~/.cursor`
 - Existing plan facts: Scaffold only; no implementation in this goal
 
 ## Success criteria
 
-`node curator/scripts/check-objective-state.mjs docs/objectives/sample-cursor-smoke/state.yaml` returns `ok: true`.
+`bun cursor-curator/dist/cli/curator.mjs check-objective sample-cursor-smoke` returns `ok: true`.
 
 ## Goal Kind
 
@@ -42,7 +42,7 @@ Stop when T999 Approval Gate records `full_outcome_complete: true` after verific
 
 ## Canonical Board
 
-`docs/objectives/sample-cursor-smoke/state.yaml`
+`.cursor-curator/curator.db` (`db:sample-cursor-smoke`)
 
 ## Run Command
 

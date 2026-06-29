@@ -9,13 +9,13 @@ Upgrade guide for existing Cursor Curator installs.
 ```bash
 cd Cursor-Curator
 git pull
-npm install
-npm run install:cursor
+bun install
+bun run install:cursor
 ```
 
 1. **Cursor Settings → MCP** — enable `curator`
 2. **Restart Cursor**
-3. Verify: `node cursor-curator/dist/cli/curator.mjs doctor --objective-ready`
+3. Verify: `bun cursor-curator/dist/cli/curator.mjs doctor --objective-ready`
 
 ## What you must do differently
 
@@ -30,7 +30,7 @@ npm run install:cursor
 ## Verify version
 
 ```bash
-node -e "console.log(JSON.parse(require('fs').readFileSync('cursor-curator/version.json','utf8')).cursorPortVersion)"
+bun -e "console.log(JSON.parse(require('fs').readFileSync('cursor-curator/version.json','utf8')).cursorPortVersion)"
 # 2.1.0
 ```
 

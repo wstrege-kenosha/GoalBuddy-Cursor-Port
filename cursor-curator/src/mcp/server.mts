@@ -25,12 +25,13 @@ const server = new McpServer(
   },
   {
     instructions: [
-      "cursor-curator MCP exposes read-only objective board tools for Cursor PM and subagents.",
+      "cursor-curator MCP exposes objective board tools for Cursor PM and subagents.",
       "Workspace is resolved from the objective slug across Cursor workspace env vars and registered project roots.",
-      "Call validate_state before advancing state.json.",
+      "Board state lives in .cursor-curator/curator.db (SQLite).",
+      "Call validate_state before and after apply_receipt, patch_task, or patch_objective.",
       "Call render_task_prompt before spawning Task subagents.",
-      "Call validate_receipt before writing receipts into state.json.",
-      "This server does not mutate state files or spawn agents.",
+      "Call validate_receipt before apply_receipt.",
+      "PM-owned writes: apply_receipt, patch_task, patch_objective, register_objective, db_import.",
     ].join(" "),
   },
 );
@@ -101,7 +102,7 @@ registerJsonTool(
 
 registerJsonTool(
   "validate_state",
-  "Run Cursor Curator state validation (same logic as check-objective-state.mjs). Stop PM advance when ok is false.",
+  "Run Cursor Curator state validation against curator.db (CLI: check-objective). Stop PM advance when ok is false.",
   {
     objective: z.string().describe("Objective slug or path under docs/objectives/."),
     workspace_root: workspaceRootSchema,
@@ -243,6 +244,70 @@ registerJsonTool(
     workspace_root: workspaceRootSchema,
   },
   TOOL_HANDLERS.subobjective_rollup_check,
+);
+
+registerJsonTool(
+  "apply_receipt",
+  "Apply a validated cursor_curator_receipt_v1 to the workspace database (PM-owned).",
+  {
+    objective: z.string().describe("Objective slug."),
+    receipt: z.union([z.string(), z.object({}).passthrough()]).optional(),
+    receipt_file: z.string().optional(),
+    role: z.enum(["scout", "approval_gate", "worker"]).optional(),
+    task_id: z.string().regex(/^T\d{3}$/).optional(),
+    dry_run: z.boolean().optional(),
+    workspace_root: workspaceRootSchema,
+  },
+  TOOL_HANDLERS.apply_receipt,
+);
+
+registerJsonTool(
+  "patch_task",
+  "PM-owned partial task updates with validation.",
+  {
+    objective: z.string(),
+    task_id: z.string().regex(/^T\d{3}$/),
+    patch: z.object({}).passthrough(),
+    dry_run: z.boolean().optional(),
+    workspace_root: workspaceRootSchema,
+  },
+  TOOL_HANDLERS.patch_task,
+);
+
+registerJsonTool(
+  "patch_objective",
+  "PM-owned objective/rules/agents/checks updates with validation.",
+  {
+    objective: z.string(),
+    patch: z.object({}).passthrough(),
+    dry_run: z.boolean().optional(),
+    workspace_root: workspaceRootSchema,
+  },
+  TOOL_HANDLERS.patch_objective,
+);
+
+registerJsonTool(
+  "register_objective",
+  "Register an objective directory into the workspace database (creates board state in curator.db).",
+  {
+    objective: z.string().describe("Objective slug under docs/objectives/."),
+    state: z
+      .record(z.string(), z.unknown())
+      .optional()
+      .describe("Optional full v3 board state object; defaults to built-in template skeleton."),
+    workspace_root: workspaceRootSchema,
+  },
+  TOOL_HANDLERS.register_objective,
+);
+
+registerJsonTool(
+  "db_import",
+  "One-time import of legacy state.json files from docs/objectives/ into curator.db (not used at runtime).",
+  {
+    slug: z.string().optional().describe("Import one slug only."),
+    workspace_root: workspaceRootSchema,
+  },
+  TOOL_HANDLERS.db_import,
 );
 
 async function main() {

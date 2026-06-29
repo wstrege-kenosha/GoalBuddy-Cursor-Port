@@ -4,11 +4,13 @@ import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "nod
 import { fileURLToPath } from "node:url";
 import { readBoardRepoLinks } from "./port-metadata.mjs";
 import { checkCompletionReadiness } from "../completion/objective-completion.mjs";
-import { readLastVerificationFromState } from "../verify/objective-verify.mjs";
+import { readLastVerificationFromLoadedState } from "../verify/objective-verify.mjs";
 import { readSessionDigest } from "../session/objective-session.mjs";
 import { buildTaskMetricsView, buildUsageBoardView, readUsageSummary } from "../usage/objective-usage.mjs";
 import { loadState, resolveStatePath } from "../state/objective-state.mjs";
 import { validateObjectiveStateFile } from "../mcp/validate-state-bridge.mjs";
+import { listObjectives, objectiveExistsInDb, resolveChildObjectiveSlug } from "../db/state-repository.mjs";
+import { resolveWorkspaceForObjective } from "../mcp/path-utils.mjs";
 import {
   ObjectiveBoardError,
   buildColumns,
@@ -31,10 +33,27 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const packageRoot = resolve(__dirname, "../..");
 const logoAssetPath = join(packageRoot, "assets", "curator-mark.png");
 
+function objectiveUpdatedAtMs(workspaceRoot, slug) {
+  const entry = listObjectives(workspaceRoot).find((row) => row.slug === slug);
+  if (entry?.updatedAt) {
+    const parsed = Date.parse(entry.updatedAt);
+    if (!Number.isNaN(parsed)) return parsed;
+  }
+  return Date.now();
+}
+
+function subobjectiveSlugFromPath(childRelative) {
+  const normalized = String(childRelative || "").replace(/\\/g, "/");
+  if (normalized.startsWith("db:")) return normalized.slice(3);
+  const match = normalized.match(/subobjectives\/([^/]+)/);
+  return match?.[1] ?? null;
+}
+
 function readObjectiveStateAtRoot(root) {
-  const statePath = resolveStatePath(root);
-  const loaded = loadState(root, { warnYaml: false });
-  return { statePath, loaded };
+  const workspaceRoot = resolveWorkspaceForObjective(root);
+  const statePath = resolveStatePath(root, workspaceRoot);
+  const loaded = loadState(root, workspaceRoot, { warnYaml: false });
+  return { statePath, loaded, workspaceRoot };
 }
 
 export async function loadObjectiveBoard(objectiveDir) {
@@ -45,7 +64,7 @@ export async function loadObjectiveBoard(objectiveDir) {
 export function createBoardPayload(objectiveDir, options = {}) {
   const includeSubobjectives = options.includeSubobjectives !== false;
   const root = resolve(objectiveDir);
-  const { statePath, loaded } = readObjectiveStateAtRoot(root);
+  const { statePath, loaded, workspaceRoot } = readObjectiveStateAtRoot(root);
   const document = loaded.raw;
 
   const board = normalizeObjectiveBoard(document, root);
@@ -54,7 +73,7 @@ export function createBoardPayload(objectiveDir, options = {}) {
   const usage = buildUsageBoardView(usageSummary);
   const tasks = board.tasks
     .map((task) => attachTaskNote(task, noteIndex))
-    .map((task) => includeSubobjectives ? attachTaskSubobjective(task, root) : task)
+    .map((task) => includeSubobjectives ? attachTaskSubobjective(task, root, workspaceRoot) : task)
     .map((task) => {
       const metricsView = buildTaskMetricsView(usageSummary.tasks[task.id] ?? null);
       return {
@@ -65,12 +84,11 @@ export function createBoardPayload(objectiveDir, options = {}) {
       };
     });
   const columns = buildColumns(tasks);
-  const stateStat = statSync(statePath);
+  const stateMtimeMs = objectiveUpdatedAtMs(workspaceRoot, loaded.slug);
   const repo = readBoardRepoLinks();
-  const stateText = readFileSync(statePath, "utf8");
-  const validation = validateObjectiveStateFile(statePath);
-  const completion = checkCompletionReadiness(statePath);
-  const lastVerification = readLastVerificationFromState(stateText);
+  const validation = validateObjectiveStateFile(root, workspaceRoot);
+  const completion = checkCompletionReadiness(root, workspaceRoot);
+  const lastVerification = readLastVerificationFromLoadedState(document);
   const sessionDigest = readSessionDigest(root, { limit: 3 });
   const activeTaskRow = tasks.find((task) => task.id === board.activeTask) || null;
   const doneCount = tasks.filter((task) => task.status === "done").length;
@@ -85,7 +103,9 @@ export function createBoardPayload(objectiveDir, options = {}) {
     source: {
       objectiveDir: root,
       statePath,
-      stateMtimeMs: stateStat.mtimeMs,
+      boardPath: statePath,
+      dbPath: validation.db_path,
+      stateMtimeMs,
       notesDir: join(root, "notes"),
     },
     objective: {
@@ -165,18 +185,25 @@ function attachTaskNote(task, noteIndex) {
   };
 }
 
-function attachTaskSubobjective(task, objectiveDir) {
+function childDirSegmentFromRelative(childRelative: string): string {
+  const normalized = String(childRelative || "").replace(/\\/g, "/");
+  const match = normalized.match(/subobjectives\/([^/]+)/);
+  return match?.[1] ?? "";
+}
+
+function attachTaskSubobjective(task, objectiveDir, workspaceRoot) {
   if (!task.subobjective) return task;
   const childRelative = task.subobjective.path;
-  const childGoalDir = resolve(objectiveDir, dirname(childRelative));
-  let childStatePath;
-  try {
-    childStatePath = resolveStatePath(childGoalDir);
-  } catch {
-    childStatePath = resolve(objectiveDir, childRelative);
+  const childDirSegment = childDirSegmentFromRelative(childRelative) || subobjectiveSlugFromPath(childRelative);
+  const childSlug =
+    resolveChildObjectiveSlug(workspaceRoot, objectiveDir, childRelative)
+    ?? childDirSegment;
+  if (!childSlug || !childDirSegment) {
+    throw new ObjectiveBoardError(`Invalid sub-objective path for ${task.id}: ${childRelative}`);
   }
-  validateChildSubobjectivePath(task, objectiveDir, childStatePath, childRelative);
-  if (!existsSync(childStatePath)) {
+  const childGoalDir = join(objectiveDir, "subobjectives", childDirSegment);
+  validateChildSubobjectivePath(task, objectiveDir, childRelative, childDirSegment);
+  if (!objectiveExistsInDb(workspaceRoot, childSlug)) {
     throw new ObjectiveBoardError(`Missing sub-objective state for ${task.id}: ${childRelative}`);
   }
 
@@ -184,23 +211,32 @@ function attachTaskSubobjective(task, objectiveDir) {
     ...task,
     subobjective: {
       ...task.subobjective,
-      path: relative(objectiveDir, childStatePath).replaceAll("\\", "/"),
+      path: `subobjectives/${childDirSegment}`,
       board: createBoardPayload(childGoalDir, { includeSubobjectives: false }),
     },
   };
 }
 
-function validateChildSubobjectivePath(task, objectiveDir, childStatePath, childRelative = task.subobjective.path) {
+function validateChildSubobjectivePath(task, objectiveDir, childRelative, childSlug) {
   if (task.subobjective.depth !== 1) {
     throw new ObjectiveBoardError(`Invalid sub-objective depth for ${task.id}: only depth 1 is supported.`);
   }
-  const childRelativePath = relative(objectiveDir, childStatePath);
+  const expectedPrefix = `subobjectives/${childSlug}`;
+  const normalized = String(childRelative || "").replace(/\\/g, "/");
+  if (
+    normalized !== expectedPrefix
+    && normalized !== `${expectedPrefix}/state.json`
+    && normalized !== `${expectedPrefix}/state.yaml`
+    && !normalized.startsWith("db:")
+  ) {
+    throw new ObjectiveBoardError(
+      `Invalid sub-objective path for ${task.id}: ${childRelative} must be subobjectives/<slug> or legacy state file path.`,
+    );
+  }
+  const childDir = join(objectiveDir, "subobjectives", childSlug);
+  const childRelativePath = relative(objectiveDir, childDir);
   if (!isInsideRoot(childRelativePath)) {
     throw new ObjectiveBoardError(`Invalid sub-objective path for ${task.id}: ${childRelative} must stay inside the objective root.`);
-  }
-  const parts = childRelativePath.split(/[\\/]+/);
-  if (parts.length !== 3 || parts[0] !== "subobjectives" || !["state.yaml", "state.json"].includes(parts[2])) {
-    throw new ObjectiveBoardError(`Invalid sub-objective path for ${task.id}: ${childRelative} must be subobjectives/<slug>/state.yaml or state.json.`);
   }
 }
 

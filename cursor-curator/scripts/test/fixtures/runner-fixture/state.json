@@ -6,7 +6,7 @@
     "kind": "specific",
     "status": "active",
     "success_criteria": {
-      "signal": "npm run check exits 0",
+      "signal": "bun run check exits 0",
       "cadence": "after worker slice",
       "final_proof": "phase-c tests pass"
     }

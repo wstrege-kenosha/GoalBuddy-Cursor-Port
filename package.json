@@ -4,14 +4,12 @@
   "description": "Git-installable Cursor Curator — objective orchestration for Cursor (upstream Cursor Curator 0.3.8)",
   "license": "MIT",
   "type": "module",
-  "engines": {
-    "node": ">=18"
-  },
+  "packageManager": "bun@latest",
   "scripts": {
-    "build": "tsc -p cursor-curator/tsconfig.json && node cursor-curator/scripts/copy-board-fragments.mjs",
-    "test:dev": "tsx --test cursor-curator/src/**/*.test.mts",
-    "check": "node scripts/check-port.mjs",
-    "install:cursor": "node scripts/install-from-repo.mjs"
+    "build": "tsc -p cursor-curator/tsconfig.json && bun cursor-curator/scripts/copy-board-fragments.mjs",
+    "test:dev": "bun test cursor-curator/src",
+    "check": "bun scripts/check-port.mjs",
+    "install:cursor": "bun scripts/install-from-repo.mjs"
   },
   "bin": {
     "curator": "./cursor-curator/dist/cli/curator.mjs"
@@ -22,8 +20,7 @@
     "zod": "^3.25 || ^4.0"
   },
   "devDependencies": {
-    "@types/node": "^24.3.0",
-    "tsx": "^4.20.3",
-    "typescript": "^5.9.2"
+    "typescript": "^5.9.2",
+    "bun-types": "latest"
   }
 }

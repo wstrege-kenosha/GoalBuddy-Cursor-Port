@@ -3,6 +3,8 @@ import { spawnSync } from "node:child_process";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { RUNTIME } from "../lib/runtime.mjs";
+
 const packageName = "cursor-curator";
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const skillRoot = resolve(scriptDir, "../..");
@@ -32,7 +34,7 @@ export function buildUpdateReport(): UpdateReport {
     latest_version: null,
     update_available: false,
     check_status: "unknown",
-    update_command: `node ${cliPath.replace(/\\/g, "/")} update`,
+    update_command: `${RUNTIME} ${cliPath.replace(/\\/g, "/")} update`,
     cursor_port: readCursorPortInfo(),
   };
 
@@ -100,20 +102,16 @@ function latestPublishedVersion(): string {
     return normalizeVersion(process.env.CURATOR_TEST_NPM_LATEST_VERSION);
   }
 
-  const result = spawnSync("npm", ["view", packageName, "version"], {
+  const result = spawnSync(process.execPath, ["pm", "view", packageName, "version"], {
     cwd: skillRoot,
     encoding: "utf8",
     timeout: 5000,
-    env: {
-      ...process.env,
-      npm_config_update_notifier: "false",
-    },
   });
 
   if (result.error) throw result.error;
   if (result.status !== 0) {
     const output = `${result.stderr || ""}${result.stdout || ""}`.trim();
-    throw new Error(output || `npm view exited with status ${result.status}`);
+    throw new Error(output || `bun pm view exited with status ${result.status}`);
   }
 
   return normalizeVersion(result.stdout);

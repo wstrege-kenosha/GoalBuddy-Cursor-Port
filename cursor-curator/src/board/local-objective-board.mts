@@ -1,4 +1,4 @@
-#!/usr/bin/env node
+#!/usr/bin/env bun
 // @ts-nocheck
 import { createServer } from "node:http";
 import { existsSync, mkdirSync, readFileSync, realpathSync, watch, writeFileSync } from "node:fs";
@@ -6,7 +6,10 @@ import { homedir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createBoardPayload, writeBoardApp } from "./objective-board.mjs";
+import { buildHubPayloadForServer, hubPageHtml } from "../hub/objective-hub.mjs";
 import { resolveStatePath } from "../state/objective-state.mjs";
+import { closeDatabase, resolveDbPath } from "../db/connection.mjs";
+import { resolveWorkspaceForObjective } from "../mcp/path-utils.mjs";
 
 const textTypes = {
   ".html": "text/html; charset=utf-8",
@@ -50,7 +53,7 @@ export async function main() {
   const options = parseArgs(process.argv.slice(2));
   const objectiveDir = resolve(options.objective || "");
   if (!options.objective) throw new Error("Missing --objective <path> (docs/objectives/<slug>)");
-  const statePath = resolveStatePath(objectiveDir);
+  resolveStatePath(objectiveDir);
 
   const appDir = writeBoardApp(objectiveDir);
   const board = createBoardPayload(objectiveDir);
@@ -90,7 +93,7 @@ export async function main() {
     if (server.registered) {
       console.log("Registered with the existing Cursor Curator local board hub.");
     } else {
-      console.log(`Watching: ${statePath}`);
+      console.log(`Watching: ${resolveDbPath(resolveWorkspaceForObjective(objectiveDir))} and notes/`);
       console.log("Press Ctrl-C to stop.");
     }
   }
@@ -160,7 +163,7 @@ export async function startBoardServer(options = {}) {
     try {
       resolveStatePath(root);
     } catch {
-      throw new Error(`Missing state.json in ${root}`);
+      throw new Error(`Objective not in database for ${root} (run: bun cursor-curator/dist/cli/curator.mjs db import)`);
     }
 
     const existing = [...boards.values()].find((board) => board.root === root);
@@ -181,6 +184,7 @@ export async function startBoardServer(options = {}) {
       startedAt: new Date().toISOString(),
     };
     board.watcher = watchObjective(root, () => {
+      closeDatabase(resolveWorkspaceForObjective(root));
       board.lastPayload = safePayload(root);
       for (const client of board.clients) sendEvent(client, board.lastPayload);
       board.watcher.refresh();
@@ -206,8 +210,7 @@ export async function startBoardServer(options = {}) {
         return;
       }
       if (url.pathname === "/api/hub") {
-        const hub = await loadHubModule();
-        sendJson(response, hub.buildHubPayloadForServer([...boards.values()].map((board) => board.root), {
+        sendJson(response, buildHubPayloadForServer([...boards.values()].map((board) => board.root), {
           roots: [process.cwd()],
           baseUrl,
         }));
@@ -293,11 +296,20 @@ export async function startBoardServer(options = {}) {
   return {
     ...initialSummary,
     close: () => new Promise((resolveClose, rejectClose) => {
+      const workspaceRoots = new Set(
+        [...boards.values()].map((board) => resolveWorkspaceForObjective(board.root)),
+      );
       for (const board of boards.values()) {
         board.watcher.close();
         for (const client of board.clients) client.end();
       }
-      server.close((error) => error ? rejectClose(error) : resolveClose());
+      server.close((error) => {
+        for (const workspaceRoot of workspaceRoots) {
+          closeDatabase(workspaceRoot);
+        }
+        if (error) rejectClose(error);
+        else resolveClose();
+      });
     }),
   };
 }
@@ -319,8 +331,9 @@ async function registerWithBoardHub({ objectiveDir, host, port }) {
 }
 
 function sendHubPage(response, baseUrl, boards) {
-  return loadHubModule().then((hub) => {
-    const payload = hub.buildHubPayloadForServer([...boards.values()].map((board) => board.root), {
+  if (response.headersSent) return;
+  try {
+    const payload = buildHubPayloadForServer([...boards.values()].map((board) => board.root), {
       roots: [process.cwd()],
       baseUrl,
     });
@@ -328,12 +341,10 @@ function sendHubPage(response, baseUrl, boards) {
       "Content-Type": "text/html; charset=utf-8",
       "Cache-Control": "no-store",
     });
-    response.end(hub.hubPageHtml(payload));
-  });
-}
-
-async function loadHubModule() {
-  return import("../hub/objective-hub.mjs");
+    response.end(hubPageHtml(payload));
+  } catch (error) {
+    sendError(response, error);
+  }
 }
 
 function redirectToFirstBoard(response, boards, baseUrl, settings = {}) {
@@ -375,6 +386,7 @@ function boardTrailingSlashUrl(pathname, boards, baseUrl) {
 }
 
 function redirect(response, location) {
+  if (response.headersSent) return;
   response.writeHead(302, {
     "Location": location,
     "Cache-Control": "no-store",
@@ -439,6 +451,7 @@ function routeBoardRequest(pathname, boards, initialBoard) {
 }
 
 function sendUnregisteredBoardPath(response, pathname, boards, baseUrl) {
+  if (response.headersSent) return;
   response.writeHead(404, {
     "Content-Type": "text/plain; charset=utf-8",
     "Cache-Control": "no-store",
@@ -451,7 +464,7 @@ function sendUnregisteredBoardPath(response, pathname, boards, baseUrl) {
     `Cursor Curator board path is not registered in this local hub: ${pathname}`,
     "",
     "This server is the Cursor Curator multi-board hub. Do not stop it just because a /<slug>/ board URL returned 404.",
-    "Start or rerun `node cursor-curator/dist/cli/curator.mjs board <objective-dir>` to register that objective on this same port, then open the printed /<slug>/ URL.",
+    "Start or rerun `bun cursor-curator/dist/cli/curator.mjs board <objective-dir>` to register that objective on this same port, then open the printed /<slug>/ URL.",
     "",
     "Registered boards:",
     registeredBoards.length ? registeredBoards.join("\n") : "- none",
@@ -482,14 +495,22 @@ function watchObjective(objectiveDir, onChange) {
   const watchers = [];
   const schedule = debounce(onChange, 80);
   let watchedDirs = new Set();
+  const workspaceRoot = resolveWorkspaceForObjective(objectiveDir);
+  const dbDir = dirname(resolveDbPath(workspaceRoot));
 
   const rebuild = () => {
     for (const watcher of watchers.splice(0)) watcher.close();
     watchedDirs = objectiveDirsForPayload(objectiveDir);
+    if (existsSync(dbDir)) {
+      watchers.push(watch(dbDir, { persistent: true }, () => schedule()));
+      for (const dbFile of ["curator.db", "curator.db-wal", "curator.db-shm"]) {
+        const dbPath = join(dbDir, dbFile);
+        if (existsSync(dbPath)) {
+          watchers.push(watch(dbPath, { persistent: true }, schedule));
+        }
+      }
+    }
     for (const dir of watchedDirs) {
-      watchers.push(watch(dir, { persistent: true }, (_event, filename) => {
-        if (!filename || filename === "state.json" || filename === "notes") schedule();
-      }));
       const notesDir = join(dir, "notes");
       if (existsSync(notesDir)) watchers.push(watch(notesDir, { persistent: true }, schedule));
     }
@@ -553,6 +574,7 @@ function sameSet(left, right) {
 }
 
 function sendJson(response, payload) {
+  if (response.headersSent) return;
   response.writeHead(200, {
     "Content-Type": "application/json; charset=utf-8",
     "Cache-Control": "no-store",
@@ -561,6 +583,7 @@ function sendJson(response, payload) {
 }
 
 function sendError(response, error) {
+  if (response.headersSent) return;
   response.writeHead(400, {
     "Content-Type": "text/plain; charset=utf-8",
     "Cache-Control": "no-store",
@@ -573,6 +596,7 @@ function sendEvent(response, payload) {
 }
 
 function serveStatic(appDir, pathname, response) {
+  if (response.headersSent) return;
   const cleanPath = pathname === "/" ? "/index.html" : pathname;
   if (!/^\/[A-Za-z0-9_.-]+$/.test(cleanPath)) {
     response.writeHead(404);
@@ -640,11 +664,11 @@ function usage() {
   console.log(`Cursor Curator Local Objective Board
 
 Usage:
-  node cursor-curator/dist/cli/curator.mjs board docs/objectives/<slug>
-  node cursor-curator/dist/cli/curator.mjs board docs/objectives/<slug> --once --json
+  bun cursor-curator/dist/cli/curator.mjs board docs/objectives/<slug>
+  bun cursor-curator/dist/cli/curator.mjs board docs/objectives/<slug> --once --json
 
 Options:
-  --objective <path>   Objective directory containing state.json.
+  --objective <path>   Objective directory (board state loads from .cursor-curator/curator.db).
   --host <host>   Local server bind host. Default: 127.0.0.1, advertised as curator.localhost.
   --port <port>   Local server port. Default: 41737 shared board hub.
   --once          Generate .cursor-curator-board and exit.

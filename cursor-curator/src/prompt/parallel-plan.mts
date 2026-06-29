@@ -1,4 +1,3 @@
-import { existsSync } from "node:fs";
 import { relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
@@ -41,11 +40,12 @@ interface ParallelCandidate {
 }
 
 export function createParallelPlan(options: Parameters<typeof parseArgs>[0] extends infer _T ? ReturnType<typeof parseArgs> : never) {
-  const rootBoardPath = resolveBoardPath(options);
-  const rootBoard = loadBoard(rootBoardPath);
+  const workspaceRoot = options.workspaceRoot ? resolve(options.workspaceRoot) : undefined;
+  const rootBoardPath = resolveBoardPath(options, workspaceRoot);
+  const rootBoard = loadBoard(rootBoardPath, workspaceRoot);
   const boards = [rootBoard];
-  for (const childPath of childBoardPaths(rootBoard)) {
-    if (existsSync(childPath)) boards.push(loadBoard(childPath));
+  for (const childPath of childBoardPaths(rootBoard, workspaceRoot)) {
+    boards.push(loadBoard(childPath, workspaceRoot));
   }
 
   const maxWriteWorkers = readMaxWriteWorkers(rootBoard);
@@ -79,6 +79,7 @@ function buildSpawnPlanEntry(candidate: ParallelCandidate, options: ReturnType<t
     boardPath: candidate.board_path,
     taskId: candidate.task_id,
     json: true,
+    workspaceRoot: options.workspaceRoot,
   });
   const agent = candidate.recommended_agent;
   const cursorAgent = agent === "objective_scout" ? "objective-scout"

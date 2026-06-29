@@ -1,52 +1,24 @@
-import { existsSync } from "node:fs";
 import { dirname, resolve } from "node:path";
-import { isWeakProof, loadState } from "../state/objective-state.mjs";
+import { isWeakProof, loadState, validateStateV3 } from "../state/objective-state.mjs";
 import { validateObjectiveStateFile } from "../mcp/validate-state-bridge.mjs";
 import { misfireAuditOverdueAtCompletion } from "../misfire/objective-misfire.mjs";
-import type { StateV3Task } from "../schema/state-v3.js";
+import { logicalBoardPath } from "../db/connection.mjs";
+import type { StateV3, StateV3Task } from "../schema/state-v3.js";
 
 function receiptValue(receipt: StateV3Task["receipt"], key: string): unknown {
   if (!receipt || typeof receipt !== "object") return null;
   return (receipt as Record<string, unknown>)[key];
 }
 
-export function checkCompletionReadiness(statePath: string) {
-  const resolved = resolve(statePath);
-  const validation = validateObjectiveStateFile(resolved);
+export function checkCompletionReadinessFromState(
+  state: StateV3,
+  context: { slug?: string; workspaceRoot?: string } = {},
+) {
+  const validation = validateStateV3(state, { slug: context.slug });
   const blockers = [...validation.errors];
   const warnings = [...validation.warnings];
-
-  if (!existsSync(resolved)) {
-    return {
-      ready: false,
-      validation_ok: false,
-      success_criteria_ready: false,
-      audit_ready: false,
-      blockers,
-      warnings,
-      state_path: resolved,
-      objective_root: dirname(resolved),
-      objective_status: null,
-    };
-  }
-
-  let state;
-  try {
-    state = loadState(resolved).state;
-  } catch (error) {
-    blockers.push(error instanceof Error ? error.message : String(error));
-    return {
-      ready: false,
-      validation_ok: false,
-      success_criteria_ready: false,
-      audit_ready: false,
-      blockers,
-      warnings,
-      state_path: resolved,
-      objective_root: dirname(resolved),
-      objective_status: null,
-    };
-  }
+  const slug = context.slug ?? state.objective.slug;
+  const boardPath = logicalBoardPath(slug);
 
   const goalStatus = state.objective.status;
   const successCriteriaSignal = state.objective.success_criteria?.signal;
@@ -93,7 +65,7 @@ export function checkCompletionReadiness(statePath: string) {
     );
   }
 
-  const misfireAudit = misfireAuditOverdueAtCompletion(resolved);
+  const misfireAudit = misfireAuditOverdueAtCompletion(slug, context.workspaceRoot);
   if (misfireAudit.overdue) {
     blockers.push(`intake misfire audit overdue: ${misfireAudit.recommendation}`);
   }
@@ -117,7 +89,51 @@ export function checkCompletionReadiness(statePath: string) {
     objective_status: goalStatus,
     blockers: [...new Set(blockers)],
     warnings,
-    state_path: resolved,
-    objective_root: dirname(resolved),
+    objective_slug: slug,
+    board_path: boardPath,
+    state_path: boardPath,
+    objective_root: context.workspaceRoot
+      ? resolve(context.workspaceRoot, "docs", "objectives", slug)
+      : null,
+  };
+}
+
+export function checkCompletionReadiness(stateRef: string, workspaceRoot?: string) {
+  const resolved = resolve(stateRef);
+  const validation = validateObjectiveStateFile(resolved, workspaceRoot);
+  const blockers = [...validation.errors];
+  const warnings = [...validation.warnings];
+
+  let state: StateV3;
+  try {
+    state = loadState(resolved, workspaceRoot).state;
+  } catch (error) {
+    blockers.push(error instanceof Error ? error.message : String(error));
+    return {
+      ready: false,
+      validation_ok: false,
+      success_criteria_ready: false,
+      audit_ready: false,
+      blockers,
+      warnings,
+      objective_slug: validation.objective_slug,
+      board_path: validation.board_path,
+      state_path: validation.board_path,
+      objective_root: validation.objective_dir,
+      objective_status: null,
+    };
+  }
+
+  const result = checkCompletionReadinessFromState(state, {
+    slug: validation.objective_slug ?? state.objective.slug,
+    workspaceRoot: validation.workspace_root ?? workspaceRoot,
+  });
+
+  return {
+    ...result,
+    blockers: [...new Set([...blockers, ...result.blockers])],
+    warnings: [...warnings, ...result.warnings],
+    objective_root: validation.objective_dir ?? result.objective_root,
+    workspace_root: validation.workspace_root,
   };
 }

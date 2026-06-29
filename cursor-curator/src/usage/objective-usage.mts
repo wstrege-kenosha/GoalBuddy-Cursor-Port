@@ -161,21 +161,29 @@ export function parseHookUsagePayload(payload: Record<string, unknown>): ParsedH
 
 export { discoverAllObjectiveDirsFromHook, resolveObjectiveDirsFromHook } from "../hook/objective-hook-resolve.mjs";
 
-export function readActiveTaskId(statePath: string): string | null {
+export function workspaceRootFromObjectiveDir(objectiveDir: string): string {
+  return resolve(objectiveDir, "..", "..", "..");
+}
+
+export function readActiveTaskId(statePath: string, workspaceRoot?: string): string | null {
   try {
-    return loadState(statePath).state.active_task;
+    return loadState(statePath, workspaceRoot).state.active_task;
   } catch {
     return null;
   }
 }
 
-export function attributeTaskId(payload: Record<string, unknown>, statePath: string): string {
+export function attributeTaskId(
+  payload: Record<string, unknown>,
+  statePath: string,
+  workspaceRoot?: string,
+): string {
   if (typeof payload.task_id === "string" && /^T\d{3}$/.test(payload.task_id)) {
     return payload.task_id;
   }
 
   try {
-    const state = loadState(statePath).state;
+    const state = loadState(statePath, workspaceRoot).state;
     const activeId = state.active_task;
     if (!activeId) {
       return "unattributed";
@@ -427,12 +435,13 @@ export function processHookUsage(payload: Record<string, unknown>): {
   const at = new Date().toISOString();
 
   for (const objectiveDir of objectiveDirs) {
+    const workspaceRoot = workspaceRootFromObjectiveDir(objectiveDir);
     const statePath = resolveObjectiveStatePath(objectiveDir);
     if (!statePath) {
       continue;
     }
 
-    const taskId = attributeTaskId(payload, statePath);
+    const taskId = attributeTaskId(payload, statePath, workspaceRoot);
     const result = appendUsageEvent(objectiveDir, {
       at,
       task_id: taskId,

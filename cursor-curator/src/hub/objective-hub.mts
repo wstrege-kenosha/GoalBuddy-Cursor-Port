@@ -1,7 +1,8 @@
-import { existsSync, readFileSync, statSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { basename, join, resolve } from "node:path";
 import { isWeakProof, loadState, validateObjectiveState } from "../state/objective-state.mjs";
-import { discoverObjectiveStatePaths, resolveObjectiveStatePath } from "../stale/objective-stale.mjs";
+import { listObjectives } from "../db/state-repository.mjs";
+import { logicalBoardPath, resolveDbPath } from "../db/connection.mjs";
 import {
   hubPageCss,
   themeFontLinksHtml,
@@ -9,57 +10,66 @@ import {
   themeTokensCss,
 } from "../board/board-theme.mjs";
 import { readBoardRepoLinks } from "../board/port-metadata.mjs";
-import { readLastVerificationFromState } from "../verify/objective-verify.mjs";
 import { buildUsageBoardView, readUsageSummary } from "../usage/objective-usage.mjs";
+import { resolveWorkspaceForObjective } from "../mcp/path-utils.mjs";
 
 export function discoverObjectiveDirs(roots: string[] = [process.cwd()]): string[] {
-  return discoverObjectiveStatePaths(roots).map((statePath) => resolve(statePath, ".."));
+  const dirs = new Set<string>();
+  for (const root of roots) {
+    const resolvedRoot = resolve(root);
+    for (const entry of listObjectives(resolvedRoot)) {
+      dirs.add(entry.dirPath);
+    }
+    const objectivesRoot = join(resolvedRoot, "docs", "objectives");
+    if (!existsSync(objectivesRoot)) continue;
+    for (const entry of readdirSyncSafe(objectivesRoot)) {
+      if (!entry.isDirectory() || entry.name.startsWith("_")) continue;
+      dirs.add(join(objectivesRoot, entry.name));
+    }
+  }
+  return [...dirs];
+}
+
+function readdirSyncSafe(path: string) {
+  try {
+    return readdirSync(path, { withFileTypes: true });
+  } catch {
+    return [];
+  }
 }
 
 export function buildHubEntry(objectiveDir: string, baseUrl = "") {
   const root = resolve(objectiveDir);
-  const statePath = resolveObjectiveStatePath(root);
-  if (!statePath) {
-    const slug = basename(root);
-    return {
-      slug,
-      title: slug,
-      objective_dir: root,
-      state_path: join(root, "state.json"),
-      url: baseUrl ? `${baseUrl}/${slug}/` : `/${slug}/`,
-      board_path: `/${slug}/`,
-      status: null,
+  const slug = basename(root);
+  const workspaceRoot = resolveWorkspaceForObjective(root);
+  const boardPath = logicalBoardPath(slug);
+
+  let validation;
+  try {
+    validation = validateObjectiveState(slug, workspaceRoot);
+  } catch {
+    validation = {
+      ok: false,
+      objective_status: null,
       active_task: null,
-      active_task_type: null,
-      success_criteria_health: "weak",
-      success_criteria_signal: null,
-      validation_ok: false,
-      error_count: 1,
-      warning_count: 0,
-      blockers: [`No state.json found under ${root}`],
-      last_verification: null,
-      stale_ms: null,
-      updated_at: null,
-      usage_rollup: null,
-      usage_summary: null,
-      usage_has_unattributed: false,
+      errors: [`Objective not found in database: ${slug}`],
+      warnings: [],
     };
   }
-  const validation = validateObjectiveState(statePath);
-  const stateStat = existsSync(statePath) ? statSync(statePath) : null;
-  const slug = basename(root);
-  const boardPath = `/${slug}/`;
-  const successCriteriaSignal = readSuccessCriteriaSignal(statePath);
-  const activeTask = findActiveTaskType(statePath, validation.active_task);
+
+  const successCriteriaSignal = readSuccessCriteriaSignal(slug, workspaceRoot);
+  const activeTask = findActiveTaskType(slug, workspaceRoot, validation.active_task);
   const usage = buildUsageBoardView(readUsageSummary(root));
+  const dbStat = existsSync(resolveDbPath(workspaceRoot)) ? statSync(resolveDbPath(workspaceRoot)) : null;
 
   return {
     slug,
-    title: readObjectiveTitle(statePath) || slug,
+    title: readObjectiveTitle(slug, workspaceRoot) || slug,
     objective_dir: root,
-    state_path: statePath,
-    url: baseUrl ? `${baseUrl}${boardPath}` : boardPath,
+    state_path: boardPath,
     board_path: boardPath,
+    db_path: resolveDbPath(workspaceRoot),
+    url: baseUrl ? `${baseUrl}/${slug}/` : `/${slug}/`,
     status: validation.objective_status,
     active_task: validation.active_task,
     active_task_type: activeTask?.type || null,
@@ -69,9 +79,9 @@ export function buildHubEntry(objectiveDir: string, baseUrl = "") {
     error_count: validation.errors.length,
     warning_count: validation.warnings.length,
     blockers: validation.errors.slice(0, 3),
-    last_verification: readLastVerification(statePath),
-    stale_ms: stateStat ? Date.now() - stateStat.mtimeMs : null,
-    updated_at: stateStat ? new Date(stateStat.mtimeMs).toISOString() : null,
+    last_verification: readLastVerification(slug, workspaceRoot),
+    stale_ms: dbStat ? Date.now() - dbStat.mtimeMs : null,
+    updated_at: dbStat ? new Date(dbStat.mtimeMs).toISOString() : null,
     usage_rollup: usage.visible ? usage.rollup : null,
     usage_summary: usage.visible ? usage.summary : null,
     usage_has_unattributed: usage.has_unattributed,
@@ -127,120 +137,103 @@ export function buildHubPayloadForServer(registeredObjectiveDirs: string[], opti
   };
 }
 
-export function hubPageHtml(payload: ReturnType<typeof buildHubPayload>) {
-  const json = JSON.stringify(payload).replace(/</g, "\\u003c");
-  const repo = payload.repo || {};
-  const portVersion = repo.cursorPortVersion ? ` · Cursor port ${repo.cursorPortVersion}` : "";
-  const upstreamVersion = repo.upstreamVersion ? ` (${repo.upstreamVersion})` : "";
-  const provenance = repo.portUrl && repo.upstreamUrl
-    ? `<p class="hub-provenance">Hub UI from <a href="${repo.portUrl}" target="_blank" rel="noreferrer">${repo.portLabel || "Cursor Curator"}</a>${portVersion} · ported from upstream <a href="${repo.upstreamUrl}" target="_blank" rel="noreferrer">${repo.upstreamLabel || "tolibear/goalbuddy"}</a>${upstreamVersion}</p>`
-    : "";
-  return `<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Cursor Curator Hub</title>
-  ${themeFontLinksHtml()}
-  <style>
-${themeTokensCss()}
-${themeSurfaceCss()}
-${hubPageCss()}
-  </style>
-</head>
-<body class="theme-hub">
-  <div class="hub-wrap">
-    <header class="hub-hero">
-      <p class="eyebrow">Workspace</p>
-      <h1>Cursor Curator Hub</h1>
-      <p class="meta" id="hub-meta">Loading objectives…</p>
-    </header>
-    ${provenance}
-    <div id="hub-root"></div>
-  </div>
-  <script id="hub-payload" type="application/json">${json}</script>
-  <script>
-    const payload = JSON.parse(document.getElementById("hub-payload").textContent);
-    const root = document.getElementById("hub-root");
-    const meta = document.getElementById("hub-meta");
-    meta.textContent = payload.objective_count + " objective(s) · updated " + new Date(payload.generated_at).toLocaleString();
-    if (!payload.objectives.length) {
-      root.innerHTML = '<div class="hub-empty">No objectives found under docs/objectives/. Run /objective-prep to create one.</div>';
-    } else {
-      root.innerHTML = '<div class="hub-grid">' + payload.objectives.map((objective, index) => \`
-        <article class="hub-card" style="--i:\${index}">
-          <div class="hub-card-head">
-            <a href="\${objective.url}">\${objective.title}</a>
-            <div class="hub-slug">\${objective.slug}</div>
-          </div>
-          <div class="hub-card-badges">
-            <span class="badge \${objective.status}">\${objective.status}</span>
-            <span class="badge \${objective.success_criteria_health}">\${objective.success_criteria_health}</span>
-          </div>
-          <dl>
-            <div>
-              <dt>Active</dt>
-              <dd>\${objective.active_task || "—"}\${objective.active_task_type ? " · " + objective.active_task_type : ""}</dd>
-            </div>
-            <div>
-              <dt>Validation</dt>
-              <dd>\${objective.warning_count} warn · \${objective.error_count} err</dd>
-            </div>
-            <div>
-              <dt>Oracle</dt>
-              <dd><span class="hub-success-criteria">\${objective.success_criteria_signal || "—"}</span></dd>
-            </div>
-            <div>
-              <dt>Updated</dt>
-              <dd>\${objective.updated_at ? new Date(objective.updated_at).toLocaleString() : "—"}</dd>
-            </div>
-            <div>
-              <dt>Usage</dt>
-              <dd>\${objective.usage_summary || "—"}</dd>
-            </div>
-          </dl>
-        </article>\`).join("") + '</div>';
-    }
-  </script>
-</body>
-</html>`;
-}
-
-function readObjectiveTitle(statePath: string): string | null {
+function readObjectiveTitle(slug: string, workspaceRoot: string): string | null {
   try {
-    return loadState(statePath).state.objective.title || null;
+    return loadState(slug, workspaceRoot).state.objective.title || null;
   } catch {
     return null;
   }
 }
 
-function readSuccessCriteriaSignal(statePath: string): string | null {
+function readSuccessCriteriaSignal(slug: string, workspaceRoot: string): string | null {
   try {
-    const signal = loadState(statePath).state.objective.success_criteria?.signal;
+    const signal = loadState(slug, workspaceRoot).state.objective.success_criteria?.signal;
     return typeof signal === "string" ? signal : null;
   } catch {
     return null;
   }
 }
 
-function readLastVerification(statePath: string): string | null {
-  if (!existsSync(statePath)) return null;
-  const parsed = readLastVerificationFromState(readFileSync(statePath, "utf8"));
-  if (!parsed) return null;
-  return parsed.result;
-}
-
-export function readLastVerificationDetails(statePath: string) {
-  if (!existsSync(statePath)) return null;
-  return readLastVerificationFromState(readFileSync(statePath, "utf8"));
-}
-
-function findActiveTaskType(statePath: string, activeTaskId: string | null): { type: string } | null {
+function findActiveTaskType(
+  slug: string,
+  workspaceRoot: string,
+  activeTaskId: string | null,
+): { type: string | null } | null {
   if (!activeTaskId) return null;
   try {
-    const task = loadState(statePath).state.tasks.find((entry) => entry.id === activeTaskId);
+    const task = loadState(slug, workspaceRoot).state.tasks.find((entry) => entry.id === activeTaskId);
     return task ? { type: task.type } : null;
   } catch {
     return null;
   }
+}
+
+function readLastVerification(slug: string, workspaceRoot: string) {
+  try {
+    const loaded = loadState(slug, workspaceRoot);
+    const lastVerification = loaded.state.checks?.last_verification;
+    if (!lastVerification || typeof lastVerification !== "object") return null;
+    const record = lastVerification as Record<string, unknown>;
+    return {
+      result: typeof record.result === "string" ? record.result : null,
+      task: typeof record.task === "string" ? record.task : null,
+      commands: Array.isArray(record.commands) ? record.commands : [],
+    };
+  } catch {
+    return null;
+  }
+}
+
+export function buildHubHtml(payload: ReturnType<typeof buildHubPayload>): string {
+  const rows = payload.objectives
+    .map((objective) => {
+      const status = objective.status || "unknown";
+      const health = objective.success_criteria_health || "weak";
+      return `<tr>
+        <td><a href="${objective.url}">${escapeHtml(objective.title)}</a></td>
+        <td>${escapeHtml(status)}</td>
+        <td>${escapeHtml(objective.active_task || "—")}</td>
+        <td>${escapeHtml(health)}</td>
+        <td>${objective.validation_ok ? "ok" : "errors"}</td>
+      </tr>`;
+    })
+    .join("\n");
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Cursor Curator Hub</title>
+  ${themeFontLinksHtml()}
+  <style>${themeTokensCss()}${themeSurfaceCss()}${hubPageCss()}</style>
+</head>
+<body>
+  <main class="hub-page">
+    <header>
+      <h1>Cursor Curator objectives</h1>
+      <p>${payload.objective_count} objective(s)</p>
+    </header>
+    <table>
+      <thead><tr><th>Objective</th><th>Status</th><th>Active task</th><th>Success criteria</th><th>Validation</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+  </main>
+</body>
+</html>`;
+}
+
+export function hubPageHtml(payload: ReturnType<typeof buildHubPayloadForServer>): string {
+  const payloadJson = JSON.stringify(payload).replace(/</g, "\\u003c");
+  return buildHubHtml(payload).replace(
+    "</body>",
+    `<script id="hub-payload" type="application/json">${payloadJson}</script>\n</body>`,
+  );
+}
+
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
 }

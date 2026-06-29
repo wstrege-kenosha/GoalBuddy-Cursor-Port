@@ -1,9 +1,6 @@
-import { basename, resolve } from "node:path";
+import { basename, join, resolve } from "node:path";
 import { loadState } from "../state/objective-state.mjs";
-import {
-  discoverObjectiveStatePaths,
-  resolveObjectiveStatePath,
-} from "../stale/objective-stale.mjs";
+import { listObjectives } from "../db/state-repository.mjs";
 
 export function resolveObjectiveDirsFromHook(
   payload: Record<string, unknown>,
@@ -40,8 +37,9 @@ function discoverObjectiveDirs(payload: Record<string, unknown>, slug: string | 
     roots.add(process.cwd());
   }
 
-  const statePaths = discoverObjectiveStatePaths([...roots]);
-  const dirs = statePaths.map((statePath) => resolve(statePath, ".."));
+  const dirs = [...roots].flatMap((root) =>
+    listObjectives(root).map((entry) => entry.dirPath),
+  );
   if (!slug) {
     return dirs;
   }
@@ -69,24 +67,17 @@ function pickSingleObjectiveDir(
 }
 
 function objectiveHasStatus(objectiveDir: string, status: string): boolean {
-  const statePath = resolveObjectiveStatePath(objectiveDir);
-  if (!statePath) {
-    return false;
-  }
   try {
-    return loadState(statePath).state.objective.status === status;
+    return loadState(basename(objectiveDir), resolve(objectiveDir, "..", "..", "..")).state.objective.status === status;
   } catch {
     return false;
   }
 }
 
 function objectiveHasActiveTask(objectiveDir: string, taskId: string): boolean {
-  const statePath = resolveObjectiveStatePath(objectiveDir);
-  if (!statePath) {
-    return false;
-  }
   try {
-    const state = loadState(statePath).state;
+    const workspaceRoot = resolve(objectiveDir, "..", "..", "..");
+    const state = loadState(basename(objectiveDir), workspaceRoot).state;
     return state.active_task === taskId
       && state.tasks.some((entry) => entry.id === taskId && entry.status === "active");
   } catch {

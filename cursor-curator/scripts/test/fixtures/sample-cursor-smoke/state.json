@@ -4,21 +4,21 @@
     "title": "Sample Cursor smoke",
     "slug": "sample-cursor-smoke",
     "kind": "specific",
-    "tranche": "Validate Scout/Approval Gate/Worker receipts and check-objective-state",
+    "tranche": "Validate Scout/Approval Gate/Worker receipts and check-objective",
     "status": "done",
     "success_criteria": {
-      "signal": "check-objective-state.mjs exits ok on this state.yaml",
+      "signal": "curator check-objective sample-cursor-smoke exits ok",
       "cadence": "after scaffold and at T999 audit",
-      "final_proof": "check-objective-state pass + board URL captured in notes"
+      "final_proof": "check-objective pass + board URL captured in notes"
     },
     "intake": {
       "original_request": "Smoke-test Cursor port objective board",
-      "interpreted_outcome": "Minimal valid v2 board with T001–T003 done",
+      "interpreted_outcome": "Minimal valid v3 board with T001–T003 done",
       "input_shape": "specific",
       "audience": "port operators",
       "authority": "requested",
       "proof_type": "artifact",
-      "completion_proof": "check-objective-state ok; board hub reachable",
+      "completion_proof": "check-objective ok; board hub reachable",
       "likely_misfire": "Placeholder receipts that fail validation",
       "blind_spots_considered": [
         "agent install state on fresh machine"
@@ -57,7 +57,7 @@
     "local": {
       "status": "live",
       "url": "http://curator.localhost:41737/sample-cursor-smoke/",
-      "command": "node curator/scripts/curator.mjs board docs/objectives/sample-cursor-smoke"
+      "command": "bun cursor-curator/dist/cli/curator.mjs board docs/objectives/sample-cursor-smoke"
     }
   },
   "active_task": null,
@@ -72,7 +72,7 @@
       "inputs": [
         "README.md",
         "package.json",
-        "cursor-curator/scripts/check-objective-state.mjs"
+        "cursor-curator/dist/cli/curator.mjs"
       ],
       "constraints": [
         "Read-only."
@@ -82,10 +82,10 @@
       ],
       "receipt": {
         "result": "done",
-        "summary": "Mapped smoke paths; verify uses check-objective-state and doctor --objective-ready.",
+        "summary": "Mapped smoke paths; verify uses check-objective and doctor --objective-ready.",
         "evidence": [
           "README.md",
-          "docs/PARITY.md"
+          "docs/wiki/Upstream-Parity.md"
         ],
         "note": "notes/T001-scout.md"
       }
@@ -109,7 +109,7 @@
       "receipt": {
         "result": "done",
         "decision": "approved",
-        "summary": "Approved notes-only Worker; verify check-objective-state on this board."
+        "summary": "Approved notes-only Worker; verify check-objective on this board."
       }
     },
     {
@@ -123,20 +123,20 @@
         "notes/**"
       ],
       "verify": [
-        "node curator/scripts/check-objective-state.mjs docs/objectives/sample-cursor-smoke/state.yaml"
+        "bun cursor-curator/dist/cli/curator.mjs check-objective sample-cursor-smoke"
       ],
       "stop_if": [
         "Needs files outside allowed_files"
       ],
       "receipt": {
         "result": "done",
-        "summary": "Added smoke worker note; check-objective-state passes.",
+        "summary": "Added smoke worker note; check-objective passes.",
         "changed_files": [
           "notes/T003-worker.md"
         ],
         "commands": [
           {
-            "cmd": "node curator/scripts/check-objective-state.mjs docs/objectives/sample-cursor-smoke/state.yaml",
+            "cmd": "bun cursor-curator/dist/cli/curator.mjs check-objective sample-cursor-smoke",
             "status": "pass"
           }
         ]
@@ -148,7 +148,7 @@
       "assignee": "Approval Gate",
       "status": "done",
       "reasoning_hint": "low",
-      "objective": "Audit whether smoke board satisfies success criteria (check-objective-state + board URL).",
+      "objective": "Audit whether smoke board satisfies success criteria (check-objective + board URL).",
       "inputs": [
         "T001–T003 receipts",
         "objective.md success criteria"
@@ -163,7 +163,7 @@
         "result": "done",
         "decision": "not_complete",
         "full_outcome_complete": false,
-        "summary": "check-objective-state passes; board URL missing from notes — T004 Worker required.",
+        "summary": "check-objective passes; board URL missing from notes — T004 Worker required.",
         "note": "notes/T999-approval-gate.md"
       }
     },
@@ -178,7 +178,7 @@
         "notes/**"
       ],
       "verify": [
-        "node cursor-curator/scripts/check-objective-state.mjs docs/objectives/sample-cursor-smoke/state.yaml"
+        "bun cursor-curator/dist/cli/curator.mjs check-objective sample-cursor-smoke"
       ],
       "stop_if": [
         "Needs files outside allowed_files"
@@ -191,7 +191,7 @@
         ],
         "commands": [
           {
-            "cmd": "node cursor-curator/scripts/check-objective-state.mjs docs/objectives/sample-cursor-smoke/state.yaml",
+            "cmd": "bun cursor-curator/dist/cli/curator.mjs check-objective sample-cursor-smoke",
             "status": "pass"
           }
         ]
@@ -219,7 +219,7 @@
         "result": "done",
         "decision": "complete",
         "full_outcome_complete": true,
-        "summary": "final_proof satisfied: check-objective-state pass and board URL in notes/smoke-final-proof.md.",
+        "summary": "final_proof satisfied: check-objective pass and board URL in notes/smoke-final-proof.md.",
         "note": "notes/T005-approval-gate.md"
       }
     }
@@ -231,7 +231,7 @@
       "task": "T004",
       "commands": [
         {
-          "cmd": "node cursor-curator/scripts/check-objective-state.mjs docs/objectives/sample-cursor-smoke/state.yaml",
+          "cmd": "bun cursor-curator/dist/cli/curator.mjs check-objective sample-cursor-smoke",
           "status": "pass"
         }
       ]

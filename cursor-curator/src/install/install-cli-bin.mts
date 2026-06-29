@@ -3,6 +3,7 @@ import { join, resolve } from "node:path";
 import { homedir } from "node:os";
 
 import { CLI_NAME } from "../lib/brand.mjs";
+import { RUNTIME } from "../lib/runtime.mjs";
 
 export const CLI_BIN_DIR_NAME = "bin";
 export const CLI_BIN_NAME = CLI_NAME;
@@ -22,13 +23,13 @@ export function resolveCuratorCliPath(skillRoot: string): string {
 export function buildCliBinShim({ skillRoot }: { cursorHome?: string; skillRoot: string }): string {
   const cliPath = toPosixPath(resolveCuratorCliPath(skillRoot));
   return `#!/usr/bin/env sh
-exec node "${cliPath}" "$@"
+exec ${RUNTIME} "${cliPath}" "$@"
 `;
 }
 
 export function buildCliBinCmd({ skillRoot }: { cursorHome?: string; skillRoot: string }): string {
   const cliPath = resolveCuratorCliPath(skillRoot);
-  return `@echo off\r\nnode "${cliPath}" %*\r\n`;
+  return `@echo off\r\n${RUNTIME} "${cliPath}" %*\r\n`;
 }
 
 export function installCliBin({ cursorHome, skillRoot }: { cursorHome: string; skillRoot: string }) {
@@ -50,6 +51,6 @@ export function installCliBin({ cursorHome, skillRoot }: { cursorHome: string; s
     shPath,
     cmdPath,
     cliPath,
-    pathHint: `curator is installed at ${binDir}. Re-run npm run install:cursor (or node dist/cli/curator.mjs install) with --no-add-to-path to skip automatic PATH updates.`,
+    pathHint: `curator is installed at ${binDir}. Re-run bun run install:cursor (or bun dist/cli/curator.mjs install) with --no-add-to-path to skip automatic PATH updates.`,
   };
 }

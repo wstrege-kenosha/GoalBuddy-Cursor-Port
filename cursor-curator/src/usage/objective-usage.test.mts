@@ -14,46 +14,49 @@ import {
   processHookUsage,
   readUsageSummary,
 } from "./objective-usage.mjs";
-
-function writeState(objectiveDir: string, state: unknown): void {
-  writeFileSync(join(objectiveDir, "state.json"), `${JSON.stringify(state, null, 2)}\n`, "utf8");
-}
+import { seedObjectiveInDb, removeWorkspaceDir } from "../db/test-helpers.mjs";
+import { resetDatabaseCache } from "../db/connection.mjs";
 
 function scaffoldObjective(root: string, slug: string, activeTask: string | null, activeStatus = "active") {
-  const objectiveDir = join(root, "docs", "objectives", slug);
-  const notesDir = join(objectiveDir, "notes");
-  mkdirSync(objectiveDir, { recursive: true });
-  writeFileSync(join(objectiveDir, "objective.md"), `# ${slug}\n`, "utf8");
-  writeState(objectiveDir, {
-    version: 3,
+  resetDatabaseCache();
+  const state = {
+    version: 3 as const,
     objective: {
       title: slug,
       slug,
-      status: "active",
+      status: "active" as const,
       success_criteria: { signal: "done", cadence: "once", final_proof: "done" },
     },
     rules: { pm_owns_state: true, one_active_task: true },
-    agents: { scout: "installed", worker: "installed", approval_gate: "installed" },
-    visual_board: { selected: "none", local: { status: "not_requested" } },
+    agents: { scout: "installed" as const, worker: "installed" as const, approval_gate: "installed" as const },
+    visual_board: { selected: "none" as const, local: { status: "not_requested" as const } },
     active_task: activeTask,
     tasks: [
       {
         id: "T001",
-        type: "scout",
-        assignee: "Scout",
-        status: activeTask === "T001" ? activeStatus : "done",
+        type: "scout" as const,
+        assignee: "Scout" as const,
+        status: (activeTask === "T001" ? activeStatus : "done") as "active" | "done",
         objective: "Scout slice",
+        receipt: activeTask === "T001" ? null : { result: "done", summary: "done" },
       },
       {
         id: "T002",
-        type: "worker",
-        assignee: "Worker",
-        status: activeTask === "T002" ? activeStatus : "queued",
+        type: "worker" as const,
+        assignee: "Worker" as const,
+        status: (activeTask === "T002" ? activeStatus : "queued") as "active" | "queued",
         objective: "Worker slice",
+        allowed_files: ["README.md"],
+        verify: ["bun run check"],
+        stop_if: ["blocked"],
+        receipt: null,
       },
     ],
-  });
-  return { objectiveDir, notesDir };
+    checks: { dirty_fingerprint: "test" },
+  };
+  seedObjectiveInDb(root, state, { slug });
+  const objectiveDir = join(root, "docs", "objectives", slug);
+  return { objectiveDir, notesDir: join(objectiveDir, "notes"), boardPath: `db:${slug}` };
 }
 
 test("parseHookUsagePayload tolerates missing token fields", () => {
@@ -66,23 +69,21 @@ test("parseHookUsagePayload tolerates missing token fields", () => {
 test("attributeTaskId prefers explicit task_id then active task", () => {
   const root = mkdtempSync(join(tmpdir(), "curator-usage-"));
   try {
-    const { objectiveDir } = scaffoldObjective(root, "alpha", "T002");
-    const statePath = join(objectiveDir, "state.json");
-    assert.equal(attributeTaskId({ task_id: "T001" }, statePath), "T001");
-    assert.equal(attributeTaskId({}, statePath), "T002");
+    const { boardPath } = scaffoldObjective(root, "alpha", "T002");
+    assert.equal(attributeTaskId({ task_id: "T001" }, boardPath, root), "T001");
+    assert.equal(attributeTaskId({}, boardPath, root), "T002");
   } finally {
-    rmSync(root, { recursive: true, force: true });
+    removeWorkspaceDir(root);
   }
 });
 
 test("attributeTaskId falls back to unattributed when active task is not active", () => {
   const root = mkdtempSync(join(tmpdir(), "curator-usage-"));
   try {
-    const { objectiveDir } = scaffoldObjective(root, "beta", "T002", "queued");
-    const statePath = join(objectiveDir, "state.json");
-    assert.equal(attributeTaskId({}, statePath), "unattributed");
+    const { boardPath } = scaffoldObjective(root, "beta", "T002", "queued");
+    assert.equal(attributeTaskId({}, boardPath, root), "unattributed");
   } finally {
-    rmSync(root, { recursive: true, force: true });
+    removeWorkspaceDir(root);
   }
 });
 
@@ -127,7 +128,7 @@ test("appendUsageEvent rolls up per task and board totals", () => {
     assert.equal(file.version, 1);
     assert.equal(file.sessions.length, 2);
   } finally {
-    rmSync(root, { recursive: true, force: true });
+    removeWorkspaceDir(root);
   }
 });
 
@@ -147,7 +148,7 @@ test("processHookUsage resolves objectives from workspace roots", () => {
     assert.equal(result.appended[0]?.task_id, "T001");
     assert.ok(existsSync(join(result.appended[0]!.objective_dir, "notes", "usage.json")));
   } finally {
-    rmSync(root, { recursive: true, force: true });
+    removeWorkspaceDir(root);
   }
 });
 
@@ -168,7 +169,7 @@ test("processHookUsage skips ambiguous multi-objective workspaces without object
     assert.equal(result.skipped, "ambiguous objective; set objective_slug");
     assert.match(result.warnings.join(" "), /objective_slug/);
   } finally {
-    rmSync(root, { recursive: true, force: true });
+    removeWorkspaceDir(root);
   }
 });
 

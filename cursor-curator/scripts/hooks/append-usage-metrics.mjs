@@ -1,4 +1,4 @@
-#!/usr/bin/env node
+#!/usr/bin/env bun
 import { appendSessionNote } from "../../dist/session/objective-session.mjs";
 import { processHookUsage, readHookPayload } from "../../dist/usage/objective-usage.mjs";
 

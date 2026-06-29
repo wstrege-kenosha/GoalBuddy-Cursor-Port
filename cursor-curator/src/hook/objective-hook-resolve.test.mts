@@ -1,19 +1,13 @@
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { test } from "node:test";
 import { resolveObjectiveDirsFromHook } from "./objective-hook-resolve.mjs";
-
-function writeState(objectiveDir: string, state: unknown): void {
-  writeFileSync(join(objectiveDir, "state.json"), `${JSON.stringify(state, null, 2)}\n`, "utf8");
-}
+import { seedObjectiveInDb, removeWorkspaceDir } from "../db/test-helpers.mjs";
 
 function scaffoldObjective(root: string, slug: string, activeTask: string | null, activeStatus = "active") {
-  const objectiveDir = join(root, "docs", "objectives", slug);
-  mkdirSync(objectiveDir, { recursive: true });
-  writeFileSync(join(objectiveDir, "objective.md"), `# ${slug}\n`, "utf8");
-  writeState(objectiveDir, {
+  seedObjectiveInDb(root, {
     version: 3,
     objective: {
       title: slug,
@@ -23,7 +17,6 @@ function scaffoldObjective(root: string, slug: string, activeTask: string | null
     },
     rules: { pm_owns_state: true, one_active_task: true },
     agents: { scout: "installed", worker: "installed", approval_gate: "installed" },
-    visual_board: { selected: "none", local: { status: "not_requested" } },
     active_task: activeTask,
     tasks: [
       {
@@ -32,6 +25,7 @@ function scaffoldObjective(root: string, slug: string, activeTask: string | null
         assignee: "Scout",
         status: activeTask === "T001" ? activeStatus : "done",
         objective: "Scout slice",
+        receipt: activeTask === "T001" ? null : { result: "done", summary: "done" },
       },
       {
         id: "T002",
@@ -39,10 +33,13 @@ function scaffoldObjective(root: string, slug: string, activeTask: string | null
         assignee: "Worker",
         status: activeTask === "T002" ? activeStatus : "queued",
         objective: "Worker slice",
+        allowed_files: ["README.md"],
+        verify: ["bun run check"],
+        stop_if: ["blocked"],
+        receipt: null,
       },
     ],
-  });
-  return { objectiveDir };
+  }, { slug });
 }
 
 test("resolveObjectiveDirsFromHook filters by objective slug", () => {
@@ -54,7 +51,7 @@ test("resolveObjectiveDirsFromHook filters by objective slug", () => {
     assert.equal(dirs.length, 1);
     assert.match(dirs[0]!, /two$/);
   } finally {
-    rmSync(root, { recursive: true, force: true });
+    removeWorkspaceDir(root);
   }
 });
 
@@ -66,6 +63,6 @@ test("resolveObjectiveDirsFromHook returns one dir when workspace has a single o
     assert.equal(dirs.length, 1);
     assert.match(dirs[0]!, /solo$/);
   } finally {
-    rmSync(root, { recursive: true, force: true });
+    removeWorkspaceDir(root);
   }
 });

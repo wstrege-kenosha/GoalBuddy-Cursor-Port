@@ -2,6 +2,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { registerKnownWorkspace } from "../mcp/path-utils.mjs";
 import { MCP_SERVER_NAME } from "../lib/brand.mjs";
+import { RUNTIME } from "../lib/runtime.mjs";
 
 const VENDORED_DIST_SERVER_REL = "cursor-curator/dist/mcp/server.mjs";
 export const PORT_CONFIG_FILE = ".cursor-curator-port.json";
@@ -78,8 +79,8 @@ export function resolveMcpRepoRoot(skillRoot: string): string {
     if (hasMcpDeps(candidate)) return candidate;
   }
 
-  console.error("cursor-curator MCP: missing npm dependencies.");
-  console.error("From your Cursor-Curator clone run: npm install && npm run install:cursor");
+  console.error("cursor-curator MCP: missing dependencies.");
+  console.error("From your Cursor-Curator clone run: bun install && bun run install:cursor");
   process.exit(1);
 }
 
@@ -101,7 +102,7 @@ export function resolveInstallRepoRoot(skillRoot: string, projectRoots: string[]
 
 export function buildMcpServerEntry(skillRoot: string) {
   return {
-    command: "node",
+    command: RUNTIME,
     args: [toPosixPath(resolveServerPath(skillRoot))],
     cwd: ".",
   };
@@ -111,7 +112,7 @@ export function buildMcpServerEntryForProject(projectRoot: string, skillRoot: st
   const vendoredServer = vendoredDistServerPath(projectRoot);
   if (existsSync(vendoredServer)) {
     return {
-      command: "node",
+      command: RUNTIME,
       args: [VENDORED_DIST_SERVER_REL],
       cwd: ".",
     };
@@ -208,7 +209,7 @@ export function installMcpConfig({
       errors.push(portResult.error);
     }
   } else {
-    errors.push("Could not locate Cursor-Curator clone with npm install (run npm install, then reinstall)");
+    errors.push("Could not locate Cursor-Curator clone with bun install (run bun install, then reinstall)");
   }
 
   for (const projectRoot of roots) {

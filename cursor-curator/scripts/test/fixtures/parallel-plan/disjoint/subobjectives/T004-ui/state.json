@@ -28,7 +28,7 @@
         "src/feature/ui/**"
       ],
       "verify": [
-        "npm run test -- src/feature/ui"
+        "bun run test -- src/feature/ui"
       ],
       "stop_if": [
         "Need files outside allowed_files."

@@ -55,7 +55,7 @@
     "local": {
       "status": "not_requested",
       "url": null,
-      "command": "node ~/.cursor/skills/cursor-curator/dist/cli/curator.mjs board docs/objectives/<objective-slug>"
+      "command": "bun ~/.cursor/skills/cursor-curator/dist/cli/curator.mjs board docs/objectives/<objective-slug>"
     }
   },
   "active_task": "T001",

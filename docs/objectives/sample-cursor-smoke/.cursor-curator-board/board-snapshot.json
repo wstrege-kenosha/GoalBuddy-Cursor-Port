@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-06-26T13:28:12.349Z",
+  "generatedAt": "2026-06-29T15:07:27.262Z",
   "repo": {
     "portUrl": "https://github.com/wstrege-kenosha/Cursor-Curator",
     "portLabel": "wstrege-kenosha/Cursor-Curator",
@@ -11,8 +11,10 @@
   },
   "source": {
     "objectiveDir": "W:\\Experimental\\Cursor-Curator\\docs\\objectives\\sample-cursor-smoke",
-    "statePath": "W:\\Experimental\\Cursor-Curator\\docs\\objectives\\sample-cursor-smoke\\state.json",
-    "stateMtimeMs": 1782221715391.148,
+    "statePath": "db:sample-cursor-smoke",
+    "boardPath": "db:sample-cursor-smoke",
+    "dbPath": "W:\\Experimental\\Cursor-Curator\\.cursor-curator\\curator.db",
+    "stateMtimeMs": 1782761001000,
     "notesDir": "W:\\Experimental\\Cursor-Curator\\docs\\objectives\\sample-cursor-smoke\\notes"
   },
   "objective": {
@@ -24,8 +26,8 @@
     "activeTask": "",
     "success_criteria": {
       "signal": "check-objective-state.mjs exits ok on this state.yaml",
-      "cadence": "after scaffold and at T999 audit",
-      "final_proof": "check-objective-state pass + board URL captured in notes"
+      "final_proof": "check-objective-state pass + board URL captured in notes",
+      "cadence": "after scaffold and at T999 audit"
     },
     "intake": {
       "original_request": "Smoke-test Cursor port objective board",
@@ -49,7 +51,9 @@
   },
   "completion": {
     "ready": true,
-    "blockers": [],
+    "blockers": [
+      "intake misfire audit overdue: Queue an Approval Gate task to compare recent Worker receipts against objective.intake (likely_misfire, interpreted_outcome)."
+    ],
     "success_criteria_ready": true,
     "audit_ready": true
   },
@@ -58,7 +62,7 @@
     "task": "T004",
     "commands": [
       {
-        "cmd": "node cursor-curator/scripts/check-objective-state.mjs docs/objectives/sample-cursor-smoke/state.yaml",
+        "cmd": "bun cursor-curator/scripts/check-objective-state.mjs docs/objectives/sample-cursor-smoke/state.yaml",
         "status": "pass"
       }
     ]
@@ -234,7 +238,7 @@
             "notes/**"
           ],
           "verify": [
-            "node cursor-curator/scripts/check-objective-state.mjs docs/objectives/sample-cursor-smoke/state.yaml"
+            "bun cursor-curator/scripts/check-objective-state.mjs docs/objectives/sample-cursor-smoke/state.yaml"
           ],
           "stopIf": [
             "Needs files outside allowed_files"
@@ -251,7 +255,7 @@
             ],
             "commands": [
               {
-                "cmd": "node cursor-curator/scripts/check-objective-state.mjs docs/objectives/sample-cursor-smoke/state.yaml",
+                "cmd": "bun cursor-curator/scripts/check-objective-state.mjs docs/objectives/sample-cursor-smoke/state.yaml",
                 "status": "pass"
               }
             ],
@@ -277,7 +281,7 @@
             "notes/**"
           ],
           "verify": [
-            "node curator/scripts/check-objective-state.mjs docs/objectives/sample-cursor-smoke/state.yaml"
+            "bun curator/scripts/check-objective-state.mjs docs/objectives/sample-cursor-smoke/state.yaml"
           ],
           "stopIf": [
             "Needs files outside allowed_files"
@@ -294,7 +298,7 @@
             ],
             "commands": [
               {
-                "cmd": "node curator/scripts/check-objective-state.mjs docs/objectives/sample-cursor-smoke/state.yaml",
+                "cmd": "bun curator/scripts/check-objective-state.mjs docs/objectives/sample-cursor-smoke/state.yaml",
                 "status": "pass"
               }
             ],
@@ -380,8 +384,8 @@
           "note": {
             "path": "notes/T001-scout.md",
             "title": "T001 Scout — sample-cursor-smoke",
-            "content": "# T001 Scout — sample-cursor-smoke\r\n\r\nSmoke objective: validate Cursor port without editing `cursor-curator`.\r\n\r\n**Verify commands:**\r\n\r\n- `npm run check`\r\n- `node curator/scripts/curator.mjs doctor --objective-ready`\r\n- `node curator/scripts/check-objective-state.mjs docs/objectives/sample-cursor-smoke/state.yaml`\r\n- `node curator/scripts/curator.mjs board docs/objectives/sample-cursor-smoke`\r\n",
-            "mtimeMs": 1782142243328.6233
+            "content": "# T001 Scout — sample-cursor-smoke\r\n\r\nSmoke objective: validate Cursor port without editing `cursor-curator`.\r\n\r\n**Verify commands:**\r\n\r\n- `bun run check`\r\n- `bun curator/scripts/curator.mjs doctor --objective-ready`\r\n- `bun curator/scripts/check-objective-state.mjs docs/objectives/sample-cursor-smoke/state.yaml`\r\n- `bun curator/scripts/curator.mjs board docs/objectives/sample-cursor-smoke`\r\n",
+            "mtimeMs": 1782745077862.9807
           },
           "metrics": null,
           "metrics_badge": "",
@@ -431,8 +435,8 @@
       "note": {
         "path": "notes/T001-scout.md",
         "title": "T001 Scout — sample-cursor-smoke",
-        "content": "# T001 Scout — sample-cursor-smoke\r\n\r\nSmoke objective: validate Cursor port without editing `cursor-curator`.\r\n\r\n**Verify commands:**\r\n\r\n- `npm run check`\r\n- `node curator/scripts/curator.mjs doctor --objective-ready`\r\n- `node curator/scripts/check-objective-state.mjs docs/objectives/sample-cursor-smoke/state.yaml`\r\n- `node curator/scripts/curator.mjs board docs/objectives/sample-cursor-smoke`\r\n",
-        "mtimeMs": 1782142243328.6233
+        "content": "# T001 Scout — sample-cursor-smoke\r\n\r\nSmoke objective: validate Cursor port without editing `cursor-curator`.\r\n\r\n**Verify commands:**\r\n\r\n- `bun run check`\r\n- `bun curator/scripts/curator.mjs doctor --objective-ready`\r\n- `bun curator/scripts/check-objective-state.mjs docs/objectives/sample-cursor-smoke/state.yaml`\r\n- `bun curator/scripts/curator.mjs board docs/objectives/sample-cursor-smoke`\r\n",
+        "mtimeMs": 1782745077862.9807
       },
       "metrics": null,
       "metrics_badge": "",
@@ -490,7 +494,7 @@
         "notes/**"
       ],
       "verify": [
-        "node curator/scripts/check-objective-state.mjs docs/objectives/sample-cursor-smoke/state.yaml"
+        "bun curator/scripts/check-objective-state.mjs docs/objectives/sample-cursor-smoke/state.yaml"
       ],
       "stopIf": [
         "Needs files outside allowed_files"
@@ -507,7 +511,7 @@
         ],
         "commands": [
           {
-            "cmd": "node curator/scripts/check-objective-state.mjs docs/objectives/sample-cursor-smoke/state.yaml",
+            "cmd": "bun curator/scripts/check-objective-state.mjs docs/objectives/sample-cursor-smoke/state.yaml",
             "status": "pass"
           }
         ],
@@ -576,7 +580,7 @@
         "notes/**"
       ],
       "verify": [
-        "node cursor-curator/scripts/check-objective-state.mjs docs/objectives/sample-cursor-smoke/state.yaml"
+        "bun cursor-curator/scripts/check-objective-state.mjs docs/objectives/sample-cursor-smoke/state.yaml"
       ],
       "stopIf": [
         "Needs files outside allowed_files"
@@ -593,7 +597,7 @@
         ],
         "commands": [
           {
-            "cmd": "node cursor-curator/scripts/check-objective-state.mjs docs/objectives/sample-cursor-smoke/state.yaml",
+            "cmd": "bun cursor-curator/scripts/check-objective-state.mjs docs/objectives/sample-cursor-smoke/state.yaml",
             "status": "pass"
           }
         ],
@@ -657,12 +661,12 @@
     {
       "path": "notes/smoke-final-proof.md",
       "title": "Smoke final proof — board URL",
-      "mtimeMs": 1782417939285.892
+      "mtimeMs": 1782745077860.9756
     },
     {
       "path": "notes/T001-scout.md",
       "title": "T001 Scout — sample-cursor-smoke",
-      "mtimeMs": 1782142243328.6233
+      "mtimeMs": 1782745077862.9807
     },
     {
       "path": "notes/T003-worker.md",

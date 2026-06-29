@@ -4,7 +4,7 @@ Smoke objective: validate Cursor port without editing `cursor-curator`.
 
 **Verify commands:**
 
-- `npm run check`
-- `node curator/scripts/curator.mjs doctor --objective-ready`
-- `node curator/scripts/check-objective-state.mjs docs/objectives/sample-cursor-smoke/state.yaml`
-- `node curator/scripts/curator.mjs board docs/objectives/sample-cursor-smoke`
+- `bun run check`
+- `bun cursor-curator/dist/cli/curator.mjs doctor --objective-ready`
+- `bun cursor-curator/dist/cli/curator.mjs check-objective sample-cursor-smoke`
+- `bun cursor-curator/dist/cli/curator.mjs board docs/objectives/sample-cursor-smoke`

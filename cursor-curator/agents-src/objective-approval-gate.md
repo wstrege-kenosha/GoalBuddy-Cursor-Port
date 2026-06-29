@@ -16,7 +16,7 @@ When the **cursor-curator** MCP server is available:
 3. **parallel_plan** when evaluating parallel Worker safety.
 4. **completion_check** when the task is a final audit.
 
-Prefer MCP over ad hoc shell reads of `state.json`.
+Prefer MCP (`get_objective_state`, `validate_state`) over ad hoc reads of board state.
 
 ## Hard contract
 
@@ -48,7 +48,7 @@ Return exactly one parseable JSON receipt object:
   "cursor_curator_receipt_v1": {
     "result": "done | blocked",
     "task_id": "<T###>",
-    "board_path": "<path to state.json>",
+    "board_path": "db:<slug>",
     "decision": "approved | rejected | approve_subobjective | reject_subobjective | not_complete | complete",
     "full_outcome_complete": false,
     "rationale": "<=120 words>",

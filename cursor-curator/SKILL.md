@@ -2,8 +2,8 @@
 name: cursor-curator
 description: >-
   Cursor Curator operating loop for long Cursor coding tasks: success criteria, local
-  boards, state.json (v3), Scout/Approval Gate/Worker subagents, receipts, and
-  verification. Use for objective-prep, /objective, state.json, objective board, parallel-plan,
+  boards, SQLite board state (.cursor-curator/curator.db), Scout/Approval Gate/Worker subagents, receipts, and
+  verification. Use for objective-prep, /objective, curator.db, objective board, parallel-plan,
   or multi-session work that needs a finish line and proof loop.
 disable-model-invocation: true
 ---
@@ -32,18 +32,18 @@ Intent -> Success criteria -> Surface -> Loop -> Proof
 ## Quick start
 
 1. Run `/objective-prep` with your outcome (or load the objective-prep skill).
-2. Confirm `docs/objectives/<slug>/{objective.md,state.json,notes/}` exist.
+2. Confirm `docs/objectives/<slug>/{objective.md,notes/}` exist and the slug is in `.cursor-curator/curator.db` (`curator db import` after prep).
 3. Run `/objective` with the printed objective path.
 4. Optional: `/objective-board` or open the [multi-objective hub](http://curator.localhost:41737/) or [objective board](http://curator.localhost:41737/<slug>/).
 
 Install or verify Cursor surfaces:
 
 ```bash
-node ~/.cursor/skills/cursor-curator/dist/cli/curator.mjs install
-node ~/.cursor/skills/cursor-curator/dist/cli/curator.mjs doctor --objective-ready
+bun ~/.cursor/skills/cursor-curator/dist/cli/curator.mjs install
+bun ~/.cursor/skills/cursor-curator/dist/cli/curator.mjs doctor --objective-ready
 ```
 
-Upgrading from port **1.0.0**? See [docs/wiki/Migration-1.0-to-2.0.md](../../docs/wiki/Migration-1.0-to-2.0.md). **YAML → JSON v3?** [docs/wiki/Migration-5.0.md](../../docs/wiki/Migration-5.0.md).
+Upgrading from port **1.0.0**? See [docs/wiki/Migration-1.0-to-2.0.md](../../docs/wiki/Migration-1.0-to-2.0.md). **YAML → JSON v3?** [docs/wiki/Migration-5.0.md](../../docs/wiki/Migration-5.0.md). **JSON → SQLite?** [docs/wiki/Migration-6.0.md](../../docs/wiki/Migration-6.0.md). **Node/npm → Bun?** [docs/wiki/Migration-Node-to-Bun.md](../../docs/wiki/Migration-Node-to-Bun.md).
 
 Enable the **cursor-curator** MCP server in Cursor settings after install. `/objective` and subagents use MCP tools for validation and prompts.
 
@@ -65,8 +65,10 @@ Enable the **cursor-curator** MCP server in Cursor settings after install. `/obj
 | `blocked_tasks` | Blocked task list + optional Approval Gate triage plan |
 | `misfire_audit_check` | Intake misfire audit due / recommendation |
 | `subobjective_rollup_check` | Pending child rollups when subobjective is done |
-
-Server entry: `cursor-curator/dist/mcp/server.mjs` (stdio, via launcher). No write tools — PM still owns board state.
+| `apply_receipt` | Apply validated receipt + advance task (PM-owned) |
+| `patch_task` / `patch_objective` | Targeted board edits |
+| `register_objective` | Register a new objective in the workspace DB |
+| `db_import` | Import legacy `state.json` files into SQLite |
 
 Project config (committed in this port):
 
@@ -74,7 +76,7 @@ Project config (committed in this port):
 {
   "mcpServers": {
     "cursor-curator": {
-      "command": "node",
+      "command": "bun",
       "args": ["cursor-curator/dist/mcp/server.mjs"]
     }
   }
@@ -88,18 +90,21 @@ After `install`, the same entry is merged with an absolute path to `~/.cursor/sk
 ```
 docs/objectives/<slug>/
   objective.md              # charter (editable)
-  state.json                # source of truth (v3 preferred)
-  state.yaml                # legacy v2 (dual-read only)
   notes/                    # long receipts
-  subobjectives/            # optional depth-1 child boards
+  subobjectives/            # optional depth-1 child board dirs
   .cursor-curator-board/    # generated board artifacts
+
+.cursor-curator/
+  curator.db                # runtime board state (SQLite, workspace-scoped)
 ```
+
+Legacy `state.json` files are **never read at runtime** — use `curator db import` once, then `db:<slug>` / MCP only.
 
 ## Board state contract
 
-- **Preferred:** `state.json` with `version: 3` (Zod-validated; see `src/schema/state-v3.ts`)
-- **Legacy:** `state.yaml` with `version: 2` still loads with a deprecation warning
-- Migrate YAML → JSON: `node cursor-curator/scripts/migrate-5.0.mts docs/objectives/<slug>`
+- **Runtime:** `.cursor-curator/curator.db` (logical board path `db:<slug>`)
+- **Schema:** v3 `StateV3` (Zod-validated; see `src/schema/state-v3.ts`)
+- **Import:** legacy `state.json` / one-time YAML→JSON via `scripts/migrate-5.0.mts`, then `curator db import`
 - `objective.success_criteria` — required pressure on completion
 - `active_task` — exactly one active task id (e.g. `T001`)
 - `tasks[]` — scout | approval_gate | worker | pm types with `objective`, `receipt`, status
@@ -134,13 +139,13 @@ Prompt scripts emit `objective_scout` (underscore). Map to hyphenated Cursor nam
 3. `parallel_plan` (mandatory before Task spawn for scout/approval_gate/worker)
 4. If `spawn_plan.length >= 1`: batch-spawn all Task subagents in one turn using each entry's `task_prompt`; else `render_task_prompt` → single Task spawn
 5. `validate_receipt` → `verify_worker_receipt` per board (serial merge)
-6. PM updates each affected `state.json` → `validate_state` → `append_session_note`
+6. PM writes via `apply_receipt` / `patch_task` / `patch_objective` → `validate_state` → `append_session_note`
 
 CLI equivalents (fallback only):
 
 ```bash
-node ~/.cursor/skills/cursor-curator/dist/cli/curator.mjs prompt docs/objectives/<slug> --task <T###> --json
-node ~/.cursor/skills/cursor-curator/scripts/check-objective-state.mjs docs/objectives/<slug>
+bun ~/.cursor/skills/cursor-curator/dist/cli/curator.mjs prompt docs/objectives/<slug> --task <T###> --json
+bun ~/.cursor/skills/cursor-curator/dist/cli/curator.mjs check-objective <slug>
 ```
 
 ## Parallel work (default PM batching)
@@ -148,7 +153,7 @@ node ~/.cursor/skills/cursor-curator/scripts/check-objective-state.mjs docs/obje
 Each `/objective` turn calls `parallel_plan` before spawning subagents. When `spawn_mode` is `parallel`, PM batch-spawns every entry in `spawn_plan` in one assistant turn (multiple Task tool calls). Workers run in parallel only when parent + subobjective boards have disjoint `allowed_files` and `rules.max_write_workers >= 2`.
 
 ```bash
-node ~/.cursor/skills/cursor-curator/dist/cli/curator.mjs parallel-plan docs/objectives/<slug> --json
+bun ~/.cursor/skills/cursor-curator/dist/cli/curator.mjs parallel-plan docs/objectives/<slug> --json
 ```
 
 Inspect `spawn_plan`, `spawn_mode`, `max_write_workers`, and `worker_candidate_count`. PM still merges receipts per board and owns state.
@@ -156,7 +161,7 @@ Inspect `spawn_plan`, `spawn_mode`, `max_write_workers`, and `worker_candidate_c
 ## Local board
 
 ```bash
-node ~/.cursor/skills/cursor-curator/dist/cli/curator.mjs board docs/objectives/<slug>
+bun ~/.cursor/skills/cursor-curator/dist/cli/curator.mjs board docs/objectives/<slug>
 ```
 
 Default hub: `http://curator.localhost:41737/` (all objectives) or `http://curator.localhost:41737/<slug>/` (single board). Share as a Markdown link so it is clickable.
@@ -167,7 +172,7 @@ Board implementation: `cursor-curator/src/board/` (compiled to `dist/board/`). C
 
 | Module | Role |
 |--------|------|
-| `objective-state.mjs` | Thin re-export; validate `state.json` v3 via `dist/mcp/validate-state-bridge.mjs` (rejects `.yaml` at runtime) |
+| `objective-state.mjs` | Load/validate board state from SQLite via `dist/state/` + `dist/db/` |
 | `objective-receipt.mjs` | Parse/validate `cursor_curator_receipt_v1` |
 | `objective-completion.mjs` | Readiness for `objective.status: done` |
 | `objective-verify.mjs` | Cross-check Worker receipts vs `task.verify` |
@@ -184,9 +189,9 @@ Board implementation: `cursor-curator/src/board/` (compiled to `dist/board/`). C
 | Command | Purpose |
 |---------|---------|
 | `install` | Copy agents + slash commands + merge MCP config |
-| `doctor [--objective-ready]` | Node, files, agents, MCP config, MCP smoke, DNS, port |
+| `doctor [--objective-ready]` | Bun, files, agents, MCP config, MCP smoke, DNS, port |
 | `reset` | Remove installer-managed agents/commands only |
-| `update` | Check npm `curator` version; refresh vendored scripts |
+| `update` | Check registry version; refresh vendored scripts |
 | `prompt <slug>` | Compact task handoff (Cursor agent names) |
 | `parallel-plan <slug>` | Parallel safety report |
 | `receipt <file\|json>` | Validate `cursor_curator_receipt_v1` JSON |
@@ -198,6 +203,9 @@ Board implementation: `cursor-curator/src/board/` (compiled to `dist/board/`). C
 | `subobjective-rollup <slug>` | Pending child rollups when subobjective is done |
 | `stale [--days 7]` | List stale objectives under `docs/objectives/` |
 | `hub [--json]` | Multi-objective hub summary |
+| `check-objective <slug>` | Validate board state in SQLite |
+| `register-objective <slug>` | Register a new objective in `curator.db` |
+| `db import` | Import legacy `state.json` into `curator.db` |
 | `board <slug>` | Start local board server |
 
 Skill root: `~/.cursor/skills/cursor-curator/`. Never install skills under `~/.cursor/skills-cursor/` (reserved).
@@ -206,7 +214,7 @@ Skill root: `~/.cursor/skills/cursor-curator/`. Never install skills under `~/.c
 
 Copy from `templates/` when scaffolding manually:
 
-- `templates/objective.md`, `templates/state.json` (canonical), `templates/state.yaml` (migration/legacy only), `templates/note.md`
+- `templates/objective.md`, `templates/state.json` (canonical skeleton for `register_objective`), `templates/note.md`
 
 ## Pitfalls
 

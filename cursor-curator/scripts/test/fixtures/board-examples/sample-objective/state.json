@@ -5,7 +5,16 @@
     "slug": "local-objective-board-surface",
     "kind": "specific",
     "tranche": "Demonstrate local Cursor Curator board rendering.",
-    "status": "active"
+    "status": "active",
+    "success_criteria": {
+      "signal": "local board renders objective columns",
+      "final_proof": "local-objective-board tests pass"
+    }
+  },
+  "agents": {
+    "scout": "installed",
+    "worker": "installed",
+    "approval_gate": "installed"
   },
   "active_task": null,
   "tasks": [

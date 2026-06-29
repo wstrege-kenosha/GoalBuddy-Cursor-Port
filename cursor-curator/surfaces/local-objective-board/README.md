@@ -2,7 +2,7 @@
 
 Generate a small local Cursor Curator board for an objective directory and watch it update live while agents work.
 
-The surface reads **`state.json`** (v3, preferred) or legacy **`state.yaml`** (v2, dual-read with deprecation warning). It writes static web app files into the objective directory and serves them from a local-only Node server. The browser subscribes to Server-Sent Events, so cards update as state files, `notes/`, or linked depth-1 sub-objective state change without a manual reload.
+The surface reads board state from **`.cursor-curator/curator.db`** (SQLite). It writes static web app files into the objective directory and serves them from a local-only Bun server. The browser subscribes to Server-Sent Events, so cards update when the database, `notes/`, or linked depth-1 sub-objective state change without a manual reload.
 
 ## Source layout
 
@@ -11,7 +11,7 @@ The surface reads **`state.json`** (v3, preferred) or legacy **`state.yaml`** (v
 | `cursor-curator/src/board/` | Canonical board TypeScript (`.mts`) |
 | `cursor-curator/dist/board/` | Compiled ESM consumed at runtime |
 | `cursor-curator/scripts/local-objective-board.mjs` | CLI entry (re-exports `dist/board/`) |
-| `cursor-curator/surfaces/local-objective-board/examples/` | Sample objectives for tests |
+| `cursor-curator/surfaces/local-objective-board/examples/` | Sample objective directories for tests (board state seeded from `scripts/test/fixtures/board-examples/`) |
 | `cursor-curator/surfaces/local-objective-board/scripts/local-objective-board.mjs` | Surface CLI entry (re-exports `dist/board/`) |
 
 ## Use When
@@ -24,7 +24,7 @@ The surface reads **`state.json`** (v3, preferred) or legacy **`state.yaml`** (v
 ## Generate And Serve
 
 ```bash
-npx curator board docs/objectives/<slug>
+bunx curator board docs/objectives/<slug>
 ```
 
 The generated app includes the bundled `assets/curator-mark.png`, so the board keeps the Cursor Curator mark anywhere the package is installed.
@@ -43,7 +43,7 @@ Then it starts or reuses the shared local board hub at `http://curator.localhost
 ## Check Without A Long-Running Server
 
 ```bash
-npx curator board docs/objectives/<slug> \
+bunx curator board docs/objectives/<slug> \
   --once \
   --json
 ```
@@ -52,9 +52,8 @@ npx curator board docs/objectives/<slug> \
 
 The server watches:
 
-- `docs/objectives/<slug>/state.json` or `state.yaml` (whichever exists; JSON preferred when both are present)
+- `.cursor-curator/curator.db` (and WAL sidecars) at the workspace root
 - `docs/objectives/<slug>/notes/`
-- linked `docs/objectives/<slug>/subobjectives/**/state.json` or `state.yaml`
 - linked `docs/objectives/<slug>/subobjectives/**/notes/`
 
 When either changes, the server re-reads the objective board and pushes a fresh board payload to connected browsers over `/events`.
@@ -71,9 +70,9 @@ Clicking a card opens a detail modal with the task objective, status, assignee, 
 ## Verification
 
 ```bash
-npm run build
-node --test cursor-curator/surfaces/local-objective-board/test/*.test.mjs
-node cursor-curator/scripts/local-objective-board.mjs \
+bun run build
+bun test cursor-curator/surfaces/local-objective-board/test/*.test.mjs
+bun cursor-curator/scripts/local-objective-board.mjs \
   --objective cursor-curator/surfaces/local-objective-board/examples/sample-objective \
   --once \
   --json
@@ -81,8 +80,8 @@ node cursor-curator/scripts/local-objective-board.mjs \
 
 ## Boundaries
 
-- **`state.json` v3** is canonical for new objectives; legacy YAML still loads during dual-read.
+- **SQLite** (`curator.db`) is canonical at runtime; legacy `state.json` is import-only.
 - The server binds to `127.0.0.1:41737` by default, advertises `http://curator.localhost:41737/`, and reuses that URL as a multi-board hub with in-board header navigation.
 - Sub-objectives are file-rendered depth-1 child boards; the UI does not create, mutate, or recurse sub-objectives.
 - The generated UI renders file content as text, not raw HTML.
-- Skill-only installs bundle runtime deps via `cursor-curator/package.json` (`zod`, `yaml`, MCP SDK) when you run `scripts/install-from-repo.mjs`.
+- Skill-only installs bundle runtime deps via `cursor-curator/package.json` (`zod`, `yaml`, MCP SDK) when you run `bun scripts/install-from-repo.mjs`.

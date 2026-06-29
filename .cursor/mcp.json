@@ -1,7 +1,7 @@
 {
   "mcpServers": {
     "cursor-curator": {
-      "command": "node",
+      "command": "bun",
       "args": [
         "cursor-curator/dist/mcp/server.mjs"
       ],

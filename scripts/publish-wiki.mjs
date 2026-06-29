@@ -1,4 +1,4 @@
-#!/usr/bin/env node
+#!/usr/bin/env bun
 import { cpSync, existsSync, mkdirSync, readdirSync, rmSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
@@ -13,7 +13,7 @@ const repo = process.env.GITHUB_WIKI_REPO || "Cursor-Curator";
 const wikiUrl = `https://github.com/${owner}/${repo}.wiki.git`;
 
 if (process.argv.includes("--help") || process.argv.includes("-h")) {
-  console.log(`Usage: node scripts/publish-wiki.mjs
+  console.log(`Usage: bun scripts/publish-wiki.mjs
 
 Copies docs/wiki/*.md into a clone of ${wikiUrl} and pushes.
 

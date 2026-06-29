@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
 import {
   StateV3Schema,
@@ -6,11 +6,18 @@ import {
   type StateV3Task,
 } from "../schema/state-v3.js";
 import { areAllowedFilesDisjoint } from "../prompt/allowed-files-overlap.mjs";
+import { logicalBoardPath } from "../db/connection.mjs";
+import { loadStateV3, listObjectives, objectiveExistsInDb, resolveChildObjectiveSlug, findObjectiveSlugByDirPath } from "../db/state-repository.mjs";
+import { getWorkspaceRoot, parseObjectiveRef, resolveWorkspaceForObjective } from "../mcp/path-utils.mjs";
 
-export type StateFileFormat = "json";
+export type StateFileFormat = "db";
 
 export interface LoadStateResult {
   statePath: string;
+  boardPath: string;
+  slug: string;
+  workspaceRoot: string;
+  objectiveDir: string;
   format: StateFileFormat;
   deprecatedYaml: false;
   raw: unknown;
@@ -36,7 +43,10 @@ const EXPECTED_ASSIGNEE: Record<StateV3Task["type"], StateV3Task["assignee"]> = 
 };
 
 const YAML_DEPRECATED_MESSAGE =
-  "state.yaml is deprecated; migrate to state.json with scripts/migrate-5.0.mts";
+  "state.yaml is not read at runtime; import legacy boards with: bun cursor-curator/dist/cli/curator.mjs db import";
+
+const STATE_JSON_RUNTIME_MESSAGE =
+  "state.json is not read at runtime; use objective slug or db:<slug>. Import legacy JSON with: bun cursor-curator/dist/cli/curator.mjs db import";
 
 export function isWeakProof(value: unknown): boolean {
   if (value === null || value === undefined) return true;
@@ -64,12 +74,12 @@ function hasReceipt(receipt: StateV3Task["receipt"]): boolean {
 function agentStatusWarning(agent: string, status: string): string {
   const agentLabel = agent[0].toUpperCase() + agent.slice(1);
   if (status === "bundled_not_installed") {
-    return `agents.${agent} is bundled_not_installed; /objective can continue through PM fallback, but dedicated ${agentLabel} delegation is unavailable until installed. Run: node curator/scripts/curator.mjs install — then restart Cursor.`;
+    return `agents.${agent} is bundled_not_installed; /objective can continue through PM fallback, but dedicated ${agentLabel} delegation is unavailable until installed. Run: bun cursor-curator/dist/cli/curator.mjs install — then restart Cursor.`;
   }
   if (status === "missing") {
-    return `agents.${agent} is missing; /objective can continue through PM fallback, but dedicated ${agentLabel} delegation is unavailable. Run: node curator/scripts/curator.mjs install`;
+    return `agents.${agent} is missing; /objective can continue through PM fallback, but dedicated ${agentLabel} delegation is unavailable. Run: bun cursor-curator/dist/cli/curator.mjs install`;
   }
-  return `agents.${agent} is unknown; /objective can continue through PM fallback, but dedicated ${agentLabel} delegation was not verified. Run: node curator/scripts/curator.mjs doctor`;
+  return `agents.${agent} is unknown; /objective can continue through PM fallback, but dedicated ${agentLabel} delegation was not verified. Run: bun cursor-curator/dist/cli/curator.mjs doctor`;
 }
 
 function validateProofWarnings(state: StateV3, warnings: string[]): void {
@@ -129,25 +139,38 @@ function readMaxWriteWorkers(state: StateV3): number {
   return 1;
 }
 
-function readChildState(statePath: string, childRelativePath: string): StateV3 | null {
-  const childStatePath = resolve(dirname(statePath), childRelativePath);
-  if (!existsSync(childStatePath)) return null;
+function readChildState(
+  workspaceRoot: string,
+  parentSlug: string,
+  childRelativePath: string,
+): StateV3 | null {
+  let parentDir: string;
   try {
-    const parsed = StateV3Schema.safeParse(JSON.parse(readFileSync(childStatePath, "utf8")));
-    return parsed.success ? parsed.data : null;
+    parentDir = loadStateV3(workspaceRoot, parentSlug).dirPath;
+  } catch {
+    return null;
+  }
+  const childSlug = resolveChildObjectiveSlug(workspaceRoot, parentDir, childRelativePath);
+  if (!childSlug) return null;
+  try {
+    return loadStateV3(workspaceRoot, childSlug).state;
   } catch {
     return null;
   }
 }
 
-function validateParallelWorkerWarnings(state: StateV3, statePath: string | undefined, warnings: string[]): void {
-  if (!statePath) return;
+function validateParallelWorkerWarnings(
+  state: StateV3,
+  context: { workspaceRoot?: string; slug?: string } = {},
+  warnings: string[],
+): void {
+  if (!context.workspaceRoot || !context.slug) return;
 
   const maxWriteWorkers = readMaxWriteWorkers(state);
 
   for (const task of state.tasks) {
     if (task.type !== "worker" || task.status !== "active" || !task.subobjective?.path) continue;
-    const childState = readChildState(statePath, task.subobjective.path);
+    const childState = readChildState(context.workspaceRoot, context.slug, task.subobjective.path);
     if (!childState) continue;
 
     const childWorker = childState.tasks.find((entry) => entry.type === "worker" && entry.status === "active");
@@ -295,58 +318,99 @@ function validateTaskSemantics(state: StateV3, errors: string[]): void {
   }
 }
 
-export function resolveStatePath(input: string): string {
-  const resolved = resolve(input);
-  const base = basename(resolved).toLowerCase();
-
+export function resolveObjectiveSlug(input: string, workspaceRoot?: string): string {
+  const ref = String(input || "").trim().replace(/\\/g, "/");
+  if (!ref) {
+    throw new Error("objective slug or path is required.");
+  }
+  const base = basename(ref).toLowerCase();
   if (base === "state.yaml" || base === "state.yml") {
     throw new Error(YAML_DEPRECATED_MESSAGE);
   }
-
   if (base === "state.json") {
-    if (!existsSync(resolved)) {
-      throw new Error(`state file not found: ${resolved}`);
+    throw new Error(STATE_JSON_RUNTIME_MESSAGE);
+  }
+  if (ref.startsWith("db:")) {
+    return ref.slice(3);
+  }
+  const parsed = parseObjectiveRef(ref);
+  if (parsed.slug) {
+    return parsed.slug;
+  }
+  const resolved = resolve(ref);
+  if (existsSync(join(resolved, "objective.md"))) {
+    return basename(resolved);
+  }
+  return basename(resolved);
+}
+
+function resolveSlugForInput(input: string, workspaceRoot: string): string {
+  const root = resolve(workspaceRoot);
+  const resolvedInput = resolve(input);
+  let slug = resolveObjectiveSlug(input, root);
+  if (!objectiveExistsInDb(root, slug)) {
+    const byDir = findObjectiveSlugByDirPath(root, resolvedInput);
+    if (byDir) {
+      slug = byDir;
     }
-    return resolved;
   }
+  return slug;
+}
 
-  const jsonPath = join(resolved, "state.json");
-  if (existsSync(jsonPath)) {
-    return jsonPath;
+export function resolveStatePath(input: string, workspaceRoot?: string): string {
+  const root = workspaceRoot ? resolve(workspaceRoot) : resolveWorkspaceForObjective(input);
+  const slug = resolveSlugForInput(input, root);
+  if (!objectiveExistsInDb(root, slug)) {
+    throw new Error(
+      `Objective not found in database: ${slug} (run: bun cursor-curator/dist/cli/curator.mjs db import)`,
+    );
   }
+  return logicalBoardPath(slug);
+}
 
-  throw new Error(`No state.json found under ${resolved}`);
+export function resolveObjectiveDirectory(input: string, workspaceRoot?: string): string {
+  const root = workspaceRoot ? resolve(workspaceRoot) : resolveWorkspaceForObjective(input);
+  const slug = resolveObjectiveSlug(input, root);
+  if (objectiveExistsInDb(root, slug)) {
+    const entry = listObjectives(root).find((row) => row.slug === slug);
+    if (entry?.dirPath) {
+      return resolve(entry.dirPath);
+    }
+  }
+  return join(root, "docs", "objectives", slug);
 }
 
 export function loadState(
   input: string,
+  workspaceRoot?: string,
   _options?: { warnYaml?: boolean },
 ): LoadStateResult {
-  const statePath = resolveStatePath(input);
-  const text = readFileSync(statePath, "utf8");
-  let raw: unknown;
-  try {
-    raw = JSON.parse(text) as unknown;
-  } catch (error) {
-    throw new Error(
-      `invalid JSON in ${statePath}: ${error instanceof Error ? error.message : String(error)}`,
-    );
-  }
-  const validation = validateStateV3(raw, { statePath });
+  const root = workspaceRoot ? resolve(workspaceRoot) : resolveWorkspaceForObjective(input);
+  const slug = resolveSlugForInput(input, root);
+  const loaded = loadStateV3(root, slug);
+  const raw = loaded.state;
+  const validation = validateStateV3(raw, { slug, workspaceRoot: root });
 
   return {
-    statePath,
-    format: "json",
+    statePath: loaded.boardPath,
+    boardPath: loaded.boardPath,
+    slug,
+    workspaceRoot: root,
+    objectiveDir: loaded.dirPath,
+    format: "db",
     deprecatedYaml: false,
     raw,
-    state: raw as StateV3,
+    state: loaded.state,
     validation,
   };
 }
 
 export { validateObjectiveStateFile as validateObjectiveState } from "../mcp/validate-state-bridge.mjs";
 
-export function validateStateV3(input: unknown, context: { statePath?: string } = {}): ValidateStateV3Result {
+export function validateStateV3(
+  input: unknown,
+  context: { statePath?: string; slug?: string; workspaceRoot?: string } = {},
+): ValidateStateV3Result {
   const errors: string[] = [];
   const warnings: string[] = [];
 
@@ -372,9 +436,16 @@ export function validateStateV3(input: unknown, context: { statePath?: string } 
   }
 
   const state = parsed.data;
+  const slug = context.slug ?? state.objective.slug;
+  const workspaceRoot =
+    context.workspaceRoot
+    ?? (context.statePath?.startsWith("db:")
+      ? getWorkspaceRoot()
+      : undefined);
+
   validateTaskSemantics(state, errors);
   validateProofWarnings(state, warnings);
-  validateParallelWorkerWarnings(state, context.statePath, warnings);
+  validateParallelWorkerWarnings(state, { workspaceRoot, slug }, warnings);
   validateDoneCompletionRules(state, errors);
 
   return {

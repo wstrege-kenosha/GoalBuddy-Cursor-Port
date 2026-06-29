@@ -48,8 +48,8 @@ function log(message: string, quiet: boolean | undefined): void {
   if (!quiet) console.log(message);
 }
 
-function runNpm(args: string[], cwd: string): number {
-  const result = spawnSync("npm", args, {
+function runBun(args: string[], cwd: string): number {
+  const result = spawnSync(process.execPath, args, {
     cwd,
     stdio: "inherit",
     shell: process.platform === "win32",
@@ -176,18 +176,18 @@ function ensureRepoReady(repoRoot: string, quiet?: boolean): string[] {
   const sdkPath = join(repoRoot, "node_modules", "@modelcontextprotocol", "sdk");
   const zodPath = join(repoRoot, "node_modules", "zod");
   if (!existsSync(sdkPath) || !existsSync(zodPath)) {
-    log("Installing repo dependencies (npm install)...", quiet);
-    if (runNpm(["install"], repoRoot) !== 0) {
-      errors.push("npm install failed in Cursor-Curator clone");
+    log("Installing repo dependencies (bun install)...", quiet);
+    if (runBun(["install"], repoRoot) !== 0) {
+      errors.push("bun install failed in Cursor-Curator clone");
       return errors;
     }
   }
 
   const distCli = join(repoRoot, SKILL_NAME, "dist", "cli", "curator.mjs");
   if (!existsSync(distCli)) {
-    log("Building TypeScript dist (npm run build)...", quiet);
-    if (runNpm(["run", "build"], repoRoot) !== 0) {
-      errors.push("npm run build failed in Cursor-Curator clone");
+    log("Building TypeScript dist (bun run build)...", quiet);
+    if (runBun(["run", "build"], repoRoot) !== 0) {
+      errors.push("bun run build failed in Cursor-Curator clone");
     }
   }
 
@@ -198,8 +198,8 @@ function ensureSkillDeps(skillRoot: string, quiet?: boolean): string | null {
   const skillPackageJson = join(skillRoot, "package.json");
   if (!existsSync(skillPackageJson)) return null;
   log("Installing skill-only dependencies...", quiet);
-  if (runNpm(["install", "--omit=dev"], skillRoot) !== 0) {
-    return "Skill dependency install failed. Ensure npm is on PATH.";
+  if (runBun(["install", "--production"], skillRoot) !== 0) {
+    return "Skill dependency install failed. Ensure bun is on PATH.";
   }
   return null;
 }

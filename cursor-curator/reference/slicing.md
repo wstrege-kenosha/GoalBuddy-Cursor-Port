@@ -19,15 +19,17 @@ Reject micro-slices when the board keeps adding:
 - Contracts or proof files without implementation
 - Doc-only notes without verification progress
 
-## Policy (state.yaml)
+## Policy (board state)
 
-```yaml
-rules:
-  slice_policy:
-    max_consecutive_tiny_tasks: 2
-    prefer_vertical_slices: true
-    approval_gate_picks_largest_safe_slice: true
-    worker_completes_whole_slice: true
+```json
+"rules": {
+  "slice_policy": {
+    "max_consecutive_tiny_tasks": 2,
+    "prefer_vertical_slices": true,
+    "approval_gate_picks_largest_safe_slice": true,
+    "worker_completes_whole_slice": true
+  }
+}
 ```
 
 ## Approval Gate responsibility

@@ -15,17 +15,21 @@ Examples:
 
 ## Rules
 
-- Record success criteria in `state.yaml` under `objective.success_criteria` before shaping tasks.
+- Record success criteria in the workspace database under `objective.success_criteria` before shaping tasks (`register_objective` or `patch_objective`).
 - Re-test against success criteria after each Worker package and at final audit.
 - No success criteria, no serious objective — weak proof creates weak objectives.
 - Do not mark `full_outcome_complete: true` until receipts and verification map back to success criteria.
 
-## In state.yaml
+## In board state (v3)
 
-```yaml
-objective:
-  success_criteria:
-    signal: "<what must be observable>"
-    cadence: "after each Worker package and at final audit"
-    final_proof: "<receipt-backed evidence required before completion>"
+```json
+"objective": {
+  "success_criteria": {
+    "signal": "<what must be observable>",
+    "cadence": "after each Worker package and at final audit",
+    "final_proof": "<receipt-backed evidence required before completion>"
+  }
+}
 ```
+
+Read or validate via MCP `get_objective_state` / `validate_state`.

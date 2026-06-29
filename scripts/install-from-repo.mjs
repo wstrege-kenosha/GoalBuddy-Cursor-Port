@@ -1,4 +1,4 @@
-#!/usr/bin/env node
+#!/usr/bin/env bun
 import { cpSync, existsSync, mkdirSync, rmSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { homedir } from "node:os";
@@ -15,6 +15,8 @@ const trees = [
   { name: "objective-prep", src: join(repoRoot, "objective-prep") },
 ];
 
+const runtime = process.execPath;
+
 function run(command, args, options = {}) {
   const result = spawnSync(command, args, {
     stdio: "inherit",
@@ -30,8 +32,8 @@ function ensureRepoDeps() {
   if (existsSync(sdkPath) && existsSync(zodPath)) {
     return 0;
   }
-  console.log("Installing repo dependencies (npm install)...");
-  return run("npm", ["install"], { cwd: repoRoot });
+  console.log("Installing repo dependencies (bun install)...");
+  return run(runtime, ["install"], { cwd: repoRoot });
 }
 
 function ensureDistBuild() {
@@ -39,8 +41,8 @@ function ensureDistBuild() {
   if (existsSync(distCli)) {
     return 0;
   }
-  console.log("Building TypeScript dist (npm run build)...");
-  return run("npm", ["run", "build"], { cwd: repoRoot });
+  console.log("Building TypeScript dist (bun run build)...");
+  return run(runtime, ["run", "build"], { cwd: repoRoot });
 }
 
 mkdirSync(skillsDir, { recursive: true });
@@ -71,9 +73,9 @@ const skillRoot = join(skillsDir, "cursor-curator");
 const skillPackageJson = join(skillRoot, "package.json");
 if (existsSync(skillPackageJson)) {
   console.log("Installing skill-only dependencies (zod, MCP SDK)...");
-  status = run("npm", ["install", "--omit=dev"], { cwd: skillRoot });
+  status = run(runtime, ["install", "--production"], { cwd: skillRoot });
   if (status !== 0) {
-    console.error("Skill dependency install failed. Ensure npm is on PATH.");
+    console.error("Skill dependency install failed. Ensure bun is on PATH.");
     process.exit(status);
   }
 }

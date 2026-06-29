@@ -13,18 +13,18 @@ Use subobjectives for bounded child work that belongs to a parent task.
 
 ```
 docs/objectives/<parent-slug>/
-  state.json
   subobjectives/
     T004-ui/
       objective.md
-      state.json
       notes/
 ```
+
+Board state for parent and child lives in `.cursor-curator/curator.db` (`db:<parent-slug>`, `db:<child-slug>`). Legacy `state.json` files are import-only.
 
 ## When to use
 
 - Parent task is too large for one Worker package but still one outcome branch
-- Parallel read-only Scout work on a child board (never mutate parent from child Worker unless parent `state.json` is in `allowed_files`)
+- Parallel read-only Scout work on a child board (never mutate parent from child Worker unless parent board files are in `allowed_files`)
 - Parallel parent + child Workers when write scopes are disjoint and `rules.max_write_workers >= 2`
 
 ## Parallel parent + child Workers
@@ -32,7 +32,7 @@ docs/objectives/<parent-slug>/
 Approval Gate (or PM during setup) should structure parallel work like this:
 
 ```json
-// Parent state.json (excerpt)
+// Parent board (excerpt; stored in curator.db)
 "rules": { "max_write_workers": 2 },
 "tasks": [{
   "id": "T004",
@@ -41,12 +41,12 @@ Approval Gate (or PM during setup) should structure parallel work like this:
   "allowed_files": ["src/feature/tests/**"],
   "subobjective": {
     "status": "active",
-    "path": "subobjectives/T004-ui/state.json",
+    "path": "subobjectives/T004-ui",
     "depth": 1
   }
 }]
 
-// Child subobjectives/T004-ui/state.json (excerpt)
+// Child board db:T004-ui (excerpt)
 "tasks": [{
   "id": "T002",
   "type": "worker",

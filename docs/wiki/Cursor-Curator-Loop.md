@@ -11,12 +11,12 @@ Intent → Success criteria → Surface → Loop → Proof
 | **Scout** | Read-only map of repo and constraints |
 | **Approval Gate** | Pick the largest safe useful slice; set Worker contract |
 | **Worker** | Implement one slice with `allowed_files` and verify commands |
-| **PM** | Owns board state (`state.json`), advances the board |
+| **PM** | Owns board state (SQLite `curator.db`), advances the board |
 
 ## Source of truth
 
 - Charter: `docs/objectives/<slug>/objective.md`
-- Board: `docs/objectives/<slug>/state.json` (v3)
+- Board: `.cursor-curator/curator.db` (logical path `db:<slug>`)
 - Long notes: `docs/objectives/<slug>/notes/`
 - Session log: `docs/objectives/<slug>/notes/SESSION.md` (optional)
 
@@ -25,6 +25,8 @@ Intent → Success criteria → Surface → Loop → Proof
 Every objective needs an observable finish line (tests, demo, public URL, review). The objective does not complete on planning alone. Record proof in `objective.success_criteria` and `objective.intake.completion_proof`.
 
 ## Cursor surfaces
+
+Requires [Bun](https://bun.sh) and `bun run install:cursor` (see [Install](Install)).
 
 After install:
 
@@ -56,8 +58,8 @@ After install:
 1. Subagent returns `cursor_curator_receipt_v1` JSON
 2. PM validates receipt (MCP or `curator receipt` CLI)
 3. For done Workers, PM runs `verify_worker_receipt` and writes `checks.last_verification`
-4. PM writes receipt summary into board state (`state.json`)
-5. `check-objective-state` / `validate_state` must pass before advancing
+4. PM writes receipt summary via MCP (`apply_receipt` / `patch_task`)
+5. `check-objective` / `validate_state` must pass before advancing
 
 ## Shared libraries
 

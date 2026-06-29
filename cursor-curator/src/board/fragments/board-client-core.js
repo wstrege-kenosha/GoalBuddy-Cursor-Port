@@ -112,7 +112,7 @@ async function loadBoardSnapshot() {
 }
 
 function boardOfflineMessage() {
-  return "Start the local board server, then open http://127.0.0.1:41737/<goal-slug>/ (or refresh this page after running: node ~/.cursor/skills/cursor-curator/scripts/curator.mjs board docs/objectives/<slug>).";
+  return "Start the local board server, then open http://127.0.0.1:41737/<goal-slug>/ (or refresh this page after running: bun ~/.cursor/skills/cursor-curator/scripts/curator.mjs board docs/objectives/<slug>).";
 }
 
 async function loadBoard() {

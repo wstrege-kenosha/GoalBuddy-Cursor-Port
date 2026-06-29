@@ -3,12 +3,12 @@
   "hooks": {
     "stop": [
       {
-        "command": "node cursor-curator/scripts/hooks/append-usage-metrics.mjs"
+        "command": "bun cursor-curator/scripts/hooks/append-usage-metrics.mjs"
       }
     ],
     "subagentStop": [
       {
-        "command": "node cursor-curator/scripts/hooks/append-usage-metrics.mjs",
+        "command": "bun cursor-curator/scripts/hooks/append-usage-metrics.mjs",
         "matcher": "objective-scout|objective-worker|objective-approval-gate"
       }
     ]

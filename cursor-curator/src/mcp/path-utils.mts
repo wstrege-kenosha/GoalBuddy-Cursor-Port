@@ -1,6 +1,9 @@
-import { existsSync, readFileSync, writeFileSync, mkdirSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync, mkdirSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, dirname, join, resolve, sep } from "node:path";
+import { logicalBoardPath } from "../db/connection.mjs";
+import { objectiveExistsInDb, findObjectiveSlugByDirPath } from "../db/state-repository.mjs";
+import { resolveObjectiveDirectory, resolveObjectiveSlug } from "../state/objective-state.mjs";
 
 const KNOWN_WORKSPACES_FILE = "known-workspaces.json";
 
@@ -93,12 +96,20 @@ export function registerKnownWorkspace(workspaceRoot: string): {
   const existing = readKnownWorkspaces();
   const merged = [root, ...existing.filter((entry) => entry.toLowerCase() !== root.toLowerCase())];
   const configPath = knownWorkspacesPath();
-  mkdirSync(dirname(configPath), { recursive: true });
-  writeFileSync(
-    configPath,
-    `${JSON.stringify({ roots: merged.map((path) => ({ path, registered_at: new Date().toISOString() })) }, null, 2)}\n`,
-    "utf8",
-  );
+  try {
+    mkdirSync(dirname(configPath), { recursive: true });
+    writeFileSync(
+      configPath,
+      `${JSON.stringify({ roots: merged.map((path) => ({ path, registered_at: new Date().toISOString() })) }, null, 2)}\n`,
+      "utf8",
+    );
+  } catch (error) {
+    const code = error && typeof error === "object" && "code" in error ? String(error.code) : "";
+    if (code !== "EPERM" && code !== "EACCES") {
+      throw error;
+    }
+    return { ok: true, path: root, configPath, reason: "known_workspaces_not_writable" };
+  }
   return { ok: true, path: root, configPath };
 }
 
@@ -175,16 +186,36 @@ export function parseObjectiveRef(objectiveRef: string): { slug: string; workspa
 }
 
 function objectiveStateExists(workspaceRoot: string, slug: string): boolean {
-  const dir = join(workspaceRoot, "docs", "objectives", slug);
-  return existsSync(join(dir, "state.json"));
+  return objectiveExistsInDb(workspaceRoot, slug);
 }
 
-function resolveStateFileInDir(objectiveDir: string): string {
-  const jsonPath = join(objectiveDir, "state.json");
-  if (existsSync(jsonPath)) {
-    return jsonPath;
+function workspaceRootFromCuratorDb(startPath: string): string | null {
+  let cursor = resolve(startPath);
+  try {
+    if (!statSync(cursor).isDirectory()) {
+      cursor = dirname(cursor);
+    }
+  } catch {
+    cursor = dirname(cursor);
   }
-  throw new Error(`No state.json found under ${objectiveDir}`);
+  const resolvedStart = resolve(startPath);
+  let fallback: string | null = null;
+  while (true) {
+    if (existsSync(join(cursor, ".cursor-curator", "curator.db"))) {
+      fallback = cursor;
+      if (findObjectiveSlugByDirPath(cursor, resolvedStart)) {
+        return cursor;
+      }
+      if (existsSync(join(cursor, "docs", "objectives"))) {
+        return cursor;
+      }
+    }
+    const parent = dirname(cursor);
+    if (parent === cursor) {
+      return fallback;
+    }
+    cursor = parent;
+  }
 }
 
 export function resolveWorkspaceForObjective(
@@ -195,6 +226,12 @@ export function resolveWorkspaceForObjective(
     return resolve(options.workspaceRoot);
   }
 
+  const fromDb = workspaceRootFromCuratorDb(objectiveRef);
+  if (fromDb) {
+    registerKnownWorkspace(fromDb);
+    return fromDb;
+  }
+
   const parsed = parseObjectiveRef(objectiveRef);
   if (!parsed.slug) {
     throw new Error("objective slug or path is required.");
@@ -203,6 +240,19 @@ export function resolveWorkspaceForObjective(
   if (parsed.workspaceRoot && objectiveStateExists(parsed.workspaceRoot, parsed.slug)) {
     registerKnownWorkspace(parsed.workspaceRoot);
     return parsed.workspaceRoot;
+  }
+
+  const resolvedRef = resolve(objectiveRef);
+  for (const root of collectWorkspaceCandidates()) {
+    const normalizedRoot = resolve(root);
+    if (!resolvedRef.startsWith(`${normalizedRoot}${sep}`)) {
+      continue;
+    }
+    const slugByDir = findObjectiveSlugByDirPath(normalizedRoot, resolvedRef);
+    if (slugByDir) {
+      registerKnownWorkspace(normalizedRoot);
+      return normalizedRoot;
+    }
   }
 
   for (const root of collectWorkspaceCandidates()) {
@@ -260,47 +310,21 @@ export function resolveObjectiveStatePath(objectiveRef: string, workspaceRoot?: 
       ? workspaceRoot
       : resolveWorkspaceForObjective(objectiveRef),
   );
-  const ref = String(objectiveRef || "").trim().replace(/\\/g, "/");
-  if (!ref) {
-    throw new Error("objective slug or path is required.");
-  }
-
-  const parsed = parseObjectiveRef(ref);
-  const refBase = basename(ref);
-  const explicitFile = refBase === "state.json" ? "state.json" : undefined;
-
-  let candidate: string;
-  if (
-    parsed.slug
-    && (!ref.includes("/") || ref.includes("docs/objectives/") || ref.endsWith("state.json"))
-  ) {
-    const objectiveDir = join(root, "docs", "objectives", parsed.slug);
-    candidate = explicitFile ? join(objectiveDir, explicitFile) : resolveStateFileInDir(objectiveDir);
-  } else if (refBase === "state.json") {
-    candidate = join(root, ref);
-  } else {
-    const objectiveDir = join(root, ref);
-    candidate = explicitFile ? join(objectiveDir, explicitFile) : resolveStateFileInDir(objectiveDir);
-  }
-
-  const normalized = resolve(candidate);
-  assertUnderDocsObjectives(normalized, root);
-  if (!existsSync(normalized)) {
+  const slug = resolveObjectiveSlug(objectiveRef, root);
+  if (!objectiveExistsInDb(root, slug)) {
     const searched = collectWorkspaceCandidates().slice(0, 6).join(", ") || root;
-    throw new Error(`state file not found: ${normalized} (searched roots: ${searched})`);
+    throw new Error(
+      `Objective not found in database: ${slug} (searched roots: ${searched}; run: bun cursor-curator/dist/cli/curator.mjs db import)`,
+    );
   }
-  return normalized;
+  return logicalBoardPath(slug);
 }
 
 export function resolveObjectiveDir(objectiveRef: string, workspaceRoot?: string): string {
-  return resolve(resolveObjectiveStatePath(objectiveRef, workspaceRoot), "..");
-}
-
-function assertUnderDocsObjectives(statePath: string, workspaceRoot: string): void {
-  const objectivesRoot = resolve(workspaceRoot, "docs", "objectives");
-  const prefix = objectivesRoot.endsWith(sep) ? objectivesRoot : `${objectivesRoot}${sep}`;
-  const normalized = resolve(statePath);
-  if (!normalized.toLowerCase().startsWith(prefix.toLowerCase())) {
-    throw new Error(`Objective path must stay under docs/objectives/: ${statePath}`);
-  }
+  const root = resolve(
+    workspaceRoot !== undefined && workspaceRoot !== null
+      ? workspaceRoot
+      : resolveWorkspaceForObjective(objectiveRef),
+  );
+  return resolveObjectiveDirectory(objectiveRef, root);
 }

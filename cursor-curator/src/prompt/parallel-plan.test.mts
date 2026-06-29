@@ -1,30 +1,70 @@
 import assert from "node:assert/strict";
+import { existsSync, readdirSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
-import { test } from "node:test";
+import { after, test } from "node:test";
 import { fileURLToPath } from "node:url";
+import { resetDatabaseCache } from "../db/connection.mjs";
+import { importStateJsonFile } from "../db/state-repository.mjs";
 import { createParallelPlan } from "./parallel-plan.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(__dirname, "../../..");
+const previousWorkspacePaths = process.env.WORKSPACE_FOLDER_PATHS;
+process.env.WORKSPACE_FOLDER_PATHS = repoRoot;
 const fixturesRoot = join(repoRoot, "cursor-curator/scripts/test/fixtures/parallel-plan");
 const overlappingRoot = join(
   repoRoot,
   "cursor-curator/surfaces/local-objective-board/examples/subobjective-parent",
 );
 
+after(() => {
+  if (previousWorkspacePaths === undefined) {
+    delete process.env.WORKSPACE_FOLDER_PATHS;
+  } else {
+    process.env.WORKSPACE_FOLDER_PATHS = previousWorkspacePaths;
+  }
+});
+
+function importFixtureTree(root: string, options: { reset?: boolean } = {}): void {
+  if (options.reset) {
+    resetDatabaseCache();
+  }
+  const subRoot = join(root, "subobjectives");
+  if (existsSync(subRoot)) {
+    for (const entry of readdirSync(subRoot, { withFileTypes: true })) {
+      if (entry.isDirectory()) {
+        importFixtureTree(join(subRoot, entry.name));
+      }
+    }
+  }
+  const jsonPath = join(root, "state.json");
+  if (existsSync(jsonPath)) {
+    importStateJsonFile(repoRoot, jsonPath, { dirPath: root });
+  }
+}
+
+function planForFixture(fixtureRoot: string) {
+  importFixtureTree(fixtureRoot, { reset: true });
+  return createParallelPlan({
+    objectiveRoot: fixtureRoot,
+    json: true,
+    workspaceRoot: repoRoot,
+  });
+}
+
 function workerSpawnEntries(plan: ReturnType<typeof createParallelPlan>) {
   return plan.spawn_plan.filter((entry) => entry.role === "worker");
 }
 
 test("parallel-plan: overlapping parent+child Workers are not in spawn_plan", () => {
-  const plan = createParallelPlan({ objectiveRoot: overlappingRoot, json: true });
+  const plan = planForFixture(overlappingRoot);
   assert.equal(plan.worker_candidate_count, 2);
   assert.equal(workerSpawnEntries(plan).length, 0);
   assert.equal(plan.spawn_mode, "serial");
 });
 
 test("parallel-plan: disjoint parent+child Workers with max_write_workers 2", () => {
-  const plan = createParallelPlan({ objectiveRoot: join(fixturesRoot, "disjoint"), json: true });
+  const plan = planForFixture(join(fixturesRoot, "disjoint"));
   assert.equal(plan.max_write_workers, 2);
   assert.equal(plan.worker_candidate_count, 2);
   assert.equal(workerSpawnEntries(plan).length, 2);
@@ -32,7 +72,7 @@ test("parallel-plan: disjoint parent+child Workers with max_write_workers 2", ()
 });
 
 test("parallel-plan: max_write_workers 1 blocks parallel Workers even when disjoint", () => {
-  const plan = createParallelPlan({ objectiveRoot: join(fixturesRoot, "max-workers-blocked"), json: true });
+  const plan = planForFixture(join(fixturesRoot, "max-workers-blocked"));
   assert.equal(plan.max_write_workers, 1);
   assert.equal(plan.worker_candidate_count, 2);
   assert.equal(workerSpawnEntries(plan).length, 0);
@@ -44,7 +84,7 @@ test("parallel-plan: max_write_workers 1 blocks parallel Workers even when disjo
 });
 
 test("parallel-plan: Scouts remain parallel-safe when max_write_workers blocks Workers", () => {
-  const plan = createParallelPlan({ objectiveRoot: join(fixturesRoot, "scout-parallel"), json: true });
+  const plan = planForFixture(join(fixturesRoot, "scout-parallel"));
   assert.equal(plan.max_write_workers, 1);
   assert.equal(workerSpawnEntries(plan).length, 0);
   const scoutEntries = plan.spawn_plan.filter((entry) => entry.role === "scout");
@@ -53,7 +93,7 @@ test("parallel-plan: Scouts remain parallel-safe when max_write_workers blocks W
 });
 
 test("parallel-plan: single active Worker is not parallel-safe", () => {
-  const plan = createParallelPlan({ objectiveRoot: join(fixturesRoot, "single-worker"), json: true });
+  const plan = planForFixture(join(fixturesRoot, "single-worker"));
   assert.equal(plan.worker_candidate_count, 1);
   assert.equal(workerSpawnEntries(plan).length, 0);
   assert.equal(plan.spawn_mode, "serial");

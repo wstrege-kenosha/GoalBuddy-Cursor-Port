@@ -6,12 +6,12 @@ Start or refresh the Cursor Curator local board for an objective in this workspa
 
 1. Determine the objective directory:
    - If the user named `docs/objectives/<slug>`, use that path.
-   - Else find the most recently modified `docs/objectives/*/state.json` in the workspace, or ask which slug.
+   - Else list objectives from the workspace DB (`curator hub --json`) or ask which slug.
 
 2. Run the board server (background if long-running):
 
    ```bash
-   node ~/.cursor/skills/cursor-curator/dist/cli/curator.mjs board docs/objectives/<slug>
+   bun ~/.cursor/skills/cursor-curator/dist/cli/curator.mjs board docs/objectives/<slug>
    ```
 
 3. Tell the user the board URL as a clickable Markdown link:

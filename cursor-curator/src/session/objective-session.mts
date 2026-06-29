@@ -1,9 +1,12 @@
 import { appendFileSync, existsSync, mkdirSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
-import { validateObjectiveState } from "../state/objective-state.mjs";
-import { readLastVerificationFromState } from "../verify/objective-verify.mjs";
+import { loadState, validateObjectiveState } from "../state/objective-state.mjs";
+import { readLastVerificationFromLoadedState } from "../verify/objective-verify.mjs";
 import { findStaleObjectives } from "../stale/objective-stale.mjs";
+import { findObjectiveSlugByDirPath } from "../db/state-repository.mjs";
 import { resolveObjectiveDirsFromHook } from "../hook/objective-hook-resolve.mjs";
+import { resolveWorkspaceForObjective } from "../mcp/path-utils.mjs";
+import type { StateV3, StateV3Task } from "../schema/state-v3.js";
 
 export interface AppendSessionNoteOptions {
   workspaceRoot?: string;
@@ -104,26 +107,52 @@ export function buildResumeDigest(
   options: { limit?: number; stale_days?: number } = {},
 ) {
   const root = resolve(objectiveDir);
-  const resolvedState = resolve(statePath);
-  const validation = validateObjectiveState(resolvedState);
-  const stateText = readFileSync(resolvedState, "utf8");
+  const workspaceRoot = resolveWorkspaceForObjective(root);
+  const slug = findObjectiveSlugByDirPath(workspaceRoot, root) ?? (root.split(/[/\\]/).pop() || statePath);
+  const validation = validateObjectiveState(slug, workspaceRoot);
   const session = readSessionDigest(root, options);
-  const lastVerification = readLastVerificationFromState(stateText);
-  const activeTaskId = readTopScalar(stateText, "active_task");
-  const activeObjective = activeTaskId ? readTaskObjective(stateText, activeTaskId) : null;
-  const recentReceipts = collectRecentReceipts(stateText, 2);
 
-  const workspaceRoot = resolve(root, "../..");
+  let state: StateV3;
+  try {
+    state = loadState(root, workspaceRoot).state;
+  } catch (error) {
+    return {
+      objective_dir: root,
+      state_path: validation.board_path || statePath,
+      board_path: validation.board_path || statePath,
+      slug,
+      session,
+      validation: {
+        ok: false,
+        errors: [error instanceof Error ? error.message : String(error), ...validation.errors],
+        warnings: validation.warnings,
+      },
+      active_task: null,
+      active_task_objective: null,
+      last_verification: null,
+      recent_receipts: [],
+      stale: null,
+      stale_nudge: null,
+    };
+  }
+
+  const activeTaskId = state.active_task;
+  const activeTask = state.tasks.find((task) => task.id === activeTaskId) ?? null;
+  const lastVerification = readLastVerificationFromLoadedState(
+    state as Parameters<typeof readLastVerificationFromLoadedState>[0],
+  );
+  const recentReceipts = collectRecentReceiptsFromState(state, 2);
+
   const staleReport = findStaleObjectives({
     days: Number(options.stale_days) > 0 ? Number(options.stale_days) : 7,
     roots: [workspaceRoot],
   });
-  const slug = root.split(/[/\\]/).pop();
   const staleEntry = (staleReport.objectives || []).find((entry) => entry.slug === slug) || null;
 
   return {
     objective_dir: root,
-    state_path: resolvedState,
+    state_path: validation.board_path || statePath,
+    board_path: validation.board_path || statePath,
     slug,
     session,
     validation: {
@@ -132,7 +161,7 @@ export function buildResumeDigest(
       warnings: validation.warnings,
     },
     active_task: activeTaskId,
-    active_task_objective: activeObjective,
+    active_task_objective: activeTask?.objective ?? null,
     last_verification: lastVerification,
     recent_receipts: recentReceipts,
     stale: staleEntry,
@@ -142,55 +171,26 @@ export function buildResumeDigest(
   };
 }
 
-function readTopScalar(text: string, key: string): string | null {
-  const match = text.match(new RegExp(`^${key}:\\s*(.+?)\\s*$`, "m"));
-  if (!match) return null;
-  const cleaned = match[1].replace(/#.*/, "").trim().replace(/^['"]|['"]$/g, "");
-  return cleaned === "null" ? null : cleaned;
+function receiptSummary(task: StateV3Task): { task_id: string; summary: string | null; result: string | null } {
+  const receipt = task.receipt;
+  const summary =
+    receipt && typeof receipt === "object" && "summary" in receipt
+      ? String((receipt as Record<string, unknown>).summary ?? "")
+      : null;
+  const result =
+    receipt && typeof receipt === "object" && "result" in receipt
+      ? String((receipt as Record<string, unknown>).result ?? "")
+      : null;
+  return {
+    task_id: task.id,
+    summary: summary || null,
+    result: result || null,
+  };
 }
 
-function readTaskObjective(text: string, taskId: string): string | null {
-  const block = taskBlock(text, taskId);
-  if (!block) return null;
-  const match = block.match(/^\s{4}objective:\s*(.+?)\s*$/m);
-  return match ? match[1].replace(/^['"]|['"]$/g, "").trim() : null;
-}
-
-function taskBlock(text: string, taskId: string): string | null {
-  const lines = text.split(/\r?\n/);
-  let start = -1;
-  for (let index = 0; index < lines.length; index += 1) {
-    if (new RegExp(`^\\s{2}-\\s+id:\\s*${taskId}\\s*$`).test(lines[index])) {
-      start = index;
-      break;
-    }
-  }
-  if (start === -1) return null;
-  const collected: string[] = [];
-  for (let index = start; index < lines.length; index += 1) {
-    if (index > start && /^\s{2}-\s+id:\s*T\d{3}\s*$/.test(lines[index])) break;
-    if (index > start && /^\S/.test(lines[index])) break;
-    collected.push(lines[index]);
-  }
-  return collected.join("\n");
-}
-
-function collectRecentReceipts(text: string, limit: number) {
-  const taskIds = [...text.matchAll(/^\s{2}-\s+id:\s*(T\d{3})\s*$/gm)].map((match) => match[1]);
-  const doneIds = taskIds.filter((taskId) => {
-    const block = taskBlock(text, taskId);
-    return /^\s{4}status:\s*done\s*$/m.test(block || "");
-  });
-  const receipts: Array<{ task_id: string; summary: string | null; result: string | null }> = [];
-  for (const taskId of doneIds.slice(-limit)) {
-    const block = taskBlock(text, taskId);
-    const summaryMatch = block?.match(/^\s{6}summary:\s*(.+?)\s*$/m);
-    const resultMatch = block?.match(/^\s{6}result:\s*(.+?)\s*$/m);
-    receipts.push({
-      task_id: taskId,
-      summary: summaryMatch ? summaryMatch[1].replace(/^['"]|['"]$/g, "").trim() : null,
-      result: resultMatch ? resultMatch[1].replace(/^['"]|['"]$/g, "").trim() : null,
-    });
-  }
-  return receipts;
+function collectRecentReceiptsFromState(state: StateV3, limit: number) {
+  return state.tasks
+    .filter((task) => task.status === "done")
+    .slice(-limit)
+    .map(receiptSummary);
 }

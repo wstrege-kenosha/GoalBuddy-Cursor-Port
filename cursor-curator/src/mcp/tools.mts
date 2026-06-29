@@ -12,6 +12,15 @@ import { parseReceiptFromText } from "../state/objective-state-write.mjs";
 import { verifyWorkerReceiptForTask } from "../verify/objective-verify.mjs";
 import { createParallelPlan } from "../prompt/parallel-plan.mjs";
 import { loadBoard, renderTaskPrompt, selectTask } from "../prompt/render-task-prompt.mjs";
+import { resolveDbPath } from "../db/connection.mjs";
+import {
+  applyReceipt,
+  importLegacyObjectives,
+  patchObjective,
+  patchTask,
+  registerObjective,
+} from "../db/state-repository.mjs";
+import { StateV3Schema } from "../schema/state-v3.js";
 import {
   getWorkspaceRoot,
   resolveObjectiveDir,
@@ -81,15 +90,18 @@ export function toolListObjectives(args: Record<string, unknown> = {}) {
 
 export function toolGetObjectiveState(args: Record<string, unknown> = {}) {
   const workspaceRoot = workspaceForArgs(args);
-  const statePath = resolveObjectiveStatePath(String(args.objective), workspaceRoot);
-  const board = loadBoard(statePath);
-  const validation = validateObjectiveStateFile(statePath);
+  const objective = String(args.objective);
+  const statePath = resolveObjectiveStatePath(objective, workspaceRoot);
+  const board = loadBoard(statePath, workspaceRoot);
+  const validation = validateObjectiveStateFile(objective, workspaceRoot);
 
   return {
     workspace_root: workspaceRoot,
     state_path: statePath,
-    objective_dir: dirname(statePath),
-    slug: basename(dirname(statePath)),
+    board_path: statePath,
+    db_path: resolveDbPath(workspaceRoot),
+    objective_slug: validation.objective_slug,
+    objective_dir: validation.objective_dir,
     validation,
     objective: board.objective,
     rules: board.document.rules || {},
@@ -130,13 +142,13 @@ export function toolGetActiveTask(args: Record<string, unknown> = {}) {
 
 export function toolValidateState(args: Record<string, unknown> = {}) {
   const workspaceRoot = workspaceForArgs(args);
-  const statePath = resolveObjectiveStatePath(String(args.objective), workspaceRoot);
-  const result = validateObjectiveStateFile(statePath);
+  const objective = String(args.objective);
+  const result = validateObjectiveStateFile(objective, workspaceRoot);
   return {
     ...result,
     workspace_root: workspaceRoot,
-    objective_root: dirname(statePath),
-    slug: basename(dirname(statePath)),
+    objective_root: result.objective_dir,
+    slug: result.objective_slug,
   };
 }
 
@@ -184,14 +196,16 @@ export function toolValidateReceipt(args: Record<string, unknown> = {}) {
 
 export function toolCompletionCheck(args: Record<string, unknown> = {}) {
   const workspaceRoot = workspaceForArgs(args);
-  const statePath = resolveObjectiveStatePath(String(args.objective), workspaceRoot);
-  const result = checkCompletionReadiness(statePath);
-  const validation = validateObjectiveStateFile(statePath);
+  const objective = String(args.objective);
+  const result = checkCompletionReadiness(objective, workspaceRoot);
+  const validation = validateObjectiveStateFile(objective, workspaceRoot);
   return {
     workspace_root: workspaceRoot,
     ...result,
-    validation_ok: statePath.endsWith(".json") ? validation.ok : result.validation_ok,
-    state_path: statePath,
+    validation_ok: validation.ok,
+    state_path: result.board_path,
+    board_path: result.board_path,
+    db_path: resolveDbPath(workspaceRoot),
   };
 }
 
@@ -207,8 +221,9 @@ export function toolAppendSessionNote(args: Record<string, unknown> = {}): Recor
 
 export function toolSessionResumeDigest(args: Record<string, unknown> = {}): Record<string, unknown> {
   const workspaceRoot = workspaceForArgs(args);
-  const statePath = resolveObjectiveStatePath(String(args.objective), workspaceRoot);
-  const objectiveDir = dirname(statePath);
+  const objective = String(args.objective);
+  const objectiveDir = resolveObjectiveDir(objective, workspaceRoot);
+  const statePath = resolveObjectiveStatePath(objective, workspaceRoot);
   return {
     workspace_root: workspaceRoot,
     ...buildResumeDigest(objectiveDir, statePath, {
@@ -263,33 +278,120 @@ export function toolVerifyWorkerReceipt(args: Record<string, unknown> = {}) {
 
 export function toolBlockedTasks(args: Record<string, unknown> = {}) {
   const workspaceRoot = workspaceForArgs(args);
-  const statePath = resolveObjectiveStatePath(String(args.objective), workspaceRoot);
-  const plan = args.triage ? buildBlockedTriagePlan(statePath) : null;
+  const objective = String(args.objective);
+  const blocked_tasks = listBlockedTasks(objective, workspaceRoot);
+  const triage = args.triage ? buildBlockedTriagePlan(objective, workspaceRoot) : null;
   return {
     workspace_root: workspaceRoot,
-    state_path: statePath,
-    blocked_tasks: listBlockedTasks(statePath),
-    triage: plan,
+    state_path: resolveObjectiveStatePath(objective, workspaceRoot),
+    blocked_tasks,
+    triage,
+  };
+}
+
+export function toolApplyReceipt(args: Record<string, unknown> = {}) {
+  const workspaceRoot = workspaceForArgs(args);
+  const objective = String(args.objective);
+  let receiptInput: unknown = args.receipt;
+  if (args.receipt_file) {
+    receiptInput = readFileSync(String(args.receipt_file), "utf8");
+  }
+  if (typeof receiptInput === "string") {
+    const parsed = parseReceiptFromText(receiptInput);
+    receiptInput = parsed?.envelope ?? receiptInput;
+  }
+  return {
+    workspace_root: workspaceRoot,
+    ...applyReceipt(workspaceRoot, objective, receiptInput, {
+      role: args.role as string | undefined,
+      expectedTaskId: args.task_id as string | undefined,
+      dryRun: args.dry_run === true,
+    }),
+    db_path: resolveDbPath(workspaceRoot),
+  };
+}
+
+export function toolPatchTask(args: Record<string, unknown> = {}) {
+  const workspaceRoot = workspaceForArgs(args);
+  const objective = String(args.objective);
+  const taskId = String(args.task_id);
+  const patch = (args.patch as Record<string, unknown>) || {};
+  return {
+    workspace_root: workspaceRoot,
+    objective_slug: objective,
+    task_id: taskId,
+    ...patchTask(workspaceRoot, objective, taskId, patch as Parameters<typeof patchTask>[3], {
+      dryRun: args.dry_run === true,
+    }),
+    db_path: resolveDbPath(workspaceRoot),
+  };
+}
+
+export function toolPatchObjective(args: Record<string, unknown> = {}) {
+  const workspaceRoot = workspaceForArgs(args);
+  const objective = String(args.objective);
+  const patch = (args.patch as Record<string, unknown>) || {};
+  return {
+    workspace_root: workspaceRoot,
+    objective_slug: objective,
+    ...patchObjective(workspaceRoot, objective, patch as Parameters<typeof patchObjective>[2], {
+      dryRun: args.dry_run === true,
+    }),
+    db_path: resolveDbPath(workspaceRoot),
+  };
+}
+
+export function toolRegisterObjective(args: Record<string, unknown> = {}) {
+  const workspaceRoot = workspaceForArgs(args);
+  const slug = String(args.objective);
+  const state = args.state !== undefined
+    ? StateV3Schema.parse(args.state)
+    : undefined;
+  const loaded = registerObjective(workspaceRoot, slug, state);
+  const validation = validateObjectiveStateFile(slug, workspaceRoot);
+  return {
+    workspace_root: workspaceRoot,
+    objective_slug: loaded.slug,
+    board_path: loaded.boardPath,
+    state_path: loaded.boardPath,
+    db_path: resolveDbPath(workspaceRoot),
+    objective_dir: loaded.dirPath,
+    ok: validation.ok,
+    errors: validation.errors,
+    warnings: validation.warnings,
+  };
+}
+
+export function toolDbImport(args: Record<string, unknown> = {}) {
+  const workspaceRoot = workspaceForArgs(args);
+  const result = importLegacyObjectives(workspaceRoot, {
+    slug: args.slug as string | undefined,
+  });
+  return {
+    workspace_root: workspaceRoot,
+    db_path: resolveDbPath(workspaceRoot),
+    ...result,
   };
 }
 
 export function toolMisfireAuditCheck(args: Record<string, unknown> = {}) {
   const workspaceRoot = workspaceForArgs(args);
-  const statePath = resolveObjectiveStatePath(String(args.objective), workspaceRoot);
+  const objective = String(args.objective);
   return {
     workspace_root: workspaceRoot,
-    ...misfireAuditStatus(statePath, {
+    ...misfireAuditStatus(objective, {
       workers_between_audits: args.workers_between_audits as number | undefined,
+      workspaceRoot,
     }),
   };
 }
 
 export function toolSubobjectiveRollupCheck(args: Record<string, unknown> = {}) {
   const workspaceRoot = workspaceForArgs(args);
-  const statePath = resolveObjectiveStatePath(String(args.objective), workspaceRoot);
+  const objective = String(args.objective);
   return {
     workspace_root: workspaceRoot,
-    ...checkSubobjectiveRollup(statePath),
+    ...checkSubobjectiveRollup(objective, workspaceRoot),
   };
 }
 
@@ -297,9 +399,9 @@ export function runMcpSmokeTest(options: { workspaceRoot?: string; objective?: s
   const workspaceRoot = options.workspaceRoot || getWorkspaceRoot();
   const goal = options.objective || "sample-cursor-smoke";
   const statePath = resolveObjectiveStatePath(goal, workspaceRoot);
-  const validation = validateObjectiveStateFile(statePath);
-  const prompt = toolRenderTaskPrompt({ objective: goal });
-  const completion = checkCompletionReadiness(statePath);
+  const validation = validateObjectiveStateFile(goal, workspaceRoot);
+  const prompt = toolRenderTaskPrompt({ objective: goal, workspace_root: workspaceRoot });
+  const completion = checkCompletionReadiness(goal, workspaceRoot);
 
   return {
     ok: validation.ok && Boolean((prompt as { metadata?: { board_path?: string } })?.metadata?.board_path),
@@ -366,4 +468,9 @@ export const TOOL_HANDLERS = {
   blocked_tasks: toolBlockedTasks,
   misfire_audit_check: toolMisfireAuditCheck,
   subobjective_rollup_check: toolSubobjectiveRollupCheck,
+  apply_receipt: toolApplyReceipt,
+  patch_task: toolPatchTask,
+  patch_objective: toolPatchObjective,
+  register_objective: toolRegisterObjective,
+  db_import: toolDbImport,
 };

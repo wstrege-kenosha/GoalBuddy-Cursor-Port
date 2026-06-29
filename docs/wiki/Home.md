@@ -4,6 +4,7 @@ Git-installable [Cursor Curator](https://github.com/tolibear/cursor-curator) for
 
 | Page | Topic |
 |------|--------|
+| [Migration Node → Bun](Migration-Node-to-Bun) | Node/npm → Bun runtime |
 | [Migration 5.0](Migration-5.0) | YAML v2 → JSON v3 (fork) |
 | [Migration 2.0 → 2.1](Migration-2.0-to-2.1) | SDK auto-loop removed |
 | [Migration 1.0 → 2.0](Migration-1.0-to-2.0) | Upgrade from 1.0.0 |
@@ -15,7 +16,7 @@ Git-installable [Cursor Curator](https://github.com/tolibear/cursor-curator) for
 
 **Repo:** https://github.com/wstrege-kenosha/Cursor-Curator
 
-This port is not on npm; install from git only.
+**Runtime:** [Bun](https://bun.sh) required (`bun install`, `bun run build`). This port is not published to npm; install from git only.
 
 ## Highlights (4.0.0)
 

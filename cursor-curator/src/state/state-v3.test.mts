@@ -3,19 +3,32 @@ import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import { spawnSync } from "node:child_process";
-import { test } from "node:test";
+import { after, test } from "node:test";
 import { fileURLToPath } from "node:url";
 import {
   loadState,
   resolveStatePath,
   validateStateV3,
 } from "./objective-state.mjs";
+import { resetDatabaseCache } from "../db/connection.mjs";
+import { importStateJsonFile } from "../db/state-repository.mjs";
+import { seedObjectiveInDb } from "../db/test-helpers.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(__dirname, "../../..");
-const smokeJson = join(repoRoot, "docs/objectives/sample-cursor-smoke/state.json");
+const previousWorkspacePaths = process.env.WORKSPACE_FOLDER_PATHS;
+process.env.WORKSPACE_FOLDER_PATHS = repoRoot;
+const smokeJson = join(repoRoot, "cursor-curator/scripts/test/fixtures/sample-cursor-smoke/state.json");
 const yamlFixture = join(repoRoot, "cursor-curator/scripts/test/fixtures/runner-fixture/state.yaml");
 const migrateScript = join(repoRoot, "scripts/migrate-5.0.mts");
+
+after(() => {
+  if (previousWorkspacePaths === undefined) {
+    delete process.env.WORKSPACE_FOLDER_PATHS;
+  } else {
+    process.env.WORKSPACE_FOLDER_PATHS = previousWorkspacePaths;
+  }
+});
 
 function runnerFixtureV3() {
   return {
@@ -26,7 +39,7 @@ function runnerFixtureV3() {
       kind: "specific" as const,
       status: "active" as const,
       success_criteria: {
-        signal: "npm run check exits 0",
+        signal: "bun run check exits 0",
         cadence: "after worker slice",
         final_proof: "phase-c tests pass",
       },
@@ -81,11 +94,11 @@ function invalidActiveWorkerV3() {
       slug: "invalid-worker",
       status: "active" as const,
       success_criteria: {
-        signal: "npm run check exits 0",
+        signal: "bun run check exits 0",
         final_proof: "check-objective-state passes on fixture",
       },
       intake: {
-        completion_proof: "npm run check exits 0",
+        completion_proof: "bun run check exits 0",
       },
     },
     rules: {
@@ -142,33 +155,41 @@ test("validateStateV3 rejects wrong assignee for task type", () => {
   assert.ok(result.errors.some((error) => error.includes("assignee must be Scout")));
 });
 
-test("resolveStatePath uses state.json under objective directory", () => {
+test("resolveStatePath returns logical board path for seeded objective", () => {
   const dir = mkdtempSync(join(tmpdir(), "curator-state-"));
+  const workspaceRoot = join(dir, "workspace");
+  seedObjectiveInDb(workspaceRoot, runnerFixtureV3(), { slug: "runner-fixture" });
+  assert.equal(resolveStatePath("runner-fixture", workspaceRoot), "db:runner-fixture");
+});
+
+test("resolveStatePath rejects explicit state.json path", () => {
+  const dir = mkdtempSync(join(tmpdir(), "curator-json-"));
   const jsonPath = join(dir, "state.json");
-  writeFileSync(jsonPath, '{"version":3}');
-  assert.equal(resolveStatePath(dir), jsonPath);
+  writeFileSync(jsonPath, readFileSync(smokeJson, "utf8"));
+  assert.throws(() => resolveStatePath(jsonPath), /state\.json is not read at runtime/);
 });
 
 test("resolveStatePath rejects explicit state.yaml path", () => {
   const dir = mkdtempSync(join(tmpdir(), "curator-state-yaml-"));
   const yamlPath = join(dir, "state.yaml");
   writeFileSync(yamlPath, "version: 2\n");
-  assert.throws(() => resolveStatePath(yamlPath), /state\.yaml is deprecated/);
+  assert.throws(() => resolveStatePath(yamlPath), /state\.yaml is not read at runtime/);
 });
 
-test("loadState reads json without deprecation warning", () => {
-  const loaded = loadState(smokeJson);
-  assert.equal(loaded.format, "json");
+test("loadState reads database-backed objective", () => {
+  resetDatabaseCache();
+  importStateJsonFile(repoRoot, smokeJson, { dirPath: dirname(smokeJson) });
+  const loaded = loadState("sample-cursor-smoke", repoRoot);
+  assert.equal(loaded.format, "db");
   assert.equal(loaded.deprecatedYaml, false);
   assert.equal(loaded.validation.ok, true);
   assert.equal(loaded.validation.version, 3);
 });
 
-test("loadState rejects yaml-only objective directories", () => {
-  const dir = mkdtempSync(join(tmpdir(), "curator-yaml-"));
-  const yamlPath = join(dir, "state.yaml");
-  writeFileSync(yamlPath, readFileSync(yamlFixture, "utf8"));
-  assert.throws(() => loadState(dir), /No state\.json found/);
+test("loadState rejects objectives missing from database", () => {
+  const dir = mkdtempSync(join(tmpdir(), "curator-empty-"));
+  resetDatabaseCache();
+  assert.throws(() => loadState("missing-objective", dir), /Objective not found in database/);
 });
 
 test("migrate-5.0 dry-run reports conversion without writing", () => {
@@ -177,7 +198,7 @@ test("migrate-5.0 dry-run reports conversion without writing", () => {
 
   const result = spawnSync(
     process.execPath,
-    ["--import", "tsx", migrateScript, dir, "--dry-run"],
+    [migrateScript, dir, "--dry-run"],
     { cwd: repoRoot, encoding: "utf8" },
   );
 
@@ -191,8 +212,9 @@ test("validateStateV3 warns when parallel parent+child Workers exceed max_write_
     repoRoot,
     "cursor-curator/scripts/test/fixtures/parallel-plan/max-workers-blocked",
   );
-  const statePath = join(fixtureRoot, "state.json");
-  const loaded = loadState(statePath);
+  resetDatabaseCache();
+  importStateJsonFile(repoRoot, join(fixtureRoot, "state.json"), { dirPath: fixtureRoot });
+  const loaded = loadState("parallel-max-workers-blocked", repoRoot);
   assert.equal(loaded.validation.ok, true);
   assert.ok(
     loaded.validation.warnings.some((warning) => warning.includes("max_write_workers")),

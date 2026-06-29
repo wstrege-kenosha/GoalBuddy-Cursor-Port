@@ -37,6 +37,10 @@ import { createParallelPlan, formatPlan } from "../prompt/parallel-plan.mjs";
 import { buildUpdateReport, runCheckUpdate } from "./check-update.mjs";
 import { main as boardMain } from "../board/local-objective-board.mjs";
 import { runReinstallClean } from "../install/reinstall-clean.mjs";
+import { importLegacyObjectives, registerObjective } from "../db/state-repository.mjs";
+import { openDatabase } from "../db/connection.mjs";
+import { applyReceiptToState } from "../state/objective-state-write.mjs";
+import { resolveObjectiveSlug } from "../state/objective-state.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const skillRoot = resolve(__dirname, "../..");
@@ -122,7 +126,17 @@ async function main(): Promise<void> {
       runHub();
       break;
     case "check-state":
+    case "check-objective":
       runCheckState();
+      break;
+    case "apply-receipt":
+      runApplyReceipt();
+      break;
+    case "db":
+      runDbCommand(args[1] || "");
+      break;
+    case "register-objective":
+      runRegisterObjective();
       break;
     case "migrate":
       runMigrateCommand();
@@ -146,28 +160,31 @@ function usage(): void {
   console.log(`Cursor Curator for Cursor (port ${versionInfo.cursorPortVersion}, upstream ${versionInfo.upstreamVersion})
 
 Usage:
-  node dist/cli/curator.mjs [install] [--force] [--no-add-to-path]
+  bun dist/cli/curator.mjs [install] [--force] [--no-add-to-path]
   curator [install] [--force] [--no-add-to-path]   (after install-cli-bin)
-  node dist/cli/curator.mjs reinstall --clean [--json] [--no-add-to-path]
-  node dist/cli/curator.mjs reset
-  node dist/cli/curator.mjs doctor [--objective-ready] [--json]
-  node dist/cli/curator.mjs update [--json]
-  node dist/cli/curator.mjs check-update [--json]
-  node dist/cli/curator.mjs prompt <docs/objectives/slug> [--task T###] [--json]
-  node dist/cli/curator.mjs parallel-plan <docs/objectives/slug> [--json]
-  node dist/cli/curator.mjs receipt <file|json> [--role scout|approval_gate|worker] [--task T###] [--json]
-  node dist/cli/curator.mjs completion-check <docs/objectives/slug> [--json]
-  node dist/cli/curator.mjs check-state <docs/objectives/slug|state.json> [--json]
-  node dist/cli/curator.mjs resume <docs/objectives/slug> [--json]
-  node dist/cli/curator.mjs verify-receipt <docs/objectives/slug> [--task T###] [--receipt-file ...] [--json]
-  node dist/cli/curator.mjs blocked <docs/objectives/slug> [--json]
-  node dist/cli/curator.mjs misfire-audit <docs/objectives/slug> [--json]
-  node dist/cli/curator.mjs subobjective-rollup <docs/objectives/slug> [--json]
-  node dist/cli/curator.mjs stale [--days 7] [--json]
-  node dist/cli/curator.mjs hub [--json]
-  node dist/cli/curator.mjs board <docs/objectives/slug> [--host <host>] [--port <port>] [--once] [--json]
-  node dist/cli/curator.mjs migrate   (legacy removed — use scripts/migrate-5.0.mts at repo root)
-  node dist/cli/curator.mjs workspace register [--json]
+  bun dist/cli/curator.mjs reinstall --clean [--json] [--no-add-to-path]
+  bun dist/cli/curator.mjs reset
+  bun dist/cli/curator.mjs doctor [--objective-ready] [--json]
+  bun dist/cli/curator.mjs update [--json]
+  bun dist/cli/curator.mjs check-update [--json]
+  bun dist/cli/curator.mjs prompt <docs/objectives/slug> [--task T###] [--json]
+  bun dist/cli/curator.mjs parallel-plan <docs/objectives/slug> [--json]
+  bun dist/cli/curator.mjs receipt <file|json> [--role scout|approval_gate|worker] [--task T###] [--json]
+  bun dist/cli/curator.mjs completion-check <docs/objectives/slug> [--json]
+  bun dist/cli/curator.mjs check-objective <docs/objectives/slug> [--json]
+  bun dist/cli/curator.mjs apply-receipt <slug> [--receipt-file path] [--role worker] [--task T###] [--dry-run] [--json]
+  bun dist/cli/curator.mjs db migrate|import [--slug <slug>] [--json]
+  bun dist/cli/curator.mjs register-objective <slug> [--json]
+  bun dist/cli/curator.mjs resume <docs/objectives/slug> [--json]
+  bun dist/cli/curator.mjs verify-receipt <docs/objectives/slug> [--task T###] [--receipt-file ...] [--json]
+  bun dist/cli/curator.mjs blocked <docs/objectives/slug> [--json]
+  bun dist/cli/curator.mjs misfire-audit <docs/objectives/slug> [--json]
+  bun dist/cli/curator.mjs subobjective-rollup <docs/objectives/slug> [--json]
+  bun dist/cli/curator.mjs stale [--days 7] [--json]
+  bun dist/cli/curator.mjs hub [--json]
+  bun dist/cli/curator.mjs board <docs/objectives/slug> [--host <host>] [--port <port>] [--once] [--json]
+  bun dist/cli/curator.mjs migrate   (legacy removed — use scripts/migrate-5.0.mts at repo root)
+  bun dist/cli/curator.mjs workspace register [--json]
 
 Skill root: ${skillRoot}
 `);
@@ -213,13 +230,17 @@ function runInstall(): void {
   for (const entry of mcpResult.installed) {
     console.log(`MCP: ${entry.configPath}`);
   }
+  const workspaceRoot = projectRoots[0] || process.cwd();
+  if (existsSync(join(workspaceRoot, "docs", "objectives"))) {
+    console.log("Run `curator db import` once to migrate any legacy state.json files into curator.db.");
+  }
   console.log("Next: enable the cursor-curator MCP server in Cursor Settings → MCP, then /objective-prep and /objective.");
   console.log("User-level MCP (~/.cursor/mcp.json) works in every workspace; project .cursor/mcp.json is written for repos with docs/objectives/.");
 }
 
 function runWorkspace(subcommand: string): void {
   if (subcommand !== "register") {
-    console.error("Usage: node dist/cli/curator.mjs workspace register [--json]");
+    console.error("Usage: bun dist/cli/curator.mjs workspace register [--json]");
     process.exit(2);
   }
 
@@ -261,7 +282,7 @@ function runReset(): void {
 
 function runReinstall(): void {
   if (!hasFlag("--clean")) {
-    console.error("Usage: node dist/cli/curator.mjs reinstall --clean [--json] [--no-add-to-path]");
+    console.error("Usage: bun dist/cli/curator.mjs reinstall --clean [--json] [--no-add-to-path]");
     console.error("Removes installed skills under ~/.cursor/skills, re-copies from the clone, and re-runs install.");
     console.error("Does not delete the Cursor-Curator source tree in your clone.");
     process.exit(2);
@@ -283,9 +304,10 @@ async function runDoctor(): Promise<void> {
   if (existsSync(join(cwd, "docs", "objectives"))) {
     registerKnownWorkspace(cwd);
     ensureProjectMcpConfig(cwd, skillRoot);
+    openDatabase(cwd);
   }
 
-  checks.push(nodeVersionCheck());
+  checks.push(bunVersionCheck());
   checks.push(...requiredFilesCheck());
   checks.push(...installSurfacesCheck());
   checks.push(cliPathCheck());
@@ -307,15 +329,15 @@ async function runDoctor(): Promise<void> {
     for (const c of checks) {
       console.log(`${c.ok ? "ok" : "fail"} ${c.name}${c.detail ? `: ${c.detail}` : ""}`);
     }
-    if (!ok) console.error("\nDoctor found issues. Run: node dist/cli/curator.mjs install");
+    if (!ok) console.error("\nDoctor found issues. Run: bun dist/cli/curator.mjs install");
     if (goalReady && ok) console.log("\nGoal-ready: Cursor surfaces look good. Restart Cursor if Task subagents are missing.");
   }
   if (!ok) process.exit(1);
 }
 
-function nodeVersionCheck() {
-  const major = Number(process.versions.node.split(".")[0]);
-  return { name: "node>=18", ok: major >= 18, detail: process.versions.node };
+function bunVersionCheck() {
+  const version = process.versions.bun;
+  return { name: "bun-installed", ok: Boolean(version), detail: version ?? "bun not detected" };
 }
 
 function requiredFilesCheck() {
@@ -366,7 +388,7 @@ function cliPathCheck() {
   return {
     name: "cli:path",
     ok: onPath,
-    detail: onPath ? binDir : `From clone: npm run install:cursor (or add ${binDir} to PATH)`,
+    detail: onPath ? binDir : `From clone: bun run install:cursor (or add ${binDir} to PATH)`,
   };
 }
 
@@ -477,10 +499,10 @@ async function runUpdate(): Promise<void> {
     console.log(JSON.stringify({
       check: payload,
       skillRoot,
-      note: "Vendored dist lives in ~/.cursor/skills/cursor-curator. Re-clone upstream or run npm pack curator to refresh.",
+      note: "Vendored dist lives in ~/.cursor/skills/cursor-curator. Re-clone upstream or copy from a fresh clone to refresh.",
     }, null, 2));
   } else if (payload.update_available) {
-    console.log(`npm curator ${payload.latest_version} available (installed port tracks ${versionInfo.upstreamVersion}).`);
+    console.log(`cursor-curator ${payload.latest_version} available (installed port tracks ${versionInfo.upstreamVersion}).`);
     console.log("To refresh vendored files, re-run the port installer or copy from a fresh upstream clone.");
   } else {
     console.log(`Cursor Curator Cursor port is current with vendored upstream ${versionInfo.upstreamVersion}.`);
@@ -649,34 +671,121 @@ function runCompletionCheck(): void {
 
 function runCheckState(): void {
   const json = hasFlag("--json");
-  const pathValue = flagValue("--path");
-  const positional = args.slice(1).filter((arg) => !arg.startsWith("-") && arg !== "check-state");
-  let statePath = pathValue ? resolve(pathValue) : "";
-  if (!statePath && positional[0]) {
-    const resolved = resolve(positional[0]);
-    statePath = basename(resolved).toLowerCase() === "state.json"
-      ? resolved
-      : join(resolved, "state.json");
-  }
-  if (!statePath) {
-    try {
-      statePath = resolveBoardStatePath();
-    } catch {
-      console.error("Usage: curator check-state <docs/objectives/slug|state.json> [--json]");
-      process.exit(2);
-    }
-  }
-
-  const validation = validateObjectiveStateFile(statePath);
+  const positional = args.slice(1).filter((arg) => !arg.startsWith("-") && arg !== "check-state" && arg !== "check-objective");
+  const objectiveRef = positional[0] || positionalObjectivePath();
+  const validation = validateObjectiveStateFile(objectiveRef, process.cwd());
   if (json) {
-    console.log(JSON.stringify({ ...validation, state_path: statePath }, null, 2));
+    console.log(JSON.stringify(validation, null, 2));
   } else if (validation.ok) {
-    console.log(`State valid: ${statePath}`);
+    console.log(`State valid: ${validation.objective_slug} (${validation.board_path})`);
   } else {
-    console.error(`State invalid: ${statePath}`);
+    console.error(`State invalid: ${validation.objective_slug ?? objectiveRef}`);
     for (const error of validation.errors) console.error(`- ${error}`);
   }
   process.exit(validation.ok ? 0 : 1);
+}
+
+function runApplyReceipt(): void {
+  const json = hasFlag("--json");
+  const dryRun = hasFlag("--dry-run");
+  const role = flagValue("--role") || undefined;
+  const taskId = flagValue("--task") || undefined;
+  const receiptFile = flagValue("--receipt-file");
+  const positional = args.slice(1).filter((arg) => !arg.startsWith("-") && arg !== "apply-receipt");
+  const objectiveRef = positional[0];
+  if (!objectiveRef) {
+    console.error("Usage: bun dist/cli/curator.mjs apply-receipt <slug> [--receipt-file path] [--role worker] [--task T###] [--dry-run] [--json]");
+    process.exit(2);
+  }
+  let receiptInput: unknown = receiptFile ? readFileSync(resolve(receiptFile), "utf8") : positional[1];
+  if (!receiptInput) {
+    console.error("Receipt JSON or --receipt-file is required.");
+    process.exit(2);
+  }
+  if (typeof receiptInput === "string") {
+    const parsed = parseReceiptFromText(receiptInput);
+    receiptInput = parsed?.envelope ?? receiptInput;
+  }
+  const result = applyReceiptToState(objectiveRef, receiptInput, {
+    role,
+    expectedTaskId: taskId,
+    dryRun,
+    workspaceRoot: process.cwd(),
+  });
+  if (json) {
+    console.log(JSON.stringify(result, null, 2));
+  } else if (result.ok) {
+    console.log(`Receipt applied: ${result.objective_slug ?? objectiveRef}`);
+  } else {
+    for (const error of result.errors || []) console.error(error);
+  }
+  process.exit(result.ok ? 0 : 1);
+}
+
+function runDbCommand(subcommand: string): void {
+  const json = hasFlag("--json");
+  const workspaceRoot = process.cwd();
+  if (subcommand === "migrate") {
+    openDatabase(workspaceRoot);
+    const payload = { ok: true, db_path: join(workspaceRoot, ".cursor-curator", "curator.db") };
+    if (json) console.log(JSON.stringify(payload, null, 2));
+    else console.log(`Database migrated: ${payload.db_path}`);
+    return;
+  }
+  if (subcommand === "import") {
+    const slug = flagValue("--slug") || undefined;
+    const result = importLegacyObjectives(workspaceRoot, { slug });
+    if (json) console.log(JSON.stringify(result, null, 2));
+    else {
+      console.log(`Imported: ${result.imported.join(", ") || "(none)"}`);
+      if (result.skipped.length) console.log(`Skipped: ${result.skipped.join(", ")}`);
+      for (const error of result.errors) console.error(error);
+    }
+    process.exit(result.errors.length ? 1 : 0);
+  }
+  console.error("Usage: bun dist/cli/curator.mjs db migrate|import [--slug <slug>] [--json]");
+  process.exit(2);
+}
+
+function runRegisterObjective(): void {
+  const json = hasFlag("--json");
+  const workspaceRoot = process.cwd();
+  const positional = args.slice(1).filter((arg) => !arg.startsWith("-"));
+  const slug = positional[0];
+  if (!slug) {
+    console.error("Usage: bun dist/cli/curator.mjs register-objective <slug> [--json]");
+    process.exit(2);
+  }
+  try {
+    const loaded = registerObjective(workspaceRoot, slug);
+    const validation = validateObjectiveStateFile(slug, workspaceRoot);
+    const payload = {
+      ok: validation.ok,
+      objective_slug: loaded.slug,
+      board_path: loaded.boardPath,
+      state_path: loaded.boardPath,
+      objective_dir: loaded.dirPath,
+      db_path: join(workspaceRoot, ".cursor-curator", "curator.db"),
+      errors: validation.errors,
+      warnings: validation.warnings,
+    };
+    if (json) {
+      console.log(JSON.stringify(payload, null, 2));
+    } else if (validation.ok) {
+      console.log(`Registered objective: ${loaded.slug} (${loaded.boardPath})`);
+    } else {
+      for (const error of validation.errors) console.error(error);
+    }
+    process.exit(validation.ok ? 0 : 1);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (json) {
+      console.log(JSON.stringify({ ok: false, errors: [message] }, null, 2));
+    } else {
+      console.error(message);
+    }
+    process.exit(1);
+  }
 }
 
 function runStale(): void {
@@ -861,10 +970,7 @@ function runHub(): void {
 
 function resolveBoardStatePath(): string {
   const goal = positionalObjectivePath();
-  const resolved = resolve(goal);
-  const base = basename(resolved).toLowerCase();
-  if (base === "state.json") return resolved;
-  return join(resolved, "state.json");
+  return resolveObjectiveSlug(goal, process.cwd());
 }
 
 function flagValue(name: string): string {
@@ -889,13 +995,14 @@ function hasFlag(name: string): boolean {
   return args.includes(name);
 }
 
-function completionCheckResult(statePath: string) {
-  const result = checkCompletionReadiness(statePath);
-  const validation = validateObjectiveStateFile(statePath);
+function completionCheckResult(objectiveRef: string) {
+  const result = checkCompletionReadiness(objectiveRef, process.cwd());
+  const validation = validateObjectiveStateFile(objectiveRef, process.cwd());
   return {
     ...result,
     validation_ok: validation.ok,
-    state_path: statePath,
+    state_path: result.board_path,
+    board_path: result.board_path,
   };
 }
 

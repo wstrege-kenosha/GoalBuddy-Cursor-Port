@@ -1,18 +1,24 @@
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
-import { findBlockedTasksInText } from "../stale/objective-stale.mjs";
+import { loadState } from "../state/objective-state.mjs";
+import { logicalBoardPath } from "../db/connection.mjs";
+import { resolveWorkspaceForObjective } from "../mcp/path-utils.mjs";
+import type { StateV3Task } from "../schema/state-v3.js";
 
-export function listBlockedTasks(statePath: string) {
-  const resolved = resolve(statePath);
-  const text = readFileSync(resolved, "utf8");
-  const ids = findBlockedTasksInText(text);
-  return ids.map((id) => summarizeBlockedTask(text, id));
+export function listBlockedTasks(objectiveRef: string, workspaceRoot?: string) {
+  const root = workspaceRoot ?? resolveWorkspaceForObjective(objectiveRef);
+  const loaded = loadState(objectiveRef, root);
+  return loaded.state.tasks
+    .filter((task) => task.status === "blocked")
+    .map((task) => summarizeBlockedTask(task));
 }
 
-export function buildBlockedTriagePlan(statePath: string) {
-  const blocked = listBlockedTasks(statePath);
+export function buildBlockedTriagePlan(objectiveRef: string, workspaceRoot?: string) {
+  const root = workspaceRoot ?? resolveWorkspaceForObjective(objectiveRef);
+  const loaded = loadState(objectiveRef, root);
+  const blocked = listBlockedTasks(objectiveRef, root);
   return {
-    state_path: resolve(statePath),
+    objective_slug: loaded.slug,
+    board_path: loaded.boardPath,
+    state_path: loaded.boardPath,
     blocked_count: blocked.length,
     blocked_tasks: blocked,
     triage_steps: blocked.map((task) => buildTriageStep(task)),
@@ -21,15 +27,19 @@ export function buildBlockedTriagePlan(statePath: string) {
   };
 }
 
-function summarizeBlockedTask(text: string, taskId: string) {
-  const block = taskBlock(text, taskId) || "";
+function summarizeBlockedTask(task: StateV3Task) {
+  const receipt = task.receipt && typeof task.receipt === "object"
+    ? (task.receipt as Record<string, unknown>)
+    : {};
   return {
-    id: taskId,
-    type: taskScalar(block, "type"),
-    objective: taskScalar(block, "objective"),
-    receipt_summary: receiptScalar(block, "summary"),
-    stopped_because: receiptScalar(block, "stopped_because"),
-    remaining_blockers: receiptList(block, "remaining_blockers"),
+    id: task.id,
+    type: task.type,
+    objective: task.objective,
+    receipt_summary: typeof receipt.summary === "string" ? receipt.summary : null,
+    stopped_because: typeof receipt.stopped_because === "string" ? receipt.stopped_because : null,
+    remaining_blockers: Array.isArray(receipt.remaining_blockers)
+      ? receipt.remaining_blockers.map(String)
+      : [],
   };
 }
 
@@ -47,56 +57,4 @@ function buildTriageStep(task: ReturnType<typeof summarizeBlockedTask>) {
       "If blockers are owner-only, queue a PM task to document required input without stopping other safe local work.",
     ],
   };
-}
-
-function taskBlock(text: string, taskId: string): string | null {
-  const lines = text.split(/\r?\n/);
-  let start = -1;
-  for (let index = 0; index < lines.length; index += 1) {
-    if (new RegExp(`^\\s{2}-\\s+id:\\s*${taskId}\\s*$`).test(lines[index])) {
-      start = index;
-      break;
-    }
-  }
-  if (start === -1) return null;
-  const collected: string[] = [];
-  for (let index = start; index < lines.length; index += 1) {
-    if (index > start && /^\s{2}-\s+id:\s*T\d{3}\s*$/.test(lines[index])) break;
-    if (index > start && /^\S/.test(lines[index])) break;
-    collected.push(lines[index]);
-  }
-  return collected.join("\n");
-}
-
-function taskScalar(block: string, key: string): string | null {
-  const match = block.match(new RegExp(`^\\s{4}${key}:\\s*(.*?)\\s*$`, "m"));
-  return match ? clean(match[1]) : null;
-}
-
-function receiptScalar(block: string, key: string): string | null {
-  const match = block.match(new RegExp(`^\\s{6}${key}:\\s*(.*?)\\s*$`, "m"));
-  return match ? clean(match[1]) : null;
-}
-
-function receiptList(block: string, key: string): string[] {
-  const lines = block.split(/\r?\n/);
-  const items: string[] = [];
-  let inList = false;
-  for (const line of lines) {
-    if (new RegExp(`^\\s{6}${key}:\\s*$`).test(line)) {
-      inList = true;
-      continue;
-    }
-    if (inList && /^\s{6}-\s+/.test(line)) {
-      const item = clean(line.replace(/^\s{6}-\s+/, ""));
-      if (item) items.push(item);
-      continue;
-    }
-    if (inList && /^\s{4}\S/.test(line)) break;
-  }
-  return items;
-}
-
-function clean(value: unknown): string | null {
-  return String(value || "").replace(/#.*/, "").trim().replace(/^['"]|['"]$/g, "") || null;
 }

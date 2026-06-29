@@ -1,8 +1,10 @@
-import { existsSync, readFileSync } from "node:fs";
 import { basename, dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { misfireAuditStatus } from "../misfire/objective-misfire.mjs";
-import { isWeakProof } from "../state/objective-state.mjs";
+import { isWeakProof, loadState } from "../state/objective-state.mjs";
+import { resolveWorkspaceForObjective } from "../mcp/path-utils.mjs";
+import { logicalBoardPath } from "../db/connection.mjs";
+import { findObjectiveSlugByDirPath, resolveChildObjectiveSlug } from "../db/state-repository.mjs";
 
 const ROLE_DEFAULTS = {
   scout: { agent: "objective_scout", reasoning: "low", sandbox: "read-only" },
@@ -19,6 +21,7 @@ export interface RenderTaskPromptOptions {
   taskId?: string;
   json?: boolean;
   parallelPlan?: boolean;
+  workspaceRoot?: string;
 }
 
 export interface BoardDocument {
@@ -76,8 +79,9 @@ if (isDirectRun()) {
 }
 
 export function renderTaskPrompt(options: RenderTaskPromptOptions) {
-  const boardPath = resolveBoardPath(options);
-  const board = loadBoard(boardPath);
+  const workspaceRoot = options.workspaceRoot ? resolve(options.workspaceRoot) : undefined;
+  const boardPath = resolveBoardPath(options, workspaceRoot);
+  const board = loadBoard(boardPath, workspaceRoot);
   const task = selectTask(board, options.taskId);
   const role = normalizeRole(task.type);
   const defaults = ROLE_DEFAULTS[role] || ROLE_DEFAULTS.pm;
@@ -95,7 +99,7 @@ export function renderTaskPrompt(options: RenderTaskPromptOptions) {
         sandbox: defaults.sandbox,
         fork_context_allowed: role !== "worker",
         board_path: board.path,
-        child_board_paths: childBoardPaths(board),
+        child_board_paths: childBoardPaths(board, workspaceRoot),
         goal_success_criteria: (board.objective.success_criteria as unknown) || null,
         slice_policy: board.document.rules?.slice_policy || null,
         dirty_fingerprint: board.document.checks?.dirty_fingerprint ?? null,
@@ -146,37 +150,49 @@ export function parseArgs(args: string[]): RenderTaskPromptOptions {
     }
   }
   if (!options.objectiveRoot && !options.boardPath) {
-    throw new Error("Usage: curator prompt <goal-root> [--task T###] [--board path/to/state.json]");
+    throw new Error("Usage: curator prompt <goal-root> [--task T###] [--board db:<slug>]");
   }
   return options;
 }
 
-export function loadBoard(boardPath: string): LoadedBoard {
-  if (!existsSync(boardPath)) throw new Error(`state file not found: ${boardPath}`);
-  const text = readFileSync(boardPath, "utf8");
-  const document = JSON.parse(text) as BoardDocument;
-  const version = Number(document.version);
-  if (!document || version !== 3) {
-    throw new Error(`unsupported Cursor Curator state version in ${boardPath} (expected version 3)`);
-  }
-  if (!Array.isArray(document.tasks)) throw new Error(`state file has no tasks: ${boardPath}`);
+export function loadBoard(boardPath: string, workspaceRoot?: string): LoadedBoard {
+  const root = workspaceRoot ?? resolveWorkspaceForObjective(boardPath);
+  const loaded = loadState(boardPath, root);
+  const document = loaded.state as unknown as BoardDocument;
   return {
-    path: boardPath,
-    root: dirname(boardPath),
+    path: loaded.boardPath,
+    root: loaded.objectiveDir,
     document,
-    tasks: document.tasks,
+    tasks: document.tasks || [],
     objective: document.objective || {},
     activeTask: document.active_task ?? "",
   };
 }
 
-export function resolveBoardPath(options: RenderTaskPromptOptions): string {
+export function resolveBoardPath(
+  options: RenderTaskPromptOptions,
+  workspaceRoot?: string,
+): string {
   const candidate = options.boardPath || options.objectiveRoot;
   if (!candidate) throw new Error("Missing objective root or board path.");
+  if (candidate.startsWith("db:")) {
+    return candidate;
+  }
   const resolved = resolve(candidate);
   const base = basename(resolved).toLowerCase();
-  if (base === "state.json") return resolved;
-  return resolve(resolved, "state.json");
+  if (base === "state.json") {
+    return logicalBoardPath(basename(dirname(resolved)));
+  }
+  if (resolved.startsWith("db:")) {
+    return resolved;
+  }
+  if (workspaceRoot) {
+    const slug = findObjectiveSlugByDirPath(workspaceRoot, resolved);
+    if (slug) {
+      return logicalBoardPath(slug);
+    }
+  }
+  return logicalBoardPath(basename(resolved));
 }
 
 export function selectTask(board: LoadedBoard, taskId = ""): TaskRow {
@@ -197,11 +213,23 @@ export function selectTask(board: LoadedBoard, taskId = ""): TaskRow {
   return task;
 }
 
-export function childBoardPaths(board: LoadedBoard): string[] {
+export function childBoardPaths(board: LoadedBoard, workspaceRoot?: string): string[] {
+  const ws = workspaceRoot ?? board.root;
   return board.tasks
     .map((task) => task?.subobjective?.path)
     .filter(Boolean)
-    .map((childPath) => resolve(board.root, String(childPath)));
+    .map((childPath) => {
+      const slug = resolveChildObjectiveSlug(ws, board.root, String(childPath));
+      if (slug) {
+        return logicalBoardPath(slug);
+      }
+      const normalized = String(childPath).replace(/\\/g, "/");
+      const fallbackSlug = normalized
+        .replace(/\/state\.json$/, "")
+        .split("/")
+        .pop();
+      return fallbackSlug ? logicalBoardPath(fallbackSlug) : resolve(board.root, normalized);
+    });
 }
 
 function promptWarnings(board: LoadedBoard, task: TaskRow): string[] {
@@ -330,7 +358,7 @@ function receiptSchema(role: RoleKey) {
     return {
       result: "done | blocked",
       task_id: "<T###>",
-      board_path: "<path to state.json>",
+      board_path: "<db:slug or logical board path>",
       changed_files: [],
       commands: [],
       summary: "<=120 words>",
@@ -343,7 +371,7 @@ function receiptSchema(role: RoleKey) {
     return {
       result: "done | blocked",
       task_id: "<T###>",
-      board_path: "<path to state.json>",
+      board_path: "<db:slug or logical board path>",
       decision: "approved | rejected | approve_subobjective | reject_subobjective | not_complete | complete",
       full_outcome_complete: false,
       rationale: "<=120 words>",
@@ -358,7 +386,7 @@ function receiptSchema(role: RoleKey) {
   return {
     result: "done | blocked",
     task_id: "<T###>",
-    board_path: "<path to state.json>",
+    board_path: "db:<slug>",
     summary: "<=120 words>",
     evidence: [],
     facts: [],

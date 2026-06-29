@@ -8,10 +8,10 @@ import {
 
 test("crossCheckWorkerReceipt matches verify commands with pass status", () => {
   const result = crossCheckWorkerReceipt(
-    { id: "T003", verify: ["npm run check"] },
+    { id: "T003", verify: ["bun run check"] },
     {
       task_id: "T003",
-      commands: [{ cmd: "npm run check", status: "pass" }],
+      commands: [{ cmd: "bun run check", status: "pass" }],
     },
   );
   assert.equal(result.ok, true);
@@ -20,7 +20,7 @@ test("crossCheckWorkerReceipt matches verify commands with pass status", () => {
 
 test("crossCheckWorkerReceipt fails when verify command missing", () => {
   const result = crossCheckWorkerReceipt(
-    { id: "T003", verify: ["npm run check"] },
+    { id: "T003", verify: ["bun run check"] },
     { task_id: "T003", commands: [] },
   );
   assert.equal(result.ok, false);
@@ -34,22 +34,22 @@ test("readLastVerificationFromState parses JSON checks.last_verification", () =>
       last_verification: {
         result: "pass",
         task: "T003",
-        commands: [{ cmd: "npm run check", status: "pass" }],
+        commands: [{ cmd: "bun run check", status: "pass" }],
       },
     },
   });
   const parsed = readLastVerificationFromState(text);
   assert.equal(parsed?.result, "pass");
   assert.equal(parsed?.task, "T003");
-  assert.equal(parsed?.commands[0].cmd, "npm run check");
+  assert.equal(parsed?.commands[0].cmd, "bun run check");
 });
 
 test("verifyWorkerReceiptForTask returns structured last_verification patch", () => {
   const result = verifyWorkerReceiptForTask(
-    { id: "T003", verify: ["npm run check"] },
+    { id: "T003", verify: ["bun run check"] },
     {
       task_id: "T003",
-      commands: [{ cmd: "npm run check", status: "pass" }],
+      commands: [{ cmd: "bun run check", status: "pass" }],
     },
   );
   assert.equal(result.ok, true);

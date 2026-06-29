@@ -154,6 +154,36 @@ export function formatLastVerificationYaml(patch: LastVerificationPatch): string
   return lines.join("\n");
 }
 
+export function readLastVerificationFromLoadedState(
+  state: {
+    checks?: {
+      last_verification?: {
+        result?: string | null;
+        task?: string | null;
+        commands?: Array<{ cmd?: string; status?: string }>;
+      };
+    };
+  } | null | undefined,
+): {
+  result: string | null;
+  task: string | null;
+  commands: Array<{ cmd: string; status: string }>;
+} | null {
+  const lastVerification = state?.checks?.last_verification;
+  if (!lastVerification || typeof lastVerification !== "object") return null;
+  const commands = (lastVerification.commands || [])
+    .map((entry) => ({
+      cmd: String(entry.cmd || ""),
+      status: String(entry.status || ""),
+    }))
+    .filter((entry) => entry.cmd);
+  return {
+    result: lastVerification.result ?? null,
+    task: lastVerification.task ?? null,
+    commands,
+  };
+}
+
 export function readLastVerificationFromState(text: string | null | undefined): {
   result: string | null;
   task: string | null;
@@ -164,28 +194,8 @@ export function readLastVerificationFromState(text: string | null | undefined): 
   if (!trimmed.startsWith("{")) return null;
 
   try {
-    const state = JSON.parse(trimmed) as {
-      checks?: {
-        last_verification?: {
-          result?: string | null;
-          task?: string | null;
-          commands?: Array<{ cmd?: string; status?: string }>;
-        };
-      };
-    };
-    const lastVerification = state.checks?.last_verification;
-    if (!lastVerification) return null;
-    const commands = (lastVerification.commands || [])
-      .map((entry) => ({
-        cmd: String(entry.cmd || ""),
-        status: String(entry.status || ""),
-      }))
-      .filter((entry) => entry.cmd);
-    return {
-      result: lastVerification.result ?? null,
-      task: lastVerification.task ?? null,
-      commands,
-    };
+    const state = JSON.parse(trimmed) as Parameters<typeof readLastVerificationFromLoadedState>[0];
+    return readLastVerificationFromLoadedState(state);
   } catch {
     return null;
   }

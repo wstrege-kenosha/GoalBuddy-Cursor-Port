@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 function resolveBoardFragmentPath(name: string): string {
   const path = join(dirname(fileURLToPath(import.meta.url)), "fragments", name);
   if (!existsSync(path)) {
-    throw new Error(`Missing board fragment: ${name} at ${path}. Run npm run build.`);
+    throw new Error(`Missing board fragment: ${name} at ${path}. Run bun run build.`);
   }
   return path;
 }

@@ -10,16 +10,16 @@ The user message after this command is the objective path or charter reference, 
 Follow docs/objectives/<slug>/objective.md.
 ```
 
-Resolve `docs/objectives/<slug>/state.json` relative to the workspace root.
+Resolve `docs/objectives/<slug>/` and the workspace database `.cursor-curator/curator.db`.
 
 ## MCP required (Phase B)
 
-Use the **cursor-curator** MCP server for every turn. Do not advance `state.json` or spawn Task subagents until the mandatory tool sequence below succeeds.
+Use the **cursor-curator** MCP server for every turn. Do not advance board state or spawn Task subagents until the mandatory tool sequence below succeeds.
 
 If MCP tools are unavailable, stop and tell the user to run:
 
 ```bash
-node ~/.cursor/skills/cursor-curator/dist/cli/curator.mjs install
+bun ~/.cursor/skills/cursor-curator/dist/cli/curator.mjs install
 ```
 
 Then enable the `curator` server in Cursor MCP settings and retry.
@@ -48,10 +48,9 @@ Then enable the `curator` server in Cursor MCP settings and retry.
    - For Worker + `result: done`, **verify_worker_receipt** for that board's `task_id` — cross-check `receipt.commands` against `task.verify`; PM writes `checks.last_verification` on **that** board only.
    - Do not advance a board's `active_task` on partial batch failure; treat missing or invalid receipts as blocked for that board.
 7. Write receipt notes under the matching objective's `notes/<task_id>-<role>.md` when useful.
-8. Update each affected `state.json` (PM-owned):
-   - Set task `receipt` summary and `status` (done | blocked) on the board named in the receipt's `board_path`
-   - Advance `active_task` on that board when done and rules allow
-   - Apply Approval Gate `required_board_updates` as PM-owned edits
+8. **Write state via MCP** (PM-owned; do not edit JSON files):
+   - **apply_receipt** for each validated receipt (`objective`, `role`, `task_id`, receipt JSON)
+   - **patch_task** / **patch_objective** for Approval Gate `required_board_updates`
    - On blocked tasks, use **blocked_tasks** `{ "objective": "<slug>", "triage": true }` for triage hints
 9. **validate_state** again after substantial state changes. If `ok` is false, **stop** and fix before continuing.
 10. **append_session_note** `{ "objective_slug": "<slug>", "task_id": "<T###>", "summary": "<one line>" }` for session handoff.
@@ -74,7 +73,7 @@ Only mark full outcome complete when `ready` is true and Approval Gate/PM audit 
 If Task fails with unknown `subagent_type`:
 
 ```bash
-node ~/.cursor/skills/cursor-curator/dist/cli/curator.mjs install
+bun ~/.cursor/skills/cursor-curator/dist/cli/curator.mjs install
 ```
 
 Then ask the user to restart Cursor and retry.

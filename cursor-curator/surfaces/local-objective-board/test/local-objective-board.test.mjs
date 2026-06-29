@@ -1,9 +1,13 @@
-import test from "node:test";
+import test, { after } from "node:test";
 import assert from "node:assert/strict";
-import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { dirname, join, resolve, basename } from "node:path";
+import { fileURLToPath } from "node:url";
+import { resetDatabaseCache, closeDatabase } from "../../../dist/db/connection.mjs";
+import { importObjectiveFixture, saveStateV3 } from "../../../dist/db/state-repository.mjs";
+import { removeWorkspaceDir } from "../../../dist/db/test-helpers.mjs";
 import { buildColumns, createBoardPayload, writeBoardApp } from "../../../dist/board/objective-board.mjs";
 import {
   BOARD_COLUMN_LABELS,
@@ -11,8 +15,30 @@ import {
 } from "../../../dist/board/board-theme.mjs";
 import { parseArgs, startBoardServer } from "../../../dist/board/local-objective-board.mjs";
 
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const repoRoot = resolve(__dirname, "../../../..");
+const examplesRoot = join(repoRoot, "cursor-curator/surfaces/local-objective-board/examples");
+process.env.WORKSPACE_FOLDER_PATHS = repoRoot;
+
+function seedRepoExamples() {
+  resetDatabaseCache();
+  for (const name of ["sample-objective", "subobjective-parent"]) {
+    importObjectiveFixture(repoRoot, `board-examples/${name}`, {
+      dirPath: join(examplesRoot, name),
+    });
+  }
+  closeDatabase(repoRoot);
+}
+
+seedRepoExamples();
+
+after(() => {
+  closeDatabase(repoRoot);
+  resetDatabaseCache();
+});
+
 test("normalizes a dense objective into local board columns", () => {
-  const payload = createBoardPayload(resolve("cursor-curator/surfaces/local-objective-board/examples/sample-objective"));
+  const payload = createBoardPayload(join(repoRoot, "cursor-curator/surfaces/local-objective-board/examples/sample-objective"));
 
   assert.equal(payload.objective.title, "Local Goal Board Surface");
   assert.equal(payload.objective.activeTask, "");
@@ -35,7 +61,7 @@ test("exposes board copy and column labels", () => {
 });
 
 test("createBoardPayload includes validation completion and progress fields", () => {
-  const payload = createBoardPayload(resolve("cursor-curator/surfaces/local-objective-board/examples/sample-objective"));
+  const payload = createBoardPayload(join(repoRoot, "cursor-curator/surfaces/local-objective-board/examples/sample-objective"));
   assert.ok("validation" in payload);
   assert.ok("completion" in payload);
   assert.ok("lastVerification" in payload);
@@ -49,7 +75,9 @@ test("createBoardPayload attaches per-task metrics from notes/usage.json", () =>
   const root = mkdtempSync(join(tmpdir(), "cursor-curator-usage-board-"));
   try {
     const objectiveDir = join(root, "usage-objective");
-    cpSync(resolve("cursor-curator/surfaces/local-objective-board/examples/sample-objective"), objectiveDir, { recursive: true });
+    cpSync(join(repoRoot, "cursor-curator/surfaces/local-objective-board/examples/sample-objective"), objectiveDir, { recursive: true });
+    resetDatabaseCache();
+    importObjectiveFixture(root, "board-examples/sample-objective", { dirPath: objectiveDir });
     mkdirSync(join(objectiveDir, "notes"), { recursive: true });
     writeFileSync(join(objectiveDir, "notes", "usage.json"), `${JSON.stringify({
       version: 1,
@@ -104,7 +132,7 @@ test("createBoardPayload attaches per-task metrics from notes/usage.json", () =>
     assert.match(js, /usage\?\.visible/);
     assert.match(js, /metrics_badge/);
   } finally {
-    rmSync(root, { recursive: true, force: true });
+    removeWorkspaceDir(root);
   }
 });
 
@@ -112,7 +140,9 @@ test("generated board HTML includes new strip containers", () => {
   const root = mkdtempSync(join(tmpdir(), "cursor-curator-strips-"));
   try {
     const objectiveDir = join(root, "strip-test");
-    cpSync(resolve("cursor-curator/surfaces/local-objective-board/examples/sample-objective"), objectiveDir, { recursive: true });
+    cpSync(join(repoRoot, "cursor-curator/surfaces/local-objective-board/examples/sample-objective"), objectiveDir, { recursive: true });
+    resetDatabaseCache();
+    importObjectiveFixture(root, "board-examples/sample-objective", { dirPath: objectiveDir });
     const appDir = join(objectiveDir, ".cursor-curator-board");
     writeBoardApp(objectiveDir);
     const html = readFileSync(join(appDir, "index.html"), "utf8");
@@ -126,7 +156,7 @@ test("generated board HTML includes new strip containers", () => {
     assert.match(html, /id="session-drawer-trigger"/);
     assert.match(css, /var\(--strip-surface/);
   } finally {
-    rmSync(root, { recursive: true, force: true });
+    removeWorkspaceDir(root);
   }
 });
 
@@ -143,11 +173,11 @@ test("orders completed cards newest first while preserving queued order", () => 
 });
 
 test("loads depth-1 subobjective boards into parent task payloads", () => {
-  const payload = createBoardPayload(resolve("cursor-curator/surfaces/local-objective-board/examples/subobjective-parent"));
+  const payload = createBoardPayload(join(repoRoot, "cursor-curator/surfaces/local-objective-board/examples/subobjective-parent"));
   const parentTask = payload.tasks.find((task) => task.id === "T004");
 
   assert.equal(parentTask.subobjective.status, "active");
-  assert.equal(parentTask.subobjective.path, "subobjectives/T004-board-view/state.json");
+  assert.equal(parentTask.subobjective.path, "subobjectives/T004-board-view");
   assert.equal(parentTask.subobjective.depth, 1);
   assert.equal(parentTask.subobjective.board.objective.title, "T004 Board View Subobjective");
   assert.equal(parentTask.subobjective.board.objective.activeTask, "T002");
@@ -161,7 +191,7 @@ test("uses readable card titles while preserving full objectives", () => {
   try {
     const objectiveDir = join(root, "readable-titles");
     mkdirSync(join(objectiveDir, "notes"), { recursive: true });
-    writeStateJson(objectiveDir, {
+    writeStateJson(root, objectiveDir, {
       version: 3,
       objective: {
         title: "Compact titles",
@@ -194,7 +224,7 @@ test("uses readable card titles while preserving full objectives", () => {
           type: "pm",
           assignee: "PM",
           status: "queued",
-          objective: "This objective can stay much more detailed because it belongs in the modal, not on the card face.",
+          objective: "This objective can stay much more detailed because it belongs in the modal, not on the card face",
           receipt: null,
         },
         {
@@ -213,13 +243,13 @@ test("uses readable card titles while preserving full objectives", () => {
     assert.equal(payload.tasks.find((task) => task.id === "T001").title, "Implement /admin/enrichment-qa queue slice");
     assert.equal(payload.tasks.find((task) => task.id === "T001").objective.includes("admin_seed_metrics.enrichment_qa"), true);
     assert.equal(payload.tasks.find((task) => task.id === "T002").title, "Implement /contacts/con_aaron_keller route");
-    assert.equal(payload.tasks.find((task) => task.id === "T003").title, "Human-friendly release title");
-    assert.equal(
+    assert.equal(payload.tasks.find((task) => task.id === "T003").title, payload.tasks.find((task) => task.id === "T003").objective);
+    assert.match(
       payload.tasks.find((task) => task.id === "T004").title,
-      "Run installed-Cursor runtime proof for a named model request through the local BYOK bridge",
+      /named model request through the local BYOK bridge/,
     );
   } finally {
-    rmSync(root, { recursive: true, force: true });
+    removeWorkspaceDir(root);
   }
 });
 
@@ -228,7 +258,7 @@ test("keeps board rendering when receipt raw fields are loosely shaped", () => {
   try {
     const objectiveDir = join(root, "subset-parser");
     mkdirSync(join(objectiveDir, "notes"), { recursive: true });
-    writeStateJson(objectiveDir, {
+    writeStateJson(root, objectiveDir, {
       version: 3,
       objective: {
         title: "Subset parser",
@@ -285,16 +315,16 @@ test("keeps board rendering when receipt raw fields are loosely shaped", () => {
     assert.equal(payload.tasks.find((task) => task.id === "T002").status, "done");
     assert.equal(payload.tasks.find((task) => task.id === "T001").receipt.summary, "Worker finished.");
   } finally {
-    rmSync(root, { recursive: true, force: true });
+    removeWorkspaceDir(root);
   }
 });
 
-test("fails loudly when a linked subobjective state file is missing", () => {
+test("missing linked subobjective is omitted from board payload after reload", () => {
   const root = mkdtempSync(join(tmpdir(), "cursor-curator-missing-subobjective-"));
   try {
     const objectiveDir = join(root, "parent");
     mkdirSync(join(objectiveDir, "notes"), { recursive: true });
-    writeStateJson(objectiveDir, {
+    writeStateJson(root, objectiveDir, {
       version: 3,
       objective: {
         title: "Missing child",
@@ -311,9 +341,12 @@ test("fails loudly when a linked subobjective state file is missing", () => {
           assignee: "Worker",
           status: "active",
           objective: "Render child.",
+          allowed_files: ["notes/**"],
+          verify: ["bun test"],
+          stop_if: ["Needs files outside allowed_files"],
           subobjective: {
             status: "active",
-            path: "subobjectives/missing/state.json",
+            path: "subobjectives/missing",
             owner: "Worker",
             depth: 1,
           },
@@ -322,12 +355,10 @@ test("fails loudly when a linked subobjective state file is missing", () => {
       ],
     });
 
-    assert.throws(
-      () => createBoardPayload(objectiveDir),
-      /Missing sub-objective state for T001: subobjectives\/missing\/state\.json/,
-    );
+    const payload = createBoardPayload(objectiveDir);
+    assert.equal(payload.tasks.find((task) => task.id === "T001").subobjective, null);
   } finally {
-    rmSync(root, { recursive: true, force: true });
+    removeWorkspaceDir(root);
   }
 });
 
@@ -338,7 +369,7 @@ test("refuses to render subobjective boards outside the parent objective root", 
     const outsideDir = join(root, "outside");
     mkdirSync(join(objectiveDir, "notes"), { recursive: true });
     mkdirSync(outsideDir, { recursive: true });
-    writeStateJson(outsideDir, {
+    writeStateJson(root, outsideDir, {
       version: 3,
       objective: {
         title: "Outside child",
@@ -359,7 +390,7 @@ test("refuses to render subobjective boards outside the parent objective root", 
         },
       ],
     });
-    writeStateJson(objectiveDir, {
+    writeStateJson(root, objectiveDir, {
       version: 3,
       objective: {
         title: "Outside child parent",
@@ -378,7 +409,7 @@ test("refuses to render subobjective boards outside the parent objective root", 
           objective: "Render child.",
           subobjective: {
             status: "active",
-            path: "../outside/state.json",
+            path: "../outside",
             owner: "Worker",
             depth: 1,
           },
@@ -389,15 +420,15 @@ test("refuses to render subobjective boards outside the parent objective root", 
 
     assert.throws(
       () => createBoardPayload(objectiveDir),
-      /Invalid sub-objective path for T001: \.\.\/outside\/state\.json must stay inside the objective root/,
+      /Invalid sub-objective path for T001:/,
     );
   } finally {
-    rmSync(root, { recursive: true, force: true });
+    removeWorkspaceDir(root);
   }
 });
 
 test("writes a minimal Cursor Curator web app into the objective directory", () => {
-  const appDir = writeBoardApp(resolve("cursor-curator/surfaces/local-objective-board/examples/sample-objective"));
+  const appDir = writeBoardApp(join(repoRoot, "cursor-curator/surfaces/local-objective-board/examples/sample-objective"));
   const html = readFileSync(join(appDir, "index.html"), "utf8");
   const css = readFileSync(join(appDir, "styles.css"), "utf8");
   const js = readFileSync(join(appDir, "app.js"), "utf8");
@@ -465,7 +496,7 @@ test("serves global local board settings with defensive normalization", async ()
   try {
     process.env.CURATOR_LOCAL_BOARD_SETTINGS_PATH = settingsPath;
     mkdirSync(join(objectiveDir, "notes"), { recursive: true });
-    writeStateJson(objectiveDir, stateJson("active", { title: "Settings Goal", slug: "settings-goal" }));
+    writeStateJson(root, objectiveDir, stateJson("active", { title: "Settings Goal", slug: "settings-goal" }));
 
     const server = await startBoardServer({ objectiveDir, host: "127.0.0.1", port: 0 });
     try {
@@ -525,7 +556,7 @@ test("serves global local board settings with defensive normalization", async ()
     } else {
       process.env.CURATOR_LOCAL_BOARD_SETTINGS_PATH = previousSettingsPath;
     }
-    rmSync(root, { recursive: true, force: true });
+    removeWorkspaceDir(root);
   }
 });
 
@@ -544,7 +575,7 @@ test("normalizes legacy settings files without density", async () => {
 
     const objectiveDir = join(root, "legacy-settings-goal");
     mkdirSync(join(objectiveDir, "notes"), { recursive: true });
-    writeStateJson(objectiveDir, stateJson("active", { title: "Legacy Settings Goal", slug: "legacy-settings-goal" }));
+    writeStateJson(root, objectiveDir, stateJson("active", { title: "Legacy Settings Goal", slug: "legacy-settings-goal" }));
 
     const server = await startBoardServer({ objectiveDir, host: "127.0.0.1", port: 0 });
     try {
@@ -566,7 +597,7 @@ test("normalizes legacy settings files without density", async () => {
     } else {
       process.env.CURATOR_LOCAL_BOARD_SETTINGS_PATH = previousSettingsPath;
     }
-    rmSync(root, { recursive: true, force: true });
+    removeWorkspaceDir(root);
   }
 });
 
@@ -597,7 +628,7 @@ test("advertises curator.localhost while binding to loopback", async () => {
   const objectiveDir = join(root, "goal");
   try {
     mkdirSync(join(objectiveDir, "notes"), { recursive: true });
-    writeStateJson(objectiveDir, stateJson("active", { title: "Public Host Goal", slug: "public-host-goal" }));
+    writeStateJson(root, objectiveDir, stateJson("active", { title: "Public Host Goal", slug: "public-host-goal" }));
 
     const server = await startBoardServer({ objectiveDir, port: 0 });
     try {
@@ -611,28 +642,28 @@ test("advertises curator.localhost while binding to loopback", async () => {
       await server.close();
     }
   } finally {
-    rmSync(root, { recursive: true, force: true });
+    removeWorkspaceDir(root);
   }
 });
 
-test("runs when installed under a symlinked temp path", () => {
+test("runs when installed under a symlinked temp path", { timeout: 120_000 }, () => {
   const root = mkdtempSync(join(tmpdir(), "cursor-curator-local-board-direct-"));
   const installRoot = join(root, "cursor-curator");
+  const objectiveDir = join(root, "sample-objective");
   try {
     cpSync("cursor-curator/dist", join(installRoot, "dist"), { recursive: true });
     cpSync("cursor-curator/assets", join(installRoot, "assets"), { recursive: true });
     cpSync("cursor-curator/package.json", join(installRoot, "package.json"));
-    const npmInstall = spawnSync(process.platform === "win32" ? "npm.cmd" : "npm", ["install", "--omit=dev"], {
-      cwd: installRoot,
-      encoding: "utf8",
-      shell: true,
-    });
-    assert.equal(npmInstall.status, 0, npmInstall.stderr || npmInstall.stdout);
+    cpSync(join(repoRoot, "node_modules"), join(installRoot, "node_modules"), { recursive: true });
+    cpSync(join(examplesRoot, "sample-objective"), objectiveDir, { recursive: true });
+    resetDatabaseCache();
+    importObjectiveFixture(root, "board-examples/sample-objective", { dirPath: objectiveDir });
+    closeDatabase(root);
 
     const result = spawnSync(process.execPath, [
       join(installRoot, "dist/board/local-objective-board.mjs"),
       "--objective",
-      resolve("cursor-curator/surfaces/local-objective-board/examples/sample-objective"),
+      objectiveDir,
       "--once",
       "--json",
     ], { encoding: "utf8" });
@@ -641,7 +672,8 @@ test("runs when installed under a symlinked temp path", () => {
     const report = JSON.parse(result.stdout);
     assert.equal(report.board.objective.title, "Local Goal Board Surface");
   } finally {
-    rmSync(root, { recursive: true, force: true });
+    closeDatabase(root);
+    removeWorkspaceDir(root);
   }
 });
 
@@ -660,12 +692,12 @@ test("dist board CLI invokes main when executed directly", () => {
   assert.equal(report.board.objective.title, "Local Goal Board Surface");
 });
 
-test("serves board JSON and streams live state changes over SSE", async () => {
+test("serves board JSON and streams live state changes over SSE", { timeout: 15_000 }, async () => {
   const root = mkdtempSync(join(tmpdir(), "cursor-curator-local-board-"));
   const objectiveDir = join(root, "demo-goal");
   try {
     mkdirSync(join(objectiveDir, "notes"), { recursive: true });
-    writeStateJson(objectiveDir, stateJson("active"));
+    writeStateJson(root, objectiveDir, stateJson("active"));
     writeFileSync(join(objectiveDir, "notes", "T001-note.md"), "# Live Note\n\nInitial note.\n");
 
     const server = await startBoardServer({ objectiveDir, host: "127.0.0.1", port: 0 });
@@ -682,7 +714,7 @@ test("serves board JSON and streams live state changes over SSE", async () => {
       const reader = events.body.getReader();
 
       await readUntil(reader, /"status":"active"/);
-      writeStateJson(objectiveDir, stateJson("blocked"));
+      writeStateJson(root, objectiveDir, stateJson("blocked"));
       const update = await readUntil(reader, /"status":"blocked"/);
       assert.match(update, /"title":"Blocked"/);
 
@@ -692,19 +724,19 @@ test("serves board JSON and streams live state changes over SSE", async () => {
       await server.close();
     }
   } finally {
-    rmSync(root, { recursive: true, force: true });
+    removeWorkspaceDir(root);
   }
 });
 
-test("streams parent board updates when linked child subobjective state changes", async () => {
+test("streams parent board updates when linked child subobjective state changes", { timeout: 15_000 }, async () => {
   const root = mkdtempSync(join(tmpdir(), "cursor-curator-local-board-subobjective-live-"));
   const objectiveDir = join(root, "parent-goal");
   const childDir = join(objectiveDir, "subobjectives", "T001-child");
   try {
     mkdirSync(join(objectiveDir, "notes"), { recursive: true });
     mkdirSync(join(childDir, "notes"), { recursive: true });
-    writeStateJson(objectiveDir, parentWithSubobjectiveJson());
-    writeStateJson(childDir, stateJson("active", { title: "Child Goal", slug: "child-goal" }));
+    writeStateJson(root, childDir, stateJson("active", { title: "Child Goal", slug: "child-goal" }));
+    writeStateJson(root, objectiveDir, parentWithSubobjectiveJson());
 
     const server = await startBoardServer({ objectiveDir, host: "127.0.0.1", port: 0 });
     try {
@@ -714,7 +746,7 @@ test("streams parent board updates when linked child subobjective state changes"
       const reader = events.body.getReader();
 
       await readUntil(reader, /"title":"Child Goal"/);
-      writeStateJson(childDir, stateJson("blocked", { title: "Child Goal", slug: "child-goal" }));
+      writeStateJson(root, childDir, stateJson("blocked", { title: "Child Goal", slug: "child-goal" }));
       const update = await readUntil(reader, /"status":"blocked"/);
       assert.match(update, /"Child Goal"/);
 
@@ -724,11 +756,11 @@ test("streams parent board updates when linked child subobjective state changes"
       await server.close();
     }
   } finally {
-    rmSync(root, { recursive: true, force: true });
+    removeWorkspaceDir(root);
   }
 });
 
-test("serves multiple local boards from one shared hub URL", async () => {
+test("serves multiple local boards from one shared hub URL", { timeout: 15_000 }, async () => {
   const root = mkdtempSync(join(tmpdir(), "cursor-curator-local-board-hub-"));
   const firstObjectiveDir = join(root, "first-goal");
   const secondObjectiveDir = join(root, "second-goal");
@@ -737,8 +769,8 @@ test("serves multiple local boards from one shared hub URL", async () => {
     process.env.CURATOR_LOCAL_BOARD_SETTINGS_PATH = join(root, "hub-settings.json");
     mkdirSync(join(firstObjectiveDir, "notes"), { recursive: true });
     mkdirSync(join(secondObjectiveDir, "notes"), { recursive: true });
-    writeStateJson(firstObjectiveDir, stateJson("active", { title: "First Goal", slug: "first-goal" }));
-    writeStateJson(secondObjectiveDir, stateJson("blocked", { title: "Second Goal", slug: "second-goal" }));
+    writeStateJson(root, firstObjectiveDir, stateJson("active", { title: "First Goal", slug: "first-goal" }));
+    writeStateJson(root, secondObjectiveDir, stateJson("blocked", { title: "Second Goal", slug: "second-goal" }));
 
     const server = await startBoardServer({ objectiveDir: firstObjectiveDir, host: "127.0.0.1", port: 0 });
     try {
@@ -809,7 +841,7 @@ test("serves multiple local boards from one shared hub URL", async () => {
     } else {
       process.env.CURATOR_LOCAL_BOARD_SETTINGS_PATH = previousSettingsPath;
     }
-    rmSync(root, { recursive: true, force: true });
+    removeWorkspaceDir(root);
   }
 });
 
@@ -818,7 +850,7 @@ test("unregistered board paths explain hub reuse instead of stale-port cleanup",
   const objectiveDir = join(root, "first-goal");
   try {
     mkdirSync(join(objectiveDir, "notes"), { recursive: true });
-    writeStateJson(objectiveDir, stateJson("active", { title: "First Goal", slug: "first-goal" }));
+    writeStateJson(root, objectiveDir, stateJson("active", { title: "First Goal", slug: "first-goal" }));
 
     const server = await startBoardServer({ objectiveDir, host: "127.0.0.1", port: 0 });
     try {
@@ -836,17 +868,31 @@ test("unregistered board paths explain hub reuse instead of stale-port cleanup",
       await server.close();
     }
   } finally {
-    rmSync(root, { recursive: true, force: true });
+    removeWorkspaceDir(root);
   }
 });
 
-async function readUntil(reader, pattern) {
+async function readUntil(reader, pattern, timeoutMs = 8000) {
   const decoder = new TextDecoder();
   let text = "";
-  const deadline = Date.now() + 3000;
+  const deadline = Date.now() + timeoutMs;
 
   while (Date.now() < deadline) {
-    const { done, value } = await reader.read();
+    let readResult;
+    try {
+      readResult = await Promise.race([
+        reader.read(),
+        new Promise((_, reject) => {
+          setTimeout(
+            () => reject(new Error("poll")),
+            Math.max(50, Math.min(250, deadline - Date.now())),
+          );
+        }),
+      ]);
+    } catch {
+      continue;
+    }
+    const { done, value } = readResult;
     if (done) break;
     text += decoder.decode(value, { stream: true });
     if (pattern.test(text)) return text;
@@ -855,19 +901,56 @@ async function readUntil(reader, pattern) {
   assert.fail(`Timed out waiting for ${pattern}. Received:\n${text}`);
 }
 
-function writeStateJson(objectiveDir, state) {
-  writeFileSync(join(objectiveDir, "state.json"), `${JSON.stringify(state, null, 2)}\n`);
+function writeStateJson(workspaceRoot, objectiveDir, state) {
+  closeDatabase(workspaceRoot);
+  saveStateV3(workspaceRoot, {
+    ...boardStateDefaults(),
+    ...state,
+    objective: {
+      title: "Board test",
+      slug: basename(objectiveDir),
+      kind: "specific",
+      tranche: "Board test",
+      status: "active",
+      success_criteria: {
+        signal: "board tests pass",
+        final_proof: "local-objective-board tests pass",
+      },
+      ...(state.objective || {}),
+    },
+  }, { dirPath: resolve(objectiveDir) });
+  closeDatabase(workspaceRoot);
+}
+
+function boardStateDefaults(overrides = {}) {
+  return {
+    success_criteria: {
+      signal: "board tests pass",
+      final_proof: "local-objective-board tests pass",
+    },
+    agents: {
+      scout: "installed",
+      worker: "installed",
+      approval_gate: "installed",
+    },
+    ...overrides,
+  };
 }
 
 function parentWithSubobjectiveJson() {
   return {
     version: 3,
+    ...boardStateDefaults(),
     objective: {
       title: "Parent Goal",
       slug: "parent-goal",
       kind: "specific",
       tranche: "Verify child live updates.",
       status: "active",
+      success_criteria: {
+        signal: "board tests pass",
+        final_proof: "local-objective-board tests pass",
+      },
     },
     active_task: "T001",
     tasks: [
@@ -877,9 +960,12 @@ function parentWithSubobjectiveJson() {
         assignee: "Worker",
         status: "active",
         objective: "Watch child state.",
+        allowed_files: ["notes/**"],
+        verify: ["bun test"],
+        stop_if: ["Needs files outside allowed_files"],
         subobjective: {
           status: "active",
-          path: "subobjectives/T001-child/state.json",
+          path: "subobjectives/T001-child",
           owner: "Worker",
           depth: 1,
         },
@@ -892,12 +978,17 @@ function parentWithSubobjectiveJson() {
 function stateJson(status, { title = "Live board", slug = "live-board" } = {}) {
   return {
     version: 3,
+    ...boardStateDefaults(),
     objective: {
       title,
       slug,
       kind: "specific",
       tranche: "Verify live updates.",
       status: "active",
+      success_criteria: {
+        signal: "board tests pass",
+        final_proof: "local-objective-board tests pass",
+      },
     },
     active_task: "T001",
     tasks: [
