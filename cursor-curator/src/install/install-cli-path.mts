@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { appendFileSync, existsSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { delimiter, join, normalize, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
@@ -145,6 +145,25 @@ export function prependProcessPath(binDir: string): void {
   }
 }
 
+export function appendGitHubActionsPath(binDir: string): boolean {
+  const githubPathFile = process.env.GITHUB_PATH;
+  if (!githubPathFile) {
+    return false;
+  }
+
+  const resolved = resolve(binDir);
+  const existing = existsSync(githubPathFile) ? readFileSync(githubPathFile, "utf8") : "";
+  const alreadyListed = existing
+    .split(/\r?\n/)
+    .some((line) => normalizePathEntry(line) === normalizePathEntry(resolved));
+  if (alreadyListed) {
+    return false;
+  }
+
+  appendFileSync(githubPathFile, `${resolved}\n`, "utf8");
+  return true;
+}
+
 function readWindowsUserPath(): string {
   const result = spawnSync(
     "powershell.exe",
@@ -262,6 +281,7 @@ export function ensureCliOnPath(binDir: string, options: { enabled?: boolean } =
   }
 
   prependProcessPath(resolved);
+  appendGitHubActionsPath(resolved);
 
   if (process.platform === "win32") {
     return ensureWindowsUserPath(resolved);

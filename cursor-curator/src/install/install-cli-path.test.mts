@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { test } from "node:test";
 import {
+  appendGitHubActionsPath,
   buildNormalizedWindowsUserPath,
   buildPathMarkerBlock,
   buildUnixPathExportLine,
@@ -52,4 +53,25 @@ test("ensureCliOnPath can be skipped with enabled false", () => {
   const result = ensureCliOnPath("/tmp/.cursor/bin", { enabled: false });
   assert.equal(result.skipped, true);
   assert.match(result.message, /--no-add-to-path/);
+});
+
+test("appendGitHubActionsPath registers bin dir for later workflow steps", () => {
+  const root = mkdtempSync(join(tmpdir(), "curator-gha-path-"));
+  const githubPathFile = join(root, "github-path");
+  const binDir = join(root, ".cursor", "bin");
+  const previous = process.env.GITHUB_PATH;
+
+  try {
+    process.env.GITHUB_PATH = githubPathFile;
+    assert.equal(appendGitHubActionsPath(binDir), true);
+    assert.equal(readFileSync(githubPathFile, "utf8"), `${binDir}\n`);
+    assert.equal(appendGitHubActionsPath(binDir), false);
+  } finally {
+    if (previous === undefined) {
+      delete process.env.GITHUB_PATH;
+    } else {
+      process.env.GITHUB_PATH = previous;
+    }
+    rmSync(root, { recursive: true, force: true });
+  }
 });
