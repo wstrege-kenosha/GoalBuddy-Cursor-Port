@@ -12,9 +12,7 @@ cursor-curator/.cursor-curator-install.json
 cursor-curator/known-workspaces.json
 **/.cursor-curator-port.json
 **/.goalbuddy-port.json
-**/.cursor-curator/curator.db
-**/.cursor-curator/curator.db-wal
-**/.cursor-curator/curator.db-shm
+**/.cursor-curator/
 
 # Generated goal board artifacts
 **/.cursor-curator-board/
