@@ -9,6 +9,20 @@ import {
   type ObjectiveRulesInsertRow,
 } from "./state-mapper.mjs";
 
+function replaceChildRow<T>(
+  db: Database,
+  objectiveId: number,
+  deleteSql: string,
+  value: T | null,
+  insert: (db: Database, objectiveId: number, row: T) => void,
+): void {
+  db.query(deleteSql).run(objectiveId);
+  if (value == null) {
+    return;
+  }
+  insert(db, objectiveId, value);
+}
+
 function runIntakeInsert(
   db: Database,
   objectiveId: number,
@@ -81,11 +95,13 @@ export function replaceObjectiveIntake(
   objectiveId: number,
   intake: DecomposedIntake | null,
 ): void {
-  db.query("DELETE FROM objective_intake WHERE objective_id = ?").run(objectiveId);
-  if (!intake) {
-    return;
-  }
-  insertObjectiveIntake(db, objectiveId, intake);
+  replaceChildRow(
+    db,
+    objectiveId,
+    "DELETE FROM objective_intake WHERE objective_id = ?",
+    intake,
+    insertObjectiveIntake,
+  );
 }
 
 export function insertObjectiveRules(
@@ -101,11 +117,13 @@ export function replaceObjectiveRules(
   objectiveId: number,
   rules: DecomposedRules | null,
 ): void {
-  db.query("DELETE FROM objective_rules WHERE objective_id = ?").run(objectiveId);
-  if (!rules) {
-    return;
-  }
-  insertObjectiveRules(db, objectiveId, rules);
+  replaceChildRow(
+    db,
+    objectiveId,
+    "DELETE FROM objective_rules WHERE objective_id = ?",
+    rules,
+    insertObjectiveRules,
+  );
 }
 
 export function insertObjectiveSuccessCriteria(
@@ -128,11 +146,13 @@ export function replaceObjectiveSuccessCriteria(
   objectiveId: number,
   successCriteria: StateV3["objective"]["success_criteria"] | null,
 ): void {
-  db.query("DELETE FROM objective_success_criteria WHERE objective_id = ?").run(objectiveId);
-  if (!successCriteria) {
-    return;
-  }
-  insertObjectiveSuccessCriteria(db, objectiveId, successCriteria);
+  replaceChildRow(
+    db,
+    objectiveId,
+    "DELETE FROM objective_success_criteria WHERE objective_id = ?",
+    successCriteria,
+    insertObjectiveSuccessCriteria,
+  );
 }
 
 export function insertObjectiveAgents(
@@ -150,11 +170,13 @@ export function replaceObjectiveAgents(
   objectiveId: number,
   agents: StateV3["agents"] | null,
 ): void {
-  db.query("DELETE FROM objective_agents WHERE objective_id = ?").run(objectiveId);
-  if (!agents) {
-    return;
-  }
-  insertObjectiveAgents(db, objectiveId, agents);
+  replaceChildRow(
+    db,
+    objectiveId,
+    "DELETE FROM objective_agents WHERE objective_id = ?",
+    agents,
+    insertObjectiveAgents,
+  );
 }
 
 type VisualBoardPayload = NonNullable<StateV3["visual_board"]>;
@@ -173,13 +195,15 @@ export function insertObjectiveVisualBoard(
 export function replaceObjectiveVisualBoard(
   db: Database,
   objectiveId: number,
-  visualBoard: StateV3["visual_board"],
+  visualBoard: StateV3["visual_board"] | null,
 ): void {
-  db.query("DELETE FROM objective_visual_board WHERE objective_id = ?").run(objectiveId);
-  if (!visualBoard) {
-    return;
-  }
-  insertObjectiveVisualBoard(db, objectiveId, visualBoard);
+  replaceChildRow(
+    db,
+    objectiveId,
+    "DELETE FROM objective_visual_board WHERE objective_id = ?",
+    visualBoard,
+    insertObjectiveVisualBoard,
+  );
 }
 
 export function insertObjectiveChecks(
@@ -196,13 +220,28 @@ export function insertObjectiveChecks(
   );
 }
 
+/** Full graph rewrite: delete then insert. Surgical patches use upsertObjectiveChecks instead. */
+export function replaceObjectiveChecks(
+  db: Database,
+  objectiveId: number,
+  checks: StateV3["checks"] | null,
+): void {
+  replaceChildRow(
+    db,
+    objectiveId,
+    "DELETE FROM objective_checks WHERE objective_id = ?",
+    checks,
+    insertObjectiveChecks,
+  );
+}
+
 export function upsertObjectiveChecks(
   db: Database,
   objectiveId: number,
-  checks: StateV3["checks"],
+  checks: StateV3["checks"] | null,
   options: { preserveDirtyFingerprintWhenNull?: boolean } = {},
 ): void {
-  if (!checks) {
+  if (checks == null) {
     db.query("DELETE FROM objective_checks WHERE objective_id = ?").run(objectiveId);
     return;
   }
@@ -225,13 +264,4 @@ export function upsertObjectiveChecks(
     return;
   }
   insertObjectiveChecks(db, objectiveId, checks);
-}
-
-export function clearObjectiveSatellites(db: Database, objectiveId: number): void {
-  replaceObjectiveIntake(db, objectiveId, null);
-  replaceObjectiveSuccessCriteria(db, objectiveId, null);
-  replaceObjectiveRules(db, objectiveId, null);
-  replaceObjectiveAgents(db, objectiveId, null);
-  replaceObjectiveVisualBoard(db, objectiveId, undefined);
-  upsertObjectiveChecks(db, objectiveId, undefined);
 }

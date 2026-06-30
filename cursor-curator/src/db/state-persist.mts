@@ -7,8 +7,14 @@ import {
 } from "./state-mapper.mjs";
 import { normalizeStoredDirPath } from "./objective-lookup.mjs";
 import {
-  clearObjectiveSatellites,
+  insertObjectiveAgents,
+  insertObjectiveChecks,
+  insertObjectiveIntake,
+  insertObjectiveRules,
+  insertObjectiveSuccessCriteria,
+  insertObjectiveVisualBoard,
   replaceObjectiveAgents,
+  replaceObjectiveChecks,
   replaceObjectiveIntake,
   replaceObjectiveRules,
   replaceObjectiveSuccessCriteria,
@@ -20,18 +26,31 @@ export function clearTasksOnly(db: Database, objectiveId: number): void {
   db.query("DELETE FROM tasks WHERE objective_id = ?").run(objectiveId);
 }
 
-export function clearObjectiveDependents(db: Database, objectiveId: number): void {
-  clearTasksOnly(db, objectiveId);
-  clearObjectiveSatellites(db, objectiveId);
+export function insertObjectiveSatellites(db: Database, objectiveId: number, parts: DecomposedState): void {
+  if (parts.intake) {
+    insertObjectiveIntake(db, objectiveId, parts.intake);
+  }
+  insertObjectiveSuccessCriteria(db, objectiveId, parts.successCriteria);
+  if (parts.rules) {
+    insertObjectiveRules(db, objectiveId, parts.rules);
+  }
+  insertObjectiveAgents(db, objectiveId, parts.agents);
+  if (parts.visualBoard) {
+    insertObjectiveVisualBoard(db, objectiveId, parts.visualBoard);
+  }
+  if (parts.checks) {
+    insertObjectiveChecks(db, objectiveId, parts.checks);
+  }
 }
 
+/** Full graph rewrite: delete then insert per satellite. Checks use replaceObjectiveChecks, not upsert. */
 export function replaceObjectiveSatellites(db: Database, objectiveId: number, parts: DecomposedState): void {
   replaceObjectiveIntake(db, objectiveId, parts.intake);
   replaceObjectiveSuccessCriteria(db, objectiveId, parts.successCriteria);
   replaceObjectiveRules(db, objectiveId, parts.rules);
   replaceObjectiveAgents(db, objectiveId, parts.agents);
-  replaceObjectiveVisualBoard(db, objectiveId, parts.visualBoard ?? undefined);
-  upsertObjectiveChecks(db, objectiveId, parts.checks ?? undefined);
+  replaceObjectiveVisualBoard(db, objectiveId, parts.visualBoard);
+  replaceObjectiveChecks(db, objectiveId, parts.checks);
 }
 
 export function insertTasksAndListItems(db: Database, objectiveId: number, parts: DecomposedState): void {
@@ -134,7 +153,7 @@ function writeObjectiveGraph(
       parts.objective.first_milestone_complete,
     );
   const objectiveId = Number(objectiveResult.lastInsertRowid);
-  replaceObjectiveSatellites(db, objectiveId, parts);
+  insertObjectiveSatellites(db, objectiveId, parts);
   insertTasksAndListItems(db, objectiveId, parts);
   return objectiveId;
 }

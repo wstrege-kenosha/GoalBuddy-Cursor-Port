@@ -64,10 +64,10 @@ export function persistObjectivePatchInDb(
   }
 
   if (patch.checks !== undefined) {
-    upsertObjectiveChecks(db, objectiveId, state.checks);
+    upsertObjectiveChecks(db, objectiveId, state.checks ?? null);
   }
 
   if (patch.visual_board !== undefined) {
-    replaceObjectiveVisualBoard(db, objectiveId, state.visual_board);
+    replaceObjectiveVisualBoard(db, objectiveId, state.visual_board ?? null);
   }
 }

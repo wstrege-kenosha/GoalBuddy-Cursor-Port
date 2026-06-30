@@ -5,9 +5,15 @@ import type { Database } from "bun:sqlite";
 import { StateV3Schema, type StateV3 } from "../schema/state-v3.js";
 import {
   assembleStateV3,
+  checksFromRow,
   intakeFromRow,
   rulesFromRow,
+  type ObjectiveAgentsRow,
+  type ObjectiveChecksRow,
+  type ObjectiveIntakeRow,
   type ObjectiveRow,
+  type ObjectiveRulesRow,
+  type ObjectiveSuccessCriteriaRow,
   type SubobjectiveLinkRow,
   type TaskListItemRow,
   type TaskRow,
@@ -52,25 +58,25 @@ export function loadObjectiveTemplate(slug: string): StateV3 {
 
 function loadRelatedRows(db: ReturnType<typeof getDb>, objectiveId: number) {
   const intake = db
-    .query<Record<string, unknown>, [number]>(
+    .query<ObjectiveIntakeRow, [number]>(
       "SELECT * FROM objective_intake WHERE objective_id = ?",
     )
     .get(objectiveId);
   const successCriteria = db
-    .query<Record<string, unknown>, [number]>(
-      "SELECT * FROM objective_success_criteria WHERE objective_id = ?",
+    .query<ObjectiveSuccessCriteriaRow, [number]>(
+      "SELECT signal, cadence, final_proof FROM objective_success_criteria WHERE objective_id = ?",
     )
     .get(objectiveId);
   if (!successCriteria) {
     throw new Error(`objective ${objectiveId} missing success_criteria row`);
   }
   const rules = db
-    .query<Record<string, unknown>, [number]>(
+    .query<ObjectiveRulesRow, [number]>(
       "SELECT * FROM objective_rules WHERE objective_id = ?",
     )
     .get(objectiveId);
   const agents = db
-    .query<Record<string, string>, [number]>(
+    .query<ObjectiveAgentsRow, [number]>(
       "SELECT scout, worker, approval_gate FROM objective_agents WHERE objective_id = ?",
     )
     .get(objectiveId);
@@ -83,7 +89,7 @@ function loadRelatedRows(db: ReturnType<typeof getDb>, objectiveId: number) {
     )
     .get(objectiveId);
   const checks = db
-    .query<Record<string, unknown>, [number]>(
+    .query<ObjectiveChecksRow, [number]>(
       "SELECT dirty_fingerprint, last_verification_json FROM objective_checks WHERE objective_id = ?",
     )
     .get(objectiveId);
@@ -110,16 +116,9 @@ function loadRelatedRows(db: ReturnType<typeof getDb>, objectiveId: number) {
     rules: rulesFromRow(rules ?? null),
     agents,
     visualBoard: visualBoard?.payload_json
-      ? (JSON.parse(visualBoard.payload_json) as Record<string, unknown>)
+      ? (JSON.parse(visualBoard.payload_json) as StateV3["visual_board"])
       : null,
-    checks: checks
-      ? {
-          ...(checks.dirty_fingerprint ? { dirty_fingerprint: checks.dirty_fingerprint } : {}),
-          ...(checks.last_verification_json
-            ? { last_verification: JSON.parse(checks.last_verification_json as string) }
-            : {}),
-        }
-      : null,
+    checks: checks ? checksFromRow(checks) : null,
     tasks,
     listItems,
     subobjectiveLinks,
