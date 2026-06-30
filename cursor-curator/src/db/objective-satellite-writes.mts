@@ -1,11 +1,18 @@
 import type { Database } from "bun:sqlite";
 import type { StateV3 } from "../schema/state-v3.js";
-import { intakeRowFromDecomposed, rulesRowFromDecomposed } from "./state-mapper.mjs";
+import {
+  intakeRowFromDecomposed,
+  rulesRowFromDecomposed,
+  type DecomposedIntake,
+  type DecomposedRules,
+  type ObjectiveIntakeInsertRow,
+  type ObjectiveRulesInsertRow,
+} from "./state-mapper.mjs";
 
 function runIntakeInsert(
   db: Database,
   objectiveId: number,
-  intakeRow: Record<string, unknown>,
+  intakeRow: ObjectiveIntakeInsertRow,
 ): void {
   db.query(
     `INSERT INTO objective_intake (
@@ -14,23 +21,23 @@ function runIntakeInsert(
     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   ).run(
     objectiveId,
-    intakeRow.original_request as string | null,
-    intakeRow.interpreted_outcome as string | null,
-    intakeRow.input_shape as string | null,
-    intakeRow.audience as string | null,
-    intakeRow.authority as string | null,
-    intakeRow.proof_type as string | null,
-    intakeRow.completion_proof as string | null,
-    intakeRow.likely_misfire as string | null,
-    intakeRow.blind_spots_considered_json as string | null,
-    intakeRow.existing_plan_facts_json as string | null,
+    intakeRow.original_request,
+    intakeRow.interpreted_outcome,
+    intakeRow.input_shape,
+    intakeRow.audience,
+    intakeRow.authority,
+    intakeRow.proof_type,
+    intakeRow.completion_proof,
+    intakeRow.likely_misfire,
+    intakeRow.blind_spots_considered_json,
+    intakeRow.existing_plan_facts_json,
   );
 }
 
 function runRulesInsert(
   db: Database,
   objectiveId: number,
-  rulesRow: Record<string, unknown>,
+  rulesRow: ObjectiveRulesInsertRow,
 ): void {
   db.query(
     `INSERT INTO objective_rules (
@@ -43,28 +50,28 @@ function runRulesInsert(
     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   ).run(
     objectiveId,
-    rulesRow.pm_owns_state as number | null,
-    rulesRow.one_active_task as number | null,
-    rulesRow.max_write_workers as number | null,
-    rulesRow.no_implementation_without_worker_or_pm_task as number | null,
-    rulesRow.no_completion_without_approval_gate_or_pm_audit as number | null,
-    rulesRow.planning_is_not_completion as number | null,
-    rulesRow.queued_required_worker_blocks_completion as number | null,
-    rulesRow.continuous_until_full_outcome as number | null,
-    rulesRow.missing_input_or_credentials_do_not_stop_objective as number | null,
-    rulesRow.preserve_and_validate_existing_plan as number | null,
-    rulesRow.intake_misfire_must_be_audited as number | null,
-    rulesRow.goal_pressure_requires_success_criteria as number | null,
-    rulesRow.no_completion_on_weak_proof as number | null,
-    rulesRow.slice_policy_json as string | null,
-    rulesRow.extra_json as string | null,
+    rulesRow.pm_owns_state,
+    rulesRow.one_active_task,
+    rulesRow.max_write_workers,
+    rulesRow.no_implementation_without_worker_or_pm_task,
+    rulesRow.no_completion_without_approval_gate_or_pm_audit,
+    rulesRow.planning_is_not_completion,
+    rulesRow.queued_required_worker_blocks_completion,
+    rulesRow.continuous_until_full_outcome,
+    rulesRow.missing_input_or_credentials_do_not_stop_objective,
+    rulesRow.preserve_and_validate_existing_plan,
+    rulesRow.intake_misfire_must_be_audited,
+    rulesRow.goal_pressure_requires_success_criteria,
+    rulesRow.no_completion_on_weak_proof,
+    rulesRow.slice_policy_json,
+    rulesRow.extra_json,
   );
 }
 
 export function insertObjectiveIntake(
   db: Database,
   objectiveId: number,
-  intake: Record<string, unknown>,
+  intake: DecomposedIntake,
 ): void {
   runIntakeInsert(db, objectiveId, intakeRowFromDecomposed(intake));
 }
@@ -72,7 +79,7 @@ export function insertObjectiveIntake(
 export function replaceObjectiveIntake(
   db: Database,
   objectiveId: number,
-  intake: Record<string, unknown> | null,
+  intake: DecomposedIntake | null,
 ): void {
   db.query("DELETE FROM objective_intake WHERE objective_id = ?").run(objectiveId);
   if (!intake) {
@@ -84,7 +91,7 @@ export function replaceObjectiveIntake(
 export function insertObjectiveRules(
   db: Database,
   objectiveId: number,
-  rules: Record<string, unknown>,
+  rules: DecomposedRules,
 ): void {
   runRulesInsert(db, objectiveId, rulesRowFromDecomposed(rules));
 }
@@ -92,7 +99,7 @@ export function insertObjectiveRules(
 export function replaceObjectiveRules(
   db: Database,
   objectiveId: number,
-  rules: Record<string, unknown> | null,
+  rules: DecomposedRules | null,
 ): void {
   db.query("DELETE FROM objective_rules WHERE objective_id = ?").run(objectiveId);
   if (!rules) {
@@ -150,10 +157,12 @@ export function replaceObjectiveAgents(
   insertObjectiveAgents(db, objectiveId, agents);
 }
 
+type VisualBoardPayload = NonNullable<StateV3["visual_board"]>;
+
 export function insertObjectiveVisualBoard(
   db: Database,
   objectiveId: number,
-  visualBoard: Record<string, unknown>,
+  visualBoard: VisualBoardPayload,
 ): void {
   db.query("INSERT INTO objective_visual_board (objective_id, payload_json) VALUES (?, ?)").run(
     objectiveId,
@@ -176,13 +185,13 @@ export function replaceObjectiveVisualBoard(
 export function insertObjectiveChecks(
   db: Database,
   objectiveId: number,
-  checks: Record<string, unknown>,
+  checks: NonNullable<StateV3["checks"]>,
 ): void {
   db.query(
     "INSERT INTO objective_checks (objective_id, dirty_fingerprint, last_verification_json) VALUES (?, ?, ?)",
   ).run(
     objectiveId,
-    (checks.dirty_fingerprint as string | undefined) ?? null,
+    checks.dirty_fingerprint ?? null,
     checks.last_verification ? JSON.stringify(checks.last_verification) : null,
   );
 }

@@ -25,7 +25,7 @@ export function clearObjectiveDependents(db: Database, objectiveId: number): voi
   clearObjectiveSatellites(db, objectiveId);
 }
 
-export function insertObjectiveSatellites(db: Database, objectiveId: number, parts: DecomposedState): void {
+export function replaceObjectiveSatellites(db: Database, objectiveId: number, parts: DecomposedState): void {
   replaceObjectiveIntake(db, objectiveId, parts.intake);
   replaceObjectiveSuccessCriteria(db, objectiveId, parts.successCriteria);
   replaceObjectiveRules(db, objectiveId, parts.rules);
@@ -104,9 +104,9 @@ function writeObjectiveGraph(
   );
 
   if (existingObjectiveId !== undefined) {
-    clearObjectiveDependents(db, existingObjectiveId);
+    clearTasksOnly(db, existingObjectiveId);
     updateObjectiveHeader(db, existingObjectiveId, parts);
-    insertObjectiveSatellites(db, existingObjectiveId, parts);
+    replaceObjectiveSatellites(db, existingObjectiveId, parts);
     insertTasksAndListItems(db, existingObjectiveId, parts);
     return existingObjectiveId;
   }
@@ -134,7 +134,7 @@ function writeObjectiveGraph(
       parts.objective.first_milestone_complete,
     );
   const objectiveId = Number(objectiveResult.lastInsertRowid);
-  insertObjectiveSatellites(db, objectiveId, parts);
+  replaceObjectiveSatellites(db, objectiveId, parts);
   insertTasksAndListItems(db, objectiveId, parts);
   return objectiveId;
 }

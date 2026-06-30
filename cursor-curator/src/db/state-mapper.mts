@@ -222,7 +222,44 @@ export function assembleStateV3(input: {
   return state;
 }
 
-export function decomposeRulesFromState(rules: StateV3["rules"]): Record<string, unknown> | null {
+export type DecomposedIntake = NonNullable<StateV3["objective"]["intake"]>;
+
+export type DecomposedRules = NonNullable<StateV3["rules"]> & {
+  _extra?: Record<string, unknown>;
+};
+
+export interface ObjectiveIntakeInsertRow {
+  original_request: string | null;
+  interpreted_outcome: string | null;
+  input_shape: string | null;
+  audience: string | null;
+  authority: string | null;
+  proof_type: string | null;
+  completion_proof: string | null;
+  likely_misfire: string | null;
+  blind_spots_considered_json: string | null;
+  existing_plan_facts_json: string | null;
+}
+
+export interface ObjectiveRulesInsertRow {
+  pm_owns_state: number | null;
+  one_active_task: number | null;
+  max_write_workers: number | null;
+  no_implementation_without_worker_or_pm_task: number | null;
+  no_completion_without_approval_gate_or_pm_audit: number | null;
+  planning_is_not_completion: number | null;
+  queued_required_worker_blocks_completion: number | null;
+  continuous_until_full_outcome: number | null;
+  missing_input_or_credentials_do_not_stop_objective: number | null;
+  preserve_and_validate_existing_plan: number | null;
+  intake_misfire_must_be_audited: number | null;
+  goal_pressure_requires_success_criteria: number | null;
+  no_completion_on_weak_proof: number | null;
+  slice_policy_json: string | null;
+  extra_json: string | null;
+}
+
+export function decomposeRulesFromState(rules: StateV3["rules"]): DecomposedRules | null {
   if (!rules) {
     return null;
   }
@@ -238,14 +275,14 @@ export function decomposeRulesFromState(rules: StateV3["rules"]): Record<string,
   return {
     ...knownRules,
     _extra: Object.keys(extraRules).length > 0 ? extraRules : undefined,
-  };
+  } as DecomposedRules;
 }
 
 export type DecomposedState = {
   objective: Omit<ObjectiveRow, "id" | "created_at" | "updated_at">;
-  intake: Record<string, unknown> | null;
+  intake: DecomposedIntake | null;
   successCriteria: StateV3["objective"]["success_criteria"];
-  rules: Record<string, unknown> | null;
+  rules: DecomposedRules | null;
   agents: StateV3["agents"];
   visualBoard: StateV3["visual_board"] | null;
   checks: StateV3["checks"] | null;
@@ -333,44 +370,52 @@ export function decomposeStateV3(
   };
 }
 
-export function rulesRowFromDecomposed(rules: Record<string, unknown> | null): Record<string, unknown> {
-  if (!rules) return {};
-  const extra = rules._extra as Record<string, unknown> | undefined;
-  const slicePolicy = rules.slice_policy;
-  const row: Record<string, unknown> = {
-    pm_owns_state: boolToInt(rules.pm_owns_state as boolean | undefined),
-    one_active_task: boolToInt(rules.one_active_task as boolean | undefined),
+export function rulesRowFromDecomposed(rules: DecomposedRules | null): ObjectiveRulesInsertRow {
+  if (!rules) {
+    return {
+      pm_owns_state: null,
+      one_active_task: null,
+      max_write_workers: null,
+      no_implementation_without_worker_or_pm_task: null,
+      no_completion_without_approval_gate_or_pm_audit: null,
+      planning_is_not_completion: null,
+      queued_required_worker_blocks_completion: null,
+      continuous_until_full_outcome: null,
+      missing_input_or_credentials_do_not_stop_objective: null,
+      preserve_and_validate_existing_plan: null,
+      intake_misfire_must_be_audited: null,
+      goal_pressure_requires_success_criteria: null,
+      no_completion_on_weak_proof: null,
+      slice_policy_json: null,
+      extra_json: null,
+    };
+  }
+  const extra = rules._extra;
+  return {
+    pm_owns_state: boolToInt(rules.pm_owns_state),
+    one_active_task: boolToInt(rules.one_active_task),
     max_write_workers: rules.max_write_workers ?? null,
     no_implementation_without_worker_or_pm_task: boolToInt(
-      rules.no_implementation_without_worker_or_pm_task as boolean | undefined,
+      rules.no_implementation_without_worker_or_pm_task,
     ),
     no_completion_without_approval_gate_or_pm_audit: boolToInt(
-      rules.no_completion_without_approval_gate_or_pm_audit as boolean | undefined,
+      rules.no_completion_without_approval_gate_or_pm_audit,
     ),
-    planning_is_not_completion: boolToInt(rules.planning_is_not_completion as boolean | undefined),
+    planning_is_not_completion: boolToInt(rules.planning_is_not_completion),
     queued_required_worker_blocks_completion: boolToInt(
-      rules.queued_required_worker_blocks_completion as boolean | undefined,
+      rules.queued_required_worker_blocks_completion,
     ),
-    continuous_until_full_outcome: boolToInt(
-      rules.continuous_until_full_outcome as boolean | undefined,
-    ),
+    continuous_until_full_outcome: boolToInt(rules.continuous_until_full_outcome),
     missing_input_or_credentials_do_not_stop_objective: boolToInt(
-      rules.missing_input_or_credentials_do_not_stop_objective as boolean | undefined,
+      rules.missing_input_or_credentials_do_not_stop_objective,
     ),
-    preserve_and_validate_existing_plan: boolToInt(
-      rules.preserve_and_validate_existing_plan as boolean | undefined,
-    ),
-    intake_misfire_must_be_audited: boolToInt(
-      rules.intake_misfire_must_be_audited as boolean | undefined,
-    ),
-    goal_pressure_requires_success_criteria: boolToInt(
-      rules.goal_pressure_requires_success_criteria as boolean | undefined,
-    ),
-    no_completion_on_weak_proof: boolToInt(rules.no_completion_on_weak_proof as boolean | undefined),
-    slice_policy_json: stringifyJson(slicePolicy),
+    preserve_and_validate_existing_plan: boolToInt(rules.preserve_and_validate_existing_plan),
+    intake_misfire_must_be_audited: boolToInt(rules.intake_misfire_must_be_audited),
+    goal_pressure_requires_success_criteria: boolToInt(rules.goal_pressure_requires_success_criteria),
+    no_completion_on_weak_proof: boolToInt(rules.no_completion_on_weak_proof),
+    slice_policy_json: stringifyJson(rules.slice_policy),
     extra_json: extra && Object.keys(extra).length > 0 ? stringifyJson(extra) : null,
   };
-  return row;
 }
 
 export function rulesFromRow(row: Record<string, unknown> | null): Record<string, unknown> | null {
@@ -404,8 +449,21 @@ export function rulesFromRow(row: Record<string, unknown> | null): Record<string
   return Object.keys(rules).length > 0 ? rules : null;
 }
 
-export function intakeRowFromDecomposed(intake: Record<string, unknown> | null): Record<string, unknown> {
-  if (!intake) return {};
+export function intakeRowFromDecomposed(intake: DecomposedIntake | null): ObjectiveIntakeInsertRow {
+  if (!intake) {
+    return {
+      original_request: null,
+      interpreted_outcome: null,
+      input_shape: null,
+      audience: null,
+      authority: null,
+      proof_type: null,
+      completion_proof: null,
+      likely_misfire: null,
+      blind_spots_considered_json: null,
+      existing_plan_facts_json: null,
+    };
+  }
   return {
     original_request: intake.original_request ?? null,
     interpreted_outcome: intake.interpreted_outcome ?? null,
