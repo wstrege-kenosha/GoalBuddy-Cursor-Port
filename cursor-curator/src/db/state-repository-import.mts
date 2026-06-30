@@ -3,7 +3,7 @@ import { join, resolve } from "node:path";
 import { StateV3Schema, type StateV3 } from "../schema/state-v3.js";
 import { ensureWorkspace, withTransaction } from "./connection.mjs";
 import { invalidateHubPayloadCache } from "../hub/objective-hub.mjs";
-import { getDb, objectiveRowBySlug } from "./state-repository-db.mjs";
+import { getDb, objectiveRowBySlug } from "./state-repository-read.mjs";
 import {
   insertObjectiveGraph,
 } from "./state-persist.mjs";

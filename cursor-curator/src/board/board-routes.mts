@@ -102,12 +102,12 @@ function handleOpenRedirect(ctx: BoardRouteContext): boolean {
   return true;
 }
 
-function handleHubPage(ctx: BoardRouteContext): boolean {
+async function handleHubPage(ctx: BoardRouteContext): Promise<boolean> {
   const hubPaths = new Set(["/", "/hub", "/boards"]);
   if (!hubPaths.has(ctx.url.pathname)) {
     return false;
   }
-  void sendHubPage(ctx.response, ctx);
+  sendHubPage(ctx.response, ctx);
   return true;
 }
 
@@ -197,7 +197,7 @@ function handleBoardEvents(
   request.on("close", () => board.clients.delete(response));
 }
 
-async function sendHubPage(response: ServerResponse, ctx: BoardRouteContext): Promise<void> {
+function sendHubPage(response: ServerResponse, ctx: BoardRouteContext): void {
   if (response.headersSent) return;
   try {
     const payload = hubPayloadForBoards(ctx);

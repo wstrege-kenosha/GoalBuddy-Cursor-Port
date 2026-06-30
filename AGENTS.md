@@ -10,6 +10,8 @@
 - Keep the repo limited to functional code plus `docs/wiki/`; move other documentation out of the repo.
 - `curator install` should add the CLI to PATH by default with an opt-out flag.
 - Only create git commits or push when explicitly requested.
+- Skill docs and installed references must use `dist/` paths (CLI, MCP, libraries), not legacy `scripts/` paths.
+- Installed skill docs must not use relative `docs/wiki/` links; use GitHub URLs or vendored copies under the skill tree.
 
 ## Learned Workspace Facts
 
@@ -21,6 +23,6 @@
 - Agent time and token usage lives in SQLite `usage_sessions` (logical path `db:<slug>#usage`); legacy `notes/usage.json` is imported once on read.
 - Local board hub serves at `http://curator.localhost:41737/`.
 - Canonical CLI: `bun cursor-curator/dist/cli/curator.mjs <command>` (or global `curator` when PATH is set).
-- Install copies skills to `~/.cursor/skills` and registers the cursor-curator MCP server in `.cursor/mcp.json`.
+- Install copies `cursor-curator/` and `objective-prep/` to `~/.cursor/skills/` (not `docs/` or repo-root `scripts/`); MCP uses `dist/mcp/server.mjs`; re-run install after skill doc changes.
 - Multi-root Cursor workspaces pass comma-separated paths in `WORKSPACE_FOLDER_PATHS`; MCP must split them for objective resolution.
 - `W:\source\Sanitary_Maintenance_Portal` is reference-only; never modify it.

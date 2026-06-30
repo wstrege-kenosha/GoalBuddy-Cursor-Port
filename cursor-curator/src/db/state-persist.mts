@@ -4,16 +4,21 @@ import type { StateV3, StateV3Task } from "../schema/state-v3.js";
 import { invalidateHubPayloadCache } from "../hub/objective-hub.mjs";
 import {
   decomposeStateV3,
-  intakeRowFromDecomposed,
-  rulesRowFromDecomposed,
   type ObjectiveRow,
 } from "./state-mapper.mjs";
 import { normalizeStoredDirPath } from "./objective-lookup.mjs";
 import { ensureWorkspace, withTransaction } from "./connection.mjs";
-import { getDb, objectiveRowBySlug } from "./state-repository-db.mjs";
-import { loadStateV3 } from "./state-repository-read.mjs";
+import { getDb, loadStateV3, objectiveRowBySlug } from "./state-repository-read.mjs";
 import { replaceSubobjectiveLinks } from "./state-subobjective-links.mjs";
 import { persistObjectivePatchInDb } from "./state-objective-patch.mjs";
+import {
+  insertObjectiveAgents,
+  insertObjectiveChecks,
+  insertObjectiveIntake,
+  insertObjectiveRules,
+  insertObjectiveSuccessCriteria,
+  insertObjectiveVisualBoard,
+} from "./objective-satellite-writes.mjs";
 import type { LoadedObjective } from "./state-repository-types.mjs";
 
 export { persistObjectivePatchInDb } from "./state-objective-patch.mjs";
@@ -41,86 +46,23 @@ export function clearObjectiveDependents(db: Database, objectiveId: number): voi
 
 export function insertObjectiveSatellites(db: Database, objectiveId: number, parts: DecomposedState): void {
   if (parts.intake) {
-    const intakeRow = intakeRowFromDecomposed(parts.intake);
-    db.query(
-      `INSERT INTO objective_intake (
-        objective_id, original_request, interpreted_outcome, input_shape, audience, authority,
-        proof_type, completion_proof, likely_misfire, blind_spots_considered_json, existing_plan_facts_json
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    ).run(
-      objectiveId,
-      intakeRow.original_request as string | null,
-      intakeRow.interpreted_outcome as string | null,
-      intakeRow.input_shape as string | null,
-      intakeRow.audience as string | null,
-      intakeRow.authority as string | null,
-      intakeRow.proof_type as string | null,
-      intakeRow.completion_proof as string | null,
-      intakeRow.likely_misfire as string | null,
-      intakeRow.blind_spots_considered_json as string | null,
-      intakeRow.existing_plan_facts_json as string | null,
-    );
+    insertObjectiveIntake(db, objectiveId, parts.intake);
   }
 
-  db.query(
-    "INSERT INTO objective_success_criteria (objective_id, signal, cadence, final_proof) VALUES (?, ?, ?, ?)",
-  ).run(
-    objectiveId,
-    String(parts.successCriteria.signal),
-    parts.successCriteria.cadence == null ? null : String(parts.successCriteria.cadence),
-    String(parts.successCriteria.final_proof),
-  );
+  insertObjectiveSuccessCriteria(db, objectiveId, parts.successCriteria);
 
   if (parts.rules) {
-    const rulesRow = rulesRowFromDecomposed(parts.rules);
-    db.query(
-      `INSERT INTO objective_rules (
-        objective_id, pm_owns_state, one_active_task, max_write_workers,
-        no_implementation_without_worker_or_pm_task, no_completion_without_approval_gate_or_pm_audit,
-        planning_is_not_completion, queued_required_worker_blocks_completion, continuous_until_full_outcome,
-        missing_input_or_credentials_do_not_stop_objective, preserve_and_validate_existing_plan,
-        intake_misfire_must_be_audited, goal_pressure_requires_success_criteria, no_completion_on_weak_proof,
-        slice_policy_json, extra_json
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    ).run(
-      objectiveId,
-      rulesRow.pm_owns_state as number | null,
-      rulesRow.one_active_task as number | null,
-      rulesRow.max_write_workers as number | null,
-      rulesRow.no_implementation_without_worker_or_pm_task as number | null,
-      rulesRow.no_completion_without_approval_gate_or_pm_audit as number | null,
-      rulesRow.planning_is_not_completion as number | null,
-      rulesRow.queued_required_worker_blocks_completion as number | null,
-      rulesRow.continuous_until_full_outcome as number | null,
-      rulesRow.missing_input_or_credentials_do_not_stop_objective as number | null,
-      rulesRow.preserve_and_validate_existing_plan as number | null,
-      rulesRow.intake_misfire_must_be_audited as number | null,
-      rulesRow.goal_pressure_requires_success_criteria as number | null,
-      rulesRow.no_completion_on_weak_proof as number | null,
-      rulesRow.slice_policy_json as string | null,
-      rulesRow.extra_json as string | null,
-    );
+    insertObjectiveRules(db, objectiveId, parts.rules);
   }
 
-  db.query(
-    "INSERT INTO objective_agents (objective_id, scout, worker, approval_gate) VALUES (?, ?, ?, ?)",
-  ).run(objectiveId, parts.agents.scout, parts.agents.worker, parts.agents.approval_gate);
+  insertObjectiveAgents(db, objectiveId, parts.agents);
 
   if (parts.visualBoard) {
-    db.query("INSERT INTO objective_visual_board (objective_id, payload_json) VALUES (?, ?)").run(
-      objectiveId,
-      JSON.stringify(parts.visualBoard),
-    );
+    insertObjectiveVisualBoard(db, objectiveId, parts.visualBoard);
   }
 
   if (parts.checks) {
-    db.query(
-      "INSERT INTO objective_checks (objective_id, dirty_fingerprint, last_verification_json) VALUES (?, ?, ?)",
-    ).run(
-      objectiveId,
-      (parts.checks.dirty_fingerprint as string | undefined) ?? null,
-      parts.checks.last_verification ? JSON.stringify(parts.checks.last_verification) : null,
-    );
+    insertObjectiveChecks(db, objectiveId, parts.checks);
   }
 }
 
@@ -305,16 +247,6 @@ const TASK_LIST_NAMES = [
   "verify",
   "stop_if",
 ] as const;
-
-export function persistObjectiveActiveTask(
-  db: Database,
-  objectiveId: number,
-  activeTaskId: string | null,
-): void {
-  db.query(
-    "UPDATE objectives SET active_task_id = ?, updated_at = datetime('now') WHERE id = ?",
-  ).run(activeTaskId, objectiveId);
-}
 
 export function persistTaskPatchInDb(
   db: Database,

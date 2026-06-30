@@ -2,7 +2,7 @@ import type { Database } from "bun:sqlite";
 import { basename, resolve } from "node:path";
 import { ensureWorkspace } from "../db/connection.mjs";
 import { objectiveRowByDirPath } from "../db/objective-lookup.mjs";
-import { getDb, objectiveRowBySlug } from "../db/state-repository-db.mjs";
+import { getDb, objectiveRowBySlug } from "../db/state-repository-read.mjs";
 import {
   childDirSegmentOrSlug,
   normalizeSubobjectivePath,

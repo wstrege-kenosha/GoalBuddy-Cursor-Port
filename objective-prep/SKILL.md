@@ -19,7 +19,7 @@ During Objective Prep, do **not**:
 
 Allowed:
 
-- Run update check: `bun ~/.cursor/skills/cursor-curator/scripts/check-update.mjs --json`
+- Run update check: `bun ~/.cursor/skills/cursor-curator/dist/cli/curator.mjs check-update --json`
 - Ask intake questions (one at a time when vague)
 - Create `docs/objectives/<slug>/objective.md`, `notes/.gitkeep`, `.cursor-curator-board/` as needed
 - Register board state via MCP **`register_objective`** (or CLI `register-objective`)
@@ -117,4 +117,4 @@ Do not block prep on network failure.
 
 ## Related
 
-Full loop: [cursor SKILL.md](../cursor-curator/SKILL.md). SQLite migration: [Migration-6.0.md](../docs/wiki/Migration-6.0.md). Oracle detail: [reference/success-criteria.md](../cursor-curator/reference/success-criteria.md).
+Full loop: [cursor SKILL.md](../cursor-curator/SKILL.md). SQLite migration: [Migration 6.0](https://github.com/wstrege-kenosha/Cursor-Curator/blob/master/docs/wiki/Migration-6.0.md). Oracle detail: [reference/success-criteria.md](../cursor-curator/reference/success-criteria.md).

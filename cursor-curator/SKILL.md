@@ -43,7 +43,7 @@ bun ~/.cursor/skills/cursor-curator/dist/cli/curator.mjs install
 bun ~/.cursor/skills/cursor-curator/dist/cli/curator.mjs doctor --objective-ready
 ```
 
-Upgrading from port **1.0.0**? See [docs/wiki/Migration-1.0-to-2.0.md](../../docs/wiki/Migration-1.0-to-2.0.md). **YAML → JSON v3?** [docs/wiki/Migration-5.0.md](../../docs/wiki/Migration-5.0.md). **JSON → SQLite?** [docs/wiki/Migration-6.0.md](../../docs/wiki/Migration-6.0.md). **Node/npm → Bun?** [docs/wiki/Migration-Node-to-Bun.md](../../docs/wiki/Migration-Node-to-Bun.md).
+Upgrading from port **1.0.0**? See [Migration 1.0 → 2.0](https://github.com/wstrege-kenosha/Cursor-Curator/blob/master/docs/wiki/Migration-1.0-to-2.0.md). **YAML → JSON v3?** [Migration 5.0](https://github.com/wstrege-kenosha/Cursor-Curator/blob/master/docs/wiki/Migration-5.0.md). **JSON → SQLite?** [Migration 6.0](https://github.com/wstrege-kenosha/Cursor-Curator/blob/master/docs/wiki/Migration-6.0.md). **Node/npm → Bun?** [Migration Node → Bun](https://github.com/wstrege-kenosha/Cursor-Curator/blob/master/docs/wiki/Migration-Node-to-Bun.md).
 
 Enable the **cursor-curator** MCP server in Cursor settings after install. `/objective` and subagents use MCP tools for validation and prompts.
 
@@ -83,7 +83,7 @@ Project config (committed in this port):
 }
 ```
 
-After `install`, the same entry is merged with an absolute path to `~/.cursor/skills/cursor-curator/mcp/server.mjs`.
+After `install`, the same entry is merged with an absolute path to `~/.cursor/skills/cursor-curator/dist/mcp/server.mjs`.
 
 ## What it creates
 
@@ -104,7 +104,7 @@ Legacy `state.json` files are **never read at runtime** — use `curator db impo
 
 - **Runtime:** `.cursor-curator/curator.db` (logical board path `db:<slug>`)
 - **Schema:** v3 `StateV3` (Zod-validated; see `src/schema/state-v3.ts`)
-- **Import:** legacy `state.json` / one-time YAML→JSON via `scripts/migrate-5.0.mts`, then `curator db import`
+- **Import:** legacy `state.json` / one-time YAML→JSON via repo-root `scripts/migrate-5.0.mts` (not vendored in the skill install), then `curator db import`
 - `objective.success_criteria` — required pressure on completion
 - `active_task` — exactly one active task id (e.g. `T001`)
 - `tasks[]` — scout | approval_gate | worker | pm types with `objective`, `receipt`, status
@@ -166,23 +166,23 @@ bun ~/.cursor/skills/cursor-curator/dist/cli/curator.mjs board docs/objectives/<
 
 Default hub: `http://curator.localhost:41737/` (all objectives) or `http://curator.localhost:41737/<slug>/` (single board). Share as a Markdown link so it is clickable.
 
-Board implementation: `cursor-curator/src/board/` (compiled to `dist/board/`). CLI entry: `scripts/local-objective-board.mjs`.
+Board implementation: `cursor-curator/src/board/` (compiled to `dist/board/`). CLI entry: `dist/board/local-objective-board.mjs` (or `dist/cli/curator.mjs board`).
 
-## Shared libraries (`cursor-curator/scripts/lib/`)
+## Shared libraries (`cursor-curator/dist/`)
 
 | Module | Role |
 |--------|------|
-| `objective-state.mjs` | Load/validate board state from SQLite via `dist/state/` + `dist/db/` |
-| `objective-receipt.mjs` | Parse/validate `cursor_curator_receipt_v1` |
-| `objective-completion.mjs` | Readiness for `objective.status: done` |
-| `objective-verify.mjs` | Cross-check Worker receipts vs `task.verify` |
-| `objective-session.mjs` | `notes/SESSION.md` digest + resume handoff |
-| `objective-stale.mjs` | Stale objective detection |
-| `objective-hub.mjs` | Multi-objective hub payload |
-| `objective-misfire.mjs` | Intake misfire audit scheduling |
-| `objective-blocked.mjs` | Blocked task triage |
-| `objective-subobjective.mjs` | Depth-1 rollup checks |
-| `objective-state-write.mjs` | Receipt application helpers (PM-owned writes) |
+| `dist/state/objective-state.mjs` | Load/validate board state from SQLite via `dist/state/` + `dist/db/` |
+| `dist/receipt/objective-receipt.mjs` | Parse/validate `cursor_curator_receipt_v1` |
+| `dist/completion/objective-completion.mjs` | Readiness for `objective.status: done` |
+| `dist/verify/objective-verify.mjs` | Cross-check Worker receipts vs `task.verify` |
+| `dist/session/objective-session.mjs` | `notes/SESSION.md` digest + resume handoff |
+| `dist/stale/objective-stale.mjs` | Stale objective detection |
+| `dist/hub/objective-hub.mjs` | Multi-objective hub payload |
+| `dist/misfire/objective-misfire.mjs` | Intake misfire audit scheduling |
+| `dist/blocked/objective-blocked.mjs` | Blocked task triage |
+| `dist/subobjective/objective-subobjective.mjs` | Depth-1 rollup checks |
+| `dist/state/objective-state-write.mjs` | Receipt application helpers (PM-owned writes) |
 
 ## CLI reference
 

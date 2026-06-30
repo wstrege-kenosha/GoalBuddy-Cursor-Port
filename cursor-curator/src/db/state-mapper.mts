@@ -222,6 +222,25 @@ export function assembleStateV3(input: {
   return state;
 }
 
+export function decomposeRulesFromState(rules: StateV3["rules"]): Record<string, unknown> | null {
+  if (!rules) {
+    return null;
+  }
+  const extraRules: Record<string, unknown> = {};
+  const knownRules: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(rules)) {
+    if (KNOWN_RULE_KEYS.has(key)) {
+      knownRules[key] = value;
+    } else {
+      extraRules[key] = value;
+    }
+  }
+  return {
+    ...knownRules,
+    _extra: Object.keys(extraRules).length > 0 ? extraRules : undefined,
+  };
+}
+
 export function decomposeStateV3(
   state: StateV3,
   workspaceId: number,
@@ -242,19 +261,6 @@ export function decomposeStateV3(
   subobjectiveLinks: Array<Omit<SubobjectiveLinkRow, "parent_objective_id">>;
 } {
   const intake = state.objective.intake ? { ...state.objective.intake } : null;
-
-  const rules = state.rules ? { ...state.rules } : null;
-  const extraRules: Record<string, unknown> = {};
-  const knownRules: Record<string, unknown> = {};
-  if (rules) {
-    for (const [key, value] of Object.entries(rules)) {
-      if (KNOWN_RULE_KEYS.has(key)) {
-        knownRules[key] = value;
-      } else {
-        extraRules[key] = value;
-      }
-    }
-  }
 
   const tasks = state.tasks.map((task, index) => ({
     task_id: task.id,
@@ -319,12 +325,7 @@ export function decomposeStateV3(
       cadence: state.objective.success_criteria.cadence ?? null,
       final_proof: state.objective.success_criteria.final_proof,
     },
-    rules: rules
-      ? {
-          ...knownRules,
-          _extra: Object.keys(extraRules).length > 0 ? extraRules : undefined,
-        }
-      : null,
+    rules: decomposeRulesFromState(state.rules),
     agents: { ...state.agents },
     visualBoard: state.visual_board ? { ...state.visual_board } : null,
     checks: state.checks ? { ...state.checks } : null,

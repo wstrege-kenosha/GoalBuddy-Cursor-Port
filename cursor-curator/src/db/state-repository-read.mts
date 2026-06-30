@@ -1,11 +1,13 @@
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import type { Database } from "bun:sqlite";
 import { StateV3Schema, type StateV3 } from "../schema/state-v3.js";
 import {
   assembleStateV3,
   intakeFromRow,
   rulesFromRow,
+  type ObjectiveRow,
   type SubobjectiveLinkRow,
   type TaskListItemRow,
   type TaskRow,
@@ -13,13 +15,27 @@ import {
 import {
   ensureWorkspace,
   logicalBoardPath,
+  openDatabase,
 } from "./connection.mjs";
 import { objectiveRowByDirPath } from "./objective-lookup.mjs";
-import { getDb, objectiveRowBySlug } from "./state-repository-db.mjs";
 import { resolveChildObjectiveSlug } from "../subobjective/subobjective-resolve.mjs";
 import type { ListedObjective, LoadedObjective } from "./state-repository-types.mjs";
 
 export { resolveChildObjectiveSlug } from "../subobjective/subobjective-resolve.mjs";
+
+export function getDb(workspaceRoot: string, memory = false): Database {
+  return openDatabase(workspaceRoot, { memory });
+}
+
+export function objectiveRowBySlug(db: Database, workspaceId: number, slug: string): ObjectiveRow | null {
+  return (
+    db
+      .query<ObjectiveRow, [number, string]>(
+        "SELECT * FROM objectives WHERE workspace_id = ? AND slug = ?",
+      )
+      .get(workspaceId, slug) ?? null
+  );
+}
 
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 

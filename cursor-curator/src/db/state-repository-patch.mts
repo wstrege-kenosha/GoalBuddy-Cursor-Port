@@ -7,7 +7,6 @@ import { verifyWorkerReceiptForTask } from "../verify/objective-verify.mjs";
 import { ensureWorkspace, logicalBoardPath, withTransaction } from "./connection.mjs";
 import { invalidateHubPayloadCache } from "../hub/objective-hub.mjs";
 import {
-  persistObjectiveActiveTask,
   persistObjectivePatchInDb,
   persistReceiptState,
   persistTaskPatchInDb,
@@ -16,7 +15,7 @@ import type { ObjectivePatchFields } from "./state-objective-patch.mjs";
 import {
   replaceSubobjectiveLinks,
 } from "./state-subobjective-links.mjs";
-import { getDb } from "./state-repository-db.mjs";
+import { getDb } from "./state-repository-read.mjs";
 import { loadStateV3 } from "./state-repository-read.mjs";
 import type { ApplyReceiptOptions, PatchTaskInput } from "./state-repository-types.mjs";
 
@@ -204,9 +203,6 @@ export function patchTask(
     const sortOrder = state.tasks.findIndex((entry) => entry.id === taskId);
     withTransaction(db, () => {
       persistTaskPatchInDb(db, loaded.objectiveId, task, sortOrder);
-      if (state.active_task !== taskId && state.tasks.some((entry) => entry.id === state.active_task)) {
-        persistObjectiveActiveTask(db, loaded.objectiveId, state.active_task);
-      }
       if (patch.subobjective !== undefined) {
         const workspaceId = ensureWorkspace(db, root);
         replaceSubobjectiveLinks(db, workspaceId, root, loaded.objectiveId, state, loaded.dirPath);

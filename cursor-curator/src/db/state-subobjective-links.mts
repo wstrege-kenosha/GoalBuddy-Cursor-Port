@@ -1,7 +1,7 @@
 import type { Database } from "bun:sqlite";
 import type { StateV3 } from "../schema/state-v3.js";
 import { resolveChildObjectiveInWorkspace } from "../subobjective/subobjective-resolve.mjs";
-import { objectiveRowBySlug } from "./state-repository-db.mjs";
+import { objectiveRowBySlug } from "./state-repository-read.mjs";
 
 export function insertSubobjectiveLinks(
   db: Database,
