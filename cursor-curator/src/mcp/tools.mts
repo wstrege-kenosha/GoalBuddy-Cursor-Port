@@ -51,13 +51,9 @@ function objectiveRootsForList(args: Record<string, unknown> = {}): string[] {
   if (args.workspace_root) {
     return [resolve(String(args.workspace_root))];
   }
-  const roots = collectWorkspaceCandidates().filter((root) => {
-    try {
-      return existsSync(join(root, "docs", "objectives"));
-    } catch {
-      return false;
-    }
-  });
+  const roots = collectWorkspaceCandidates().filter((root) =>
+    existsSync(join(root, "docs", "objectives")),
+  );
   return roots.length ? roots : [getWorkspaceRoot()];
 }
 
@@ -90,7 +86,7 @@ export function toolListObjectives(args: Record<string, unknown> = {}) {
         active_task_type: entry.active_task_type,
         success_criteria_health: entry.success_criteria_health,
         validation_ok: entry.validation_ok,
-        stale: staleSlugs.has(entry.slug as string),
+        stale: staleSlugs.has(entry.slug),
         state_path: entry.state_path,
         url: entry.url,
       };

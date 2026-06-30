@@ -7,6 +7,7 @@ import {
   withTransaction,
 } from "./connection.mjs";
 import { invalidateHubPayloadCache } from "../hub/objective-hub.mjs";
+import { objectiveRowByDirPath } from "./objective-lookup.mjs";
 import type {
   UsageCounters,
   UsageFile,
@@ -57,24 +58,6 @@ function objectiveRowBySlug(db: Database, workspaceId: number, slug: string): Ob
       )
       .get(workspaceId, slug) ?? null
   );
-}
-
-function normalizeStoredDirPath(dirPath: string): string {
-  return resolve(dirPath).replace(/\\/g, "/").toLowerCase();
-}
-
-function objectiveRowByDirPath(
-  db: Database,
-  workspaceId: number,
-  dirPath: string,
-): ObjectiveRow | null {
-  const normalized = normalizeStoredDirPath(dirPath);
-  const rows = db
-    .query<{ id: number; slug: string; dir_path: string }, [number]>(
-      "SELECT id, slug, dir_path FROM objectives WHERE workspace_id = ?",
-    )
-    .all(workspaceId);
-  return rows.find((row) => normalizeStoredDirPath(row.dir_path) === normalized) ?? null;
 }
 
 export function resolveObjectiveUsageTarget(

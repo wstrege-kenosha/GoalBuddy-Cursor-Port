@@ -1,5 +1,13 @@
 #!/usr/bin/env bun
-// @ts-nocheck
+// @ts-nocheck — follow-up: split per decomposition plan below
+/**
+ * Decomposition plan (keep this file under ~400 lines):
+ * - board-server.mts — HTTP listen, static file serving, SSE/live refresh
+ * - board-hub-register.mts — hub registration and port metadata
+ * - board-settings.mts — localStorage-backed settings parse/persist
+ * - board-watchers.mts — db/notes file watchers
+ * Keep this module as CLI entry + wiring only.
+ */
 import { createServer } from "node:http";
 import { existsSync, mkdirSync, readFileSync, realpathSync, watch, writeFileSync } from "node:fs";
 import { homedir } from "node:os";

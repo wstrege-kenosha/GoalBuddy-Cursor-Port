@@ -362,7 +362,6 @@ export function legacyInstallCheck(ctx: CuratorCliContext) {
         findings.push("remove mcpServers.goalbuddy from ~/.cursor/mcp.json and enable cursor-curator");
       }
     } catch {
-      /* ignore */
     }
   }
   return [{

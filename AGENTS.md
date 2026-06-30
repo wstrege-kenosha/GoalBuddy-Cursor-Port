@@ -14,11 +14,11 @@
 ## Learned Workspace Facts
 
 - Cursor Curator lives under `cursor-curator/`; workspace root is `W:\Experimental\Cursor-Curator`.
-- Runtime requires Bun; board state lives in `.cursor-curator/curator.db` (SQLite via `bun:sqlite`).
+- Runtime requires Bun; board state lives in `.cursor-curator/curator.db` (SQLite via `bun:sqlite`); never commit `.cursor-curator/` (gitignored runtime state).
 - `docs/objectives/<slug>/state.json` is a legacy import source; runtime truth is SQLite accessed via MCP/CLI.
 - Objectives scaffold under `docs/objectives/<slug>/` with `objective.md` and `state.json`.
 - Depth-1 subobjectives live at `docs/objectives/<parent>/subobjectives/<segment>/`.
-- Agent time and token usage is stored in SQLite (`usage_sessions`), not only in `notes/usage.json`.
+- Agent time and token usage lives in SQLite `usage_sessions` (logical path `db:<slug>#usage`); legacy `notes/usage.json` is imported once on read.
 - Local board hub serves at `http://curator.localhost:41737/`.
 - Canonical CLI: `bun cursor-curator/dist/cli/curator.mjs <command>` (or global `curator` when PATH is set).
 - Install copies skills to `~/.cursor/skills` and registers the cursor-curator MCP server in `.cursor/mcp.json`.

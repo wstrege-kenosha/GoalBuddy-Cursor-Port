@@ -26,7 +26,7 @@ const CURSOR_AGENT_MAP: Record<string, string> = {
 };
 
 export function runPrompt(ctx: CuratorCliContext): void {
-  const promptArgs = mapCursorAgentNamesInArgs(ctx.args.slice(1));
+  const promptArgs = ctx.args.slice(1);
   const result = renderTaskPrompt(parsePromptArgs(promptArgs));
   if (result.json) {
     const payload = mapCursorAgentsInPayload(result.payload);
@@ -399,8 +399,4 @@ function formatCursorPrompt(payload: Record<string, unknown>): string {
     "## Receipt schema",
     JSON.stringify(payload.receipt_schema, null, 2),
   ].join("\n");
-}
-
-function mapCursorAgentNamesInArgs(argv: string[]): string[] {
-  return argv;
 }

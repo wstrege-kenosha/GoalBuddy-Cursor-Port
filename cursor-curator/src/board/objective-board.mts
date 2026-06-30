@@ -1,7 +1,7 @@
-// @ts-nocheck
 import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
+import type { StateV3 } from "../schema/state-v3.js";
 import { readBoardRepoLinks } from "./port-metadata.mjs";
 import { checkCompletionReadiness } from "../completion/objective-completion.mjs";
 import { readLastVerificationFromLoadedState } from "../verify/objective-verify.mjs";
@@ -10,12 +10,16 @@ import {
   buildTaskMetricsView,
   buildTaskMetricsWithRollup,
   buildUsageBoardView,
-  readUsageSummaryForObjective,
-} from "../usage/objective-usage.mjs";
-import { loadState, resolveStatePath } from "../state/objective-state.mjs";
+} from "../usage/usage-present.mjs";
+import { readUsageSummaryForObjective } from "../usage/objective-usage.mjs";
+import { loadState, resolveStatePath, type LoadStateResult } from "../state/objective-state.mjs";
 import { validateObjectiveStateFile } from "../mcp/validate-state-bridge.mjs";
 import { listObjectives, objectiveExistsInDb, resolveChildObjectiveSlug } from "../db/state-repository.mjs";
 import { resolveWorkspaceForObjective } from "../mcp/path-utils.mjs";
+import {
+  childDirSegmentOrSlug,
+  resolveChildObjectiveDir,
+} from "../subobjective/subobjective-path.mjs";
 import {
   ObjectiveBoardError,
   buildColumns,
@@ -38,7 +42,38 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const packageRoot = resolve(__dirname, "../..");
 const logoAssetPath = join(packageRoot, "assets", "curator-mark.png");
 
-function objectiveUpdatedAtMs(workspaceRoot, slug) {
+interface CreateBoardPayloadOptions {
+  includeSubobjectives?: boolean;
+}
+
+interface NoteEntry {
+  path: string;
+  title: string;
+  content: string;
+  mtimeMs: number;
+}
+
+type NoteIndex = Record<string, NoteEntry>;
+
+type BoardTask = {
+  id: string;
+  status: string;
+  objective: string;
+  assignee: string;
+  type: string;
+  verify?: string[];
+  receipt: { note?: string };
+  subobjective?: {
+    path?: string;
+    depth?: number;
+    board?: unknown;
+    [key: string]: unknown;
+  };
+  note?: NoteEntry | null;
+  [key: string]: unknown;
+};
+
+function objectiveUpdatedAtMs(workspaceRoot: string, slug: string): number {
   const entry = listObjectives(workspaceRoot).find((row) => row.slug === slug);
   if (entry?.updatedAt) {
     const parsed = Date.parse(entry.updatedAt);
@@ -47,30 +82,35 @@ function objectiveUpdatedAtMs(workspaceRoot, slug) {
   return Date.now();
 }
 
-function subobjectiveSlugFromPath(childRelative) {
-  const normalized = String(childRelative || "").replace(/\\/g, "/");
-  if (normalized.startsWith("db:")) return normalized.slice(3);
-  const match = normalized.match(/subobjectives\/([^/]+)/);
-  return match?.[1] ?? null;
-}
-
-function readObjectiveStateAtRoot(root) {
+function readObjectiveStateAtRoot(root: string): {
+  statePath: string;
+  loaded: LoadStateResult;
+  workspaceRoot: string;
+} {
   const workspaceRoot = resolveWorkspaceForObjective(root);
   const statePath = resolveStatePath(root, workspaceRoot);
   const loaded = loadState(root, workspaceRoot, { warnYaml: false });
   return { statePath, loaded, workspaceRoot };
 }
 
-export async function loadObjectiveBoard(objectiveDir) {
+function columnTaskCount(
+  columns: ReturnType<typeof buildColumns>,
+  columnId: string,
+): number {
+  return columns.find((column) => column.id === columnId)?.tasks?.length ?? 0;
+}
+
+export async function loadObjectiveBoard(objectiveDir: string) {
   const root = resolve(objectiveDir);
   const { loaded } = readObjectiveStateAtRoot(root);
-  return normalizeObjectiveBoard(loaded.raw, root);
+  return normalizeObjectiveBoard(loaded.state, root);
 }
-export function createBoardPayload(objectiveDir, options = {}) {
+
+export function createBoardPayload(objectiveDir: string, options: CreateBoardPayloadOptions = {}) {
   const includeSubobjectives = options.includeSubobjectives !== false;
   const root = resolve(objectiveDir);
   const { statePath, loaded, workspaceRoot } = readObjectiveStateAtRoot(root);
-  const document = loaded.raw;
+  const document: StateV3 = loaded.state;
 
   const board = normalizeObjectiveBoard(document, root);
   const noteIndex = loadNotes(root);
@@ -80,9 +120,9 @@ export function createBoardPayload(objectiveDir, options = {}) {
   });
   const usage = buildUsageBoardView(usageSummary);
   const tasks = board.tasks
-    .map((task) => attachTaskNote(task, noteIndex))
-    .map((task) => includeSubobjectives ? attachTaskSubobjective(task, root, workspaceRoot) : task)
-    .map((task) => {
+    .map((task: BoardTask) => attachTaskNote(task, noteIndex))
+    .map((task: BoardTask) => (includeSubobjectives ? attachTaskSubobjective(task, root, workspaceRoot) : task))
+    .map((task: BoardTask) => {
       const childPath = task.subobjective?.path;
       const metricsView = childPath && includeSubobjectives
         ? buildTaskMetricsWithRollup(task.id, usageSummary, childPath)
@@ -99,13 +139,15 @@ export function createBoardPayload(objectiveDir, options = {}) {
   const repo = readBoardRepoLinks();
   const validation = validateObjectiveStateFile(root, workspaceRoot);
   const completion = checkCompletionReadiness(root, workspaceRoot);
-  const lastVerification = readLastVerificationFromLoadedState(document);
+  const lastVerification = readLastVerificationFromLoadedState(
+    document as Parameters<typeof readLastVerificationFromLoadedState>[0],
+  );
   const sessionDigest = readSessionDigest(root, { limit: 3 });
-  const activeTaskRow = tasks.find((task) => task.id === board.activeTask) || null;
-  const doneCount = tasks.filter((task) => task.status === "done").length;
-  const blockedCount = tasks.filter((task) => task.status === "blocked").length;
-  const queuedCount = tasks.filter((task) => task.status === "queued").length;
-  const activeCount = tasks.filter((task) => task.status === "active").length;
+  const activeTaskRow = tasks.find((task: BoardTask) => task.id === board.activeTask) || null;
+  const doneCount = tasks.filter((task: BoardTask) => task.status === "done").length;
+  const blockedCount = tasks.filter((task: BoardTask) => task.status === "blocked").length;
+  const queuedCount = tasks.filter((task: BoardTask) => task.status === "queued").length;
+  const activeCount = tasks.filter((task: BoardTask) => task.status === "active").length;
   const progressPct = tasks.length ? Math.round((doneCount / tasks.length) * 100) : 0;
 
   return {
@@ -126,8 +168,8 @@ export function createBoardPayload(objectiveDir, options = {}) {
       status: board.status,
       tranche: board.tranche,
       activeTask: board.activeTask,
-      success_criteria: document.objective?.success_criteria || null,
-      intake: document.objective?.intake || null,
+      success_criteria: document.objective.success_criteria || null,
+      intake: document.objective.intake || null,
     },
     validation: {
       ok: validation.ok,
@@ -162,10 +204,10 @@ export function createBoardPayload(objectiveDir, options = {}) {
     usage,
     counts: {
       total: tasks.length,
-      todo: columns.find((column) => column.id === "todo").tasks.length,
-      inProgress: columns.find((column) => column.id === "in-progress").tasks.length,
-      blocked: columns.find((column) => column.id === "blocked").tasks.length,
-      completed: columns.find((column) => column.id === "completed").tasks.length,
+      todo: columnTaskCount(columns, "todo"),
+      inProgress: columnTaskCount(columns, "in-progress"),
+      blocked: columnTaskCount(columns, "blocked"),
+      completed: columnTaskCount(columns, "completed"),
     },
     columns,
     tasks,
@@ -173,7 +215,8 @@ export function createBoardPayload(objectiveDir, options = {}) {
     sessionLog: noteIndex["notes/SESSION.md"]?.content || noteIndex["notes/session.md"]?.content || null,
   };
 }
-export function writeBoardApp(objectiveDir) {
+
+export function writeBoardApp(objectiveDir: string) {
   const root = resolve(objectiveDir);
   const appDir = join(root, ".cursor-curator-board");
   mkdirSync(appDir, { recursive: true });
@@ -186,7 +229,8 @@ export function writeBoardApp(objectiveDir) {
   copyFileSync(logoAssetPath, join(appDir, "curator-mark.png"));
   return appDir;
 }
-function attachTaskNote(task, noteIndex) {
+
+function attachTaskNote(task: BoardTask, noteIndex: NoteIndex): BoardTask {
   const notePath = task.receipt.note || "";
   if (!notePath) return task;
   const normalized = notePath.replaceAll("\\", "/").replace(/^\.?\//, "");
@@ -196,23 +240,24 @@ function attachTaskNote(task, noteIndex) {
   };
 }
 
-function childDirSegmentFromRelative(childRelative: string): string {
-  const normalized = String(childRelative || "").replace(/\\/g, "/");
-  const match = normalized.match(/subobjectives\/([^/]+)/);
-  return match?.[1] ?? "";
-}
-
-function attachTaskSubobjective(task, objectiveDir, workspaceRoot) {
-  if (!task.subobjective) return task;
+function attachTaskSubobjective(
+  task: BoardTask,
+  objectiveDir: string,
+  workspaceRoot: string,
+): BoardTask {
+  if (!task.subobjective?.path) return task;
   const childRelative = task.subobjective.path;
-  const childDirSegment = childDirSegmentFromRelative(childRelative) || subobjectiveSlugFromPath(childRelative);
+  const childDirSegment = childDirSegmentOrSlug(childRelative);
   const childSlug =
     resolveChildObjectiveSlug(workspaceRoot, objectiveDir, childRelative)
     ?? childDirSegment;
   if (!childSlug || !childDirSegment) {
     throw new ObjectiveBoardError(`Invalid sub-objective path for ${task.id}: ${childRelative}`);
   }
-  const childGoalDir = join(objectiveDir, "subobjectives", childDirSegment);
+  const childGoalDir = resolveChildObjectiveDir(objectiveDir, childRelative);
+  if (!childGoalDir) {
+    throw new ObjectiveBoardError(`Invalid sub-objective path for ${task.id}: ${childRelative}`);
+  }
   validateChildSubobjectivePath(task, objectiveDir, childRelative, childDirSegment);
   if (!objectiveExistsInDb(workspaceRoot, childSlug)) {
     throw new ObjectiveBoardError(`Missing sub-objective state for ${task.id}: ${childRelative}`);
@@ -228,8 +273,13 @@ function attachTaskSubobjective(task, objectiveDir, workspaceRoot) {
   };
 }
 
-function validateChildSubobjectivePath(task, objectiveDir, childRelative, childSlug) {
-  if (task.subobjective.depth !== 1) {
+function validateChildSubobjectivePath(
+  task: BoardTask,
+  objectiveDir: string,
+  childRelative: string,
+  childSlug: string,
+): void {
+  if (task.subobjective?.depth !== 1) {
     throw new ObjectiveBoardError(`Invalid sub-objective depth for ${task.id}: only depth 1 is supported.`);
   }
   const expectedPrefix = `subobjectives/${childSlug}`;
@@ -251,15 +301,20 @@ function validateChildSubobjectivePath(task, objectiveDir, childRelative, childS
   }
 }
 
-function isInsideRoot(relativePath) {
-  return relativePath && relativePath !== ".." && !relativePath.startsWith(`..${sep}`) && !isAbsolute(relativePath);
+function isInsideRoot(relativePath: string): boolean {
+  return Boolean(
+    relativePath
+    && relativePath !== ".."
+    && !relativePath.startsWith(`..${sep}`)
+    && !isAbsolute(relativePath),
+  );
 }
 
-function loadNotes(objectiveDir) {
+function loadNotes(objectiveDir: string): NoteIndex {
   const notesDir = join(objectiveDir, "notes");
   if (!existsSync(notesDir)) return {};
 
-  const notes = {};
+  const notes: NoteIndex = {};
   for (const entry of readdirSync(notesDir, { withFileTypes: true })) {
     if (!entry.isFile() || !entry.name.endsWith(".md")) continue;
     const path = `notes/${entry.name}`;
@@ -275,7 +330,7 @@ function loadNotes(objectiveDir) {
   return notes;
 }
 
-function noteTitle(content, filename) {
+function noteTitle(content: string, filename: string): string {
   const heading = content.split(/\r?\n/).find((line) => line.startsWith("# "));
   return heading ? heading.replace(/^#\s+/, "").trim() : basename(filename, ".md");
 }

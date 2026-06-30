@@ -1,15 +1,7 @@
-import {
-  existsSync,
-  mkdirSync,
-  readFileSync,
-  renameSync,
-  writeFileSync,
-} from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { loadState } from "../state/objective-state.mjs";
-import {
-  resolveObjectiveStatePath,
-} from "../stale/objective-stale.mjs";
+import { resolveObjectiveStatePath } from "../stale/objective-stale.mjs";
 import {
   discoverAllObjectiveDirsFromHook,
   resolveObjectiveDirsFromHook,
@@ -18,10 +10,30 @@ import {
   appendUsageSessionToDb,
   importUsageFileToDb,
   loadUsageFileFromDb,
-  logicalUsagePath,
 } from "../db/usage-repository.mjs";
 import { findObjectiveSlugByDirPath } from "../db/state-repository.mjs";
 import { resolveWorkspaceForObjective } from "../mcp/path-utils.mjs";
+import {
+  normalizeSubobjectivePath,
+  resolveChildObjectiveDir,
+} from "../subobjective/subobjective-path.mjs";
+
+export type {
+  TaskMetricsDetail,
+  TaskMetricsView,
+} from "./usage-present.mjs";
+
+import { usageRollupVisible } from "./usage-present.mjs";
+
+export {
+  buildTaskMetricsView,
+  buildTaskMetricsWithRollup,
+  buildUsageBoardView,
+  formatDuration,
+  formatTokenCount,
+  formatUsageShort,
+  usageRollupVisible,
+} from "./usage-present.mjs";
 
 export interface UsageCounters {
   duration_ms: number;
@@ -75,16 +87,6 @@ export interface UsageBoardView extends UsageSummary {
   usage_warning: string;
 }
 
-export interface TaskMetricsDetail {
-  sessions: string;
-  agent_time: string;
-  input: string;
-  output: string;
-  models: string;
-  parent_agent_time?: string;
-  child_agent_time?: string;
-}
-
 export interface SubobjectiveTaskRef {
   id?: string;
   subobjective?: {
@@ -108,12 +110,6 @@ export interface ReadUsageSummaryForObjectiveOptions {
   tasks?: SubobjectiveTaskRef[];
 }
 
-export interface TaskMetricsView {
-  raw: TaskUsage | null;
-  badge: string;
-  detail: TaskMetricsDetail | null;
-}
-
 export interface ParsedHookUsage {
   model: string | null;
   duration_ms: number;
@@ -124,7 +120,6 @@ export interface ParsedHookUsage {
   status: string | null;
 }
 
-const MAX_SESSIONS = 50;
 const USAGE_RELATIVE_PATH = join("notes", "usage.json");
 
 function emptyCounters(): UsageCounters {
@@ -158,11 +153,10 @@ export function emptyUsageFile(): UsageFile {
 }
 
 export function readHookPayload(): Record<string, unknown> {
-  if (process.env.CURSOR_HOOK_INPUT?.trim()) {
+  if (process.env.CURATOR_HOOK_INPUT?.trim()) {
     try {
-      return JSON.parse(process.env.CURSOR_HOOK_INPUT) as Record<string, unknown>;
+      return JSON.parse(process.env.CURATOR_HOOK_INPUT) as Record<string, unknown>;
     } catch {
-      /* fall through */
     }
   }
 
@@ -174,7 +168,6 @@ export function readHookPayload(): Record<string, unknown> {
       }
     }
   } catch {
-    /* ignore malformed stdin */
   }
 
   return {};
@@ -226,7 +219,6 @@ export function attributeTaskId(
       return activeId;
     }
   } catch {
-    /* ignore invalid state */
   }
 
   return "unattributed";
@@ -247,28 +239,6 @@ export function mergeUsageCounters(...sources: Partial<UsageCounters>[]): UsageC
     addCounters(merged, source);
   }
   return merged;
-}
-
-function childDirSegmentFromRelative(childRelative: string): string {
-  const normalized = String(childRelative || "").replace(/\\/g, "/");
-  const match = normalized.match(/subobjectives\/([^/]+)/);
-  return match?.[1] ?? "";
-}
-
-function normalizeSubobjectivePath(childRelative: string): string {
-  const segment = childDirSegmentFromRelative(childRelative);
-  if (segment) {
-    return `subobjectives/${segment}`;
-  }
-  return String(childRelative || "").replace(/\\/g, "/").replace(/\/state\.json$/, "");
-}
-
-function resolveChildObjectiveDir(objectiveDir: string, childRelative: string): string | null {
-  const segment = childDirSegmentFromRelative(childRelative);
-  if (!segment) {
-    return null;
-  }
-  return join(resolve(objectiveDir), "subobjectives", segment);
 }
 
 export function discoverChildUsageDirs(
@@ -301,17 +271,6 @@ export function discoverChildUsageDirs(
   return entries;
 }
 
-function countersFromSession(session: UsageSession): UsageCounters {
-  return {
-    duration_ms: session.duration_ms,
-    input_tokens: session.input_tokens,
-    output_tokens: session.output_tokens,
-    cache_read_tokens: session.cache_read_tokens,
-    cache_write_tokens: session.cache_write_tokens,
-    session_count: 1,
-  };
-}
-
 function readUsageFileFromJson(objectiveDir: string): UsageFile {
   const path = usageFilePath(objectiveDir);
   if (!existsSync(path)) {
@@ -335,37 +294,40 @@ function readUsageFileFromJson(objectiveDir: string): UsageFile {
   }
 }
 
+function ensureLegacyUsageImported(workspaceRoot: string, objectiveDir: string, slug: string): void {
+  if (loadUsageFileFromDb(workspaceRoot, slug)) {
+    return;
+  }
+  const legacy = readUsageFileFromJson(objectiveDir);
+  if (legacy.sessions.length > 0) {
+    importUsageFileToDb(workspaceRoot, slug, legacy);
+  }
+}
+
 function readUsageFile(objectiveDir: string): UsageFile {
   const resolvedDir = resolve(objectiveDir);
   const workspaceRoot = workspaceRootFromObjectiveDir(resolvedDir);
   const slug = findObjectiveSlugByDirPath(workspaceRoot, resolvedDir);
+  const legacy = readUsageFileFromJson(resolvedDir);
 
   if (slug) {
+    if (legacy.sessions.length > 0 && !loadUsageFileFromDb(workspaceRoot, slug)) {
+      importUsageFileToDb(workspaceRoot, slug, legacy);
+    }
+
     const fromDb = loadUsageFileFromDb(workspaceRoot, slug);
     if (fromDb) {
       return fromDb;
     }
 
-    const legacy = readUsageFileFromJson(resolvedDir);
-    if (legacy.sessions.length > 0 || legacy.rollup.session_count > 0) {
-      importUsageFileToDb(workspaceRoot, slug, legacy);
+    if (legacy.rollup.session_count > 0 || legacy.sessions.length > 0) {
       return legacy;
     }
 
     return emptyUsageFile();
   }
 
-  return readUsageFileFromJson(resolvedDir);
-}
-
-function writeUsageFile(objectiveDir: string, data: UsageFile): string {
-  const notesDir = join(resolve(objectiveDir), "notes");
-  mkdirSync(notesDir, { recursive: true });
-  const path = usageFilePath(objectiveDir);
-  const tempPath = `${path}.tmp`;
-  writeFileSync(tempPath, `${JSON.stringify(data, null, 2)}\n`, "utf8");
-  renameSync(tempPath, path);
-  return path;
+  return legacy;
 }
 
 export function appendUsageEvent(
@@ -374,37 +336,19 @@ export function appendUsageEvent(
 ): { path: string; task_id: string } {
   const resolvedDir = resolve(objectiveDir);
   const workspaceRoot = workspaceRootFromObjectiveDir(resolvedDir);
+  const slug = findObjectiveSlugByDirPath(workspaceRoot, resolvedDir);
+  if (slug) {
+    ensureLegacyUsageImported(workspaceRoot, resolvedDir, slug);
+  }
+
   const dbResult = appendUsageSessionToDb(workspaceRoot, { objectiveDir: resolvedDir }, event);
-  if (dbResult) {
-    return { path: dbResult.usage_path, task_id: dbResult.task_id };
+  if (!dbResult) {
+    throw new Error(
+      `Cannot record usage: objective not found in database for ${resolvedDir} (run: bun cursor-curator/dist/cli/curator.mjs db import)`,
+    );
   }
 
-  const data = readUsageFileFromJson(resolvedDir);
-  const counters = countersFromSession(event);
-
-  addCounters(data.rollup, counters);
-
-  if (event.task_id === "unattributed") {
-    addCounters(data.unattributed, counters);
-  } else {
-    const existing = data.tasks[event.task_id] || { ...emptyCounters() };
-    addCounters(existing, counters);
-    existing.last_session_at = event.at;
-    if (event.model) {
-      const models = new Set(existing.models || []);
-      models.add(event.model);
-      existing.models = [...models];
-    }
-    data.tasks[event.task_id] = existing;
-  }
-
-  data.sessions.push(event);
-  if (data.sessions.length > MAX_SESSIONS) {
-    data.sessions = data.sessions.slice(-MAX_SESSIONS);
-  }
-
-  const path = writeUsageFile(resolvedDir, data);
-  return { path, task_id: event.task_id };
+  return { path: dbResult.usage_path, task_id: dbResult.task_id };
 }
 
 export function readUsageSummary(objectiveDir: string): UsageSummary {
@@ -455,170 +399,6 @@ export function readUsageSummaryForObjective(
     children,
     rollup_includes_subobjectives: childDirs.length > 0,
   };
-}
-
-export function usageRollupVisible(rollup: UsageCounters): boolean {
-  return rollup.session_count > 0
-    || rollup.duration_ms > 0
-    || rollup.input_tokens > 0
-    || rollup.output_tokens > 0;
-}
-
-export function buildUsageBoardView(summary: UsageSummary): UsageBoardView {
-  const visible = summary.present && usageRollupVisible(summary.rollup);
-  const tokenTotal = summary.rollup.input_tokens + summary.rollup.output_tokens;
-  const usageWarning = summary.has_unattributed
-    ? `${summary.unattributed.session_count} agent session(s) could not be attributed to a task (see unattributed usage in curator.db usage_sessions).`
-    : "";
-
-  return {
-    ...summary,
-    visible,
-    summary: visible ? formatUsageShort(summary.rollup) : "",
-    agent_time: visible && summary.rollup.duration_ms > 0
-      ? formatDuration(summary.rollup.duration_ms)
-      : "—",
-    tokens: visible && tokenTotal > 0 ? formatTokenCount(tokenTotal) : "—",
-    tokens_title: visible && tokenTotal > 0
-      ? `${formatTokenCount(summary.rollup.input_tokens)} in / ${formatTokenCount(summary.rollup.output_tokens)} out`
-      : "",
-    usage_warning: usageWarning,
-  };
-}
-
-export function formatTaskMetricsBadge(taskUsage: TaskUsage | null | undefined): string {
-  if (!taskUsage || taskUsage.session_count === 0) {
-    return "";
-  }
-
-  const parts: string[] = [];
-  if (taskUsage.duration_ms > 0) {
-    parts.push(formatDuration(taskUsage.duration_ms));
-  }
-  const tokenTotal = taskUsage.input_tokens + taskUsage.output_tokens;
-  if (tokenTotal > 0) {
-    parts.push(`${formatTokenCount(tokenTotal)} tok`);
-  }
-  return parts.join(" · ") || `${taskUsage.session_count} session(s)`;
-}
-
-export function buildTaskMetricsView(taskUsage: TaskUsage | null | undefined): TaskMetricsView {
-  if (!taskUsage || taskUsage.session_count === 0) {
-    return { raw: taskUsage ?? null, badge: "", detail: null };
-  }
-
-  return {
-    raw: taskUsage,
-    badge: formatTaskMetricsBadge(taskUsage),
-    detail: {
-      sessions: String(taskUsage.session_count),
-      agent_time: taskUsage.duration_ms > 0 ? formatDuration(taskUsage.duration_ms) : "—",
-      input: taskUsage.input_tokens > 0 ? formatTokenCount(taskUsage.input_tokens) : "—",
-      output: taskUsage.output_tokens > 0 ? formatTokenCount(taskUsage.output_tokens) : "—",
-      models: (taskUsage.models || []).join(", ") || "—",
-    },
-  };
-}
-
-export function buildTaskMetricsWithRollup(
-  taskId: string,
-  summary: UsageSummaryWithChildren,
-  childPath?: string,
-): TaskMetricsView {
-  const taskUsage = summary.tasks[taskId] ?? null;
-  const baseView = buildTaskMetricsView(taskUsage);
-  const normalizedChildPath = childPath ? normalizeSubobjectivePath(childPath) : undefined;
-  const childSummary = normalizedChildPath ? summary.children[normalizedChildPath] : undefined;
-
-  if (!normalizedChildPath || !childSummary) {
-    return baseView;
-  }
-
-  const parentDuration = taskUsage?.duration_ms ?? 0;
-  const childDuration = childSummary.rollup.duration_ms;
-  const parentSessions = taskUsage?.session_count ?? 0;
-  const childSessions = childSummary.rollup.session_count;
-
-  if (parentSessions === 0 && childSessions === 0) {
-    return baseView;
-  }
-
-  const combinedDuration = parentDuration + childDuration;
-  const combinedInput = (taskUsage?.input_tokens ?? 0) + childSummary.rollup.input_tokens;
-  const combinedOutput = (taskUsage?.output_tokens ?? 0) + childSummary.rollup.output_tokens;
-  const parentModels = taskUsage?.models ?? [];
-  const childModels = Object.values(childSummary.tasks)
-    .flatMap((entry) => entry.models || []);
-  const models = [...new Set([...parentModels, ...childModels])];
-
-  const detail: TaskMetricsDetail = {
-    sessions: String(parentSessions + childSessions),
-    agent_time: combinedDuration > 0 ? formatDuration(combinedDuration) : "—",
-    input: combinedInput > 0 ? formatTokenCount(combinedInput) : "—",
-    output: combinedOutput > 0 ? formatTokenCount(combinedOutput) : "—",
-    models: models.join(", ") || "—",
-  };
-
-  if (parentDuration > 0) {
-    detail.parent_agent_time = formatDuration(parentDuration);
-  }
-  if (childDuration > 0) {
-    detail.child_agent_time = formatDuration(childDuration);
-  }
-
-  const badgeSource: TaskUsage = {
-    duration_ms: combinedDuration,
-    input_tokens: combinedInput,
-    output_tokens: combinedOutput,
-    cache_read_tokens: (taskUsage?.cache_read_tokens ?? 0) + childSummary.rollup.cache_read_tokens,
-    cache_write_tokens: (taskUsage?.cache_write_tokens ?? 0) + childSummary.rollup.cache_write_tokens,
-    session_count: parentSessions + childSessions,
-    models,
-  };
-
-  return {
-    raw: taskUsage,
-    badge: formatTaskMetricsBadge(badgeSource),
-    detail,
-  };
-}
-
-export function formatTokenCount(value: number): string {
-  const n = num(value);
-  if (n >= 1_000_000) {
-    return `${(n / 1_000_000).toFixed(1).replace(/\.0$/, "")}M`;
-  }
-  if (n >= 1_000) {
-    return `${(n / 1_000).toFixed(1).replace(/\.0$/, "")}k`;
-  }
-  return String(n);
-}
-
-export function formatDuration(durationMs: number): string {
-  const ms = num(durationMs);
-  if (ms < 60_000) {
-    return `${Math.max(1, Math.round(ms / 1000))}s`;
-  }
-  if (ms < 3_600_000) {
-    return `${Math.round(ms / 60_000)}m`;
-  }
-  const hours = Math.floor(ms / 3_600_000);
-  const minutes = Math.round((ms % 3_600_000) / 60_000);
-  return minutes > 0 ? `${hours}h ${minutes}m` : `${hours}h`;
-}
-
-export function formatUsageShort(counters: UsageCounters): string {
-  const parts: string[] = [];
-  if (counters.duration_ms > 0) {
-    parts.push(`${formatDuration(counters.duration_ms)} agent time`);
-  }
-  const tokenTotal = counters.input_tokens + counters.output_tokens;
-  if (tokenTotal > 0) {
-    parts.push(
-      `${formatTokenCount(tokenTotal)} tokens (${formatTokenCount(counters.input_tokens)} in / ${formatTokenCount(counters.output_tokens)} out)`,
-    );
-  }
-  return parts.length ? parts.join(" · ") : "—";
 }
 
 export function processHookUsage(payload: Record<string, unknown>): {

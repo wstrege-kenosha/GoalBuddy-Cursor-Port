@@ -1,6 +1,7 @@
-import { basename, join, resolve } from "node:path";
+import { basename, resolve } from "node:path";
 import { loadState } from "../state/objective-state.mjs";
 import { listObjectives } from "../db/state-repository.mjs";
+import { resolveWorkspaceForObjective } from "../mcp/path-utils.mjs";
 
 export function resolveObjectiveDirsFromHook(
   payload: Record<string, unknown>,
@@ -68,7 +69,8 @@ function pickSingleObjectiveDir(
 
 function objectiveHasStatus(objectiveDir: string, status: string): boolean {
   try {
-    return loadState(basename(objectiveDir), resolve(objectiveDir, "..", "..", "..")).state.objective.status === status;
+    const workspaceRoot = resolveWorkspaceForObjective(objectiveDir);
+    return loadState(objectiveDir, workspaceRoot).state.objective.status === status;
   } catch {
     return false;
   }
@@ -76,8 +78,8 @@ function objectiveHasStatus(objectiveDir: string, status: string): boolean {
 
 function objectiveHasActiveTask(objectiveDir: string, taskId: string): boolean {
   try {
-    const workspaceRoot = resolve(objectiveDir, "..", "..", "..");
-    const state = loadState(basename(objectiveDir), workspaceRoot).state;
+    const workspaceRoot = resolveWorkspaceForObjective(objectiveDir);
+    const state = loadState(objectiveDir, workspaceRoot).state;
     return state.active_task === taskId
       && state.tasks.some((entry) => entry.id === taskId && entry.status === "active");
   } catch {

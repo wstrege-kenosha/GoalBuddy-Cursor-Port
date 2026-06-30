@@ -241,13 +241,7 @@ export function decomposeStateV3(
   listItems: Array<Omit<TaskListItemRow, "objective_id">>;
   subobjectiveLinks: Array<Omit<SubobjectiveLinkRow, "parent_objective_id">>;
 } {
-  const intake = state.objective.intake
-    ? {
-        ...state.objective.intake,
-        blind_spots_considered: state.objective.intake.blind_spots_considered,
-        existing_plan_facts: state.objective.intake.existing_plan_facts,
-      }
-    : null;
+  const intake = state.objective.intake ? { ...state.objective.intake } : null;
 
   const rules = state.rules ? { ...state.rules } : null;
   const extraRules: Record<string, unknown> = {};
@@ -317,12 +311,7 @@ export function decomposeStateV3(
       tranche: state.objective.tranche ?? null,
       status: state.objective.status,
       active_task_id: state.active_task,
-      first_milestone_complete:
-        state.objective.first_milestone_complete === undefined
-          ? null
-          : state.objective.first_milestone_complete
-            ? 1
-            : 0,
+      first_milestone_complete: boolToInt(state.objective.first_milestone_complete),
     },
     intake,
     successCriteria: {

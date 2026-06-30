@@ -1,4 +1,4 @@
-// @ts-nocheck
+// @ts-nocheck — follow-up: type normalizeTask/buildColumns and YAML legacy parsers
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { boardColumnLabels } from "./board-theme.mjs";
