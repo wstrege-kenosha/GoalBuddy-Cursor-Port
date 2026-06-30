@@ -74,8 +74,6 @@ export function parseHookUsagePayload(payload: Record<string, unknown>): ParsedH
   };
 }
 
-export { discoverAllObjectiveDirsFromHook, resolveObjectiveDirsFromHook } from "../hook/objective-hook-resolve.mjs";
-
 export function workspaceRootFromObjectiveDir(objectiveDir: string): string {
   return resolveWorkspaceForObjective(objectiveDir);
 }

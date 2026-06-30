@@ -1,18 +1,11 @@
 import type { Database } from "bun:sqlite";
-import { resolve } from "node:path";
 import type { StateV3, StateV3Task } from "../schema/state-v3.js";
-import { invalidateHubPayloadCache } from "../hub/objective-hub.mjs";
 import {
   decomposeStateV3,
   TASK_LIST_NAMES,
   type ObjectiveRow,
 } from "./state-mapper.mjs";
 import { normalizeStoredDirPath } from "./objective-lookup.mjs";
-import { ensureWorkspace, withTransaction } from "./connection.mjs";
-import { getDb, objectiveRowBySlug } from "./state-repository-db.mjs";
-import { loadStateV3 } from "./state-repository-read.mjs";
-import { replaceSubobjectiveLinks } from "./state-subobjective-links.mjs";
-import { persistObjectivePatchInDb } from "./state-objective-patch.mjs";
 import {
   clearObjectiveSatellites,
   insertObjectiveAgents,
@@ -23,10 +16,6 @@ import {
   insertObjectiveVisualBoard,
   upsertObjectiveChecks,
 } from "./objective-satellite-writes.mjs";
-import type { LoadedObjective } from "./state-repository-types.mjs";
-
-export { persistObjectivePatchInDb } from "./state-objective-patch.mjs";
-export type { ObjectivePatchFields } from "./state-objective-patch.mjs";
 
 type DecomposedState = ReturnType<typeof decomposeStateV3>;
 
@@ -186,24 +175,6 @@ export function insertObjectiveGraph(
   );
 }
 
-export function replaceObjectiveGraphInDb(
-  db: Database,
-  workspaceId: number,
-  existing: ObjectiveRow,
-  state: StateV3,
-  dirPath: string,
-): number {
-  return writeObjectiveGraph(
-    db,
-    workspaceId,
-    state,
-    dirPath,
-    existing.parent_objective_id,
-    existing.parent_task_id,
-    existing.id,
-  );
-}
-
 export function persistReceiptState(db: Database, objectiveId: number, state: StateV3): void {
   db.query(
     "UPDATE objectives SET status = ?, active_task_id = ?, updated_at = datetime('now') WHERE id = ?",
@@ -251,25 +222,4 @@ export function persistTaskPatchInDb(
       ).run(objectiveId, task.id, listName, position, String(value));
     });
   }
-}
-
-export function replaceObjectiveStateV3(
-  workspaceRoot: string,
-  state: StateV3,
-  options: { dirPath: string },
-): LoadedObjective {
-  const root = resolve(workspaceRoot);
-  const db = getDb(root);
-  const result = withTransaction(db, () => {
-    const workspaceId = ensureWorkspace(db, root);
-    const existing = objectiveRowBySlug(db, workspaceId, state.objective.slug);
-    if (!existing) {
-      throw new Error(`Objective not found in database: ${state.objective.slug}`);
-    }
-    const objectiveId = replaceObjectiveGraphInDb(db, workspaceId, existing, state, options.dirPath);
-    replaceSubobjectiveLinks(db, workspaceId, root, objectiveId, state, options.dirPath);
-    return loadStateV3(root, state.objective.slug);
-  });
-  invalidateHubPayloadCache();
-  return result;
 }

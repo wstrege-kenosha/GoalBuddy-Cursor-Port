@@ -19,9 +19,13 @@ export {
 } from "./usage-types.mjs";
 
 export {
+  discoverAllObjectiveDirsFromHook,
+  resolveObjectiveDirsFromHook,
+} from "../hook/objective-hook-resolve.mjs";
+
+export {
   appendUsageEvent,
   attributeTaskId,
-  discoverAllObjectiveDirsFromHook,
   discoverChildUsageDirs,
   mergeUsageCounters,
   parseHookUsagePayload,
@@ -30,7 +34,6 @@ export {
   readHookPayload,
   readUsageSummary,
   readUsageSummaryForObjective,
-  resolveObjectiveDirsFromHook,
   workspaceRootFromObjectiveDir,
 } from "./usage-store.mjs";
 

@@ -6,12 +6,8 @@ import { checkCompletionReadinessFromState } from "../completion/objective-compl
 import { verifyWorkerReceiptForTask } from "../verify/objective-verify.mjs";
 import { ensureWorkspace, logicalBoardPath, withTransaction } from "./connection.mjs";
 import { invalidateHubPayloadCache } from "../hub/objective-hub.mjs";
-import {
-  persistObjectivePatchInDb,
-  persistReceiptState,
-  persistTaskPatchInDb,
-} from "./state-persist.mjs";
-import type { ObjectivePatchFields } from "./state-objective-patch.mjs";
+import { persistReceiptState, persistTaskPatchInDb } from "./state-persist.mjs";
+import { persistObjectivePatchInDb, type ObjectivePatchFields } from "./state-objective-patch.mjs";
 import {
   replaceSubobjectiveLinks,
 } from "./state-subobjective-links.mjs";

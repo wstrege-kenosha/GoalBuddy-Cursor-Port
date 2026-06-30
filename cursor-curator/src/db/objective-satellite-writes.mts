@@ -126,6 +126,18 @@ export function insertObjectiveAgents(
   ).run(objectiveId, agents.scout, agents.worker, agents.approval_gate);
 }
 
+export function replaceObjectiveAgents(
+  db: Database,
+  objectiveId: number,
+  agents: Record<string, string> | null,
+): void {
+  db.query("DELETE FROM objective_agents WHERE objective_id = ?").run(objectiveId);
+  if (!agents) {
+    return;
+  }
+  insertObjectiveAgents(db, objectiveId, agents);
+}
+
 export function insertObjectiveVisualBoard(
   db: Database,
   objectiveId: number,
@@ -198,7 +210,7 @@ export function clearObjectiveSatellites(db: Database, objectiveId: number): voi
   replaceObjectiveIntake(db, objectiveId, null);
   db.query("DELETE FROM objective_success_criteria WHERE objective_id = ?").run(objectiveId);
   replaceObjectiveRules(db, objectiveId, null);
-  db.query("DELETE FROM objective_agents WHERE objective_id = ?").run(objectiveId);
+  replaceObjectiveAgents(db, objectiveId, null);
   replaceObjectiveVisualBoard(db, objectiveId, undefined);
   upsertObjectiveChecks(db, objectiveId, undefined);
 }

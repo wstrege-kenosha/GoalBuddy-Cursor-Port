@@ -2,12 +2,7 @@ import type { Database } from "bun:sqlite";
 import type { StateV3 } from "../schema/state-v3.js";
 import { decomposeRulesFromState } from "./state-mapper.mjs";
 import {
-  insertObjectiveAgents,
-  insertObjectiveChecks,
-  insertObjectiveIntake,
-  insertObjectiveRules,
-  insertObjectiveSuccessCriteria,
-  insertObjectiveVisualBoard,
+  replaceObjectiveAgents,
   replaceObjectiveIntake,
   replaceObjectiveRules,
   replaceObjectiveVisualBoard,
@@ -71,9 +66,7 @@ export function persistObjectivePatchInDb(
   }
 
   if (patch.agents) {
-    db.query(
-      "UPDATE objective_agents SET scout = ?, worker = ?, approval_gate = ? WHERE objective_id = ?",
-    ).run(state.agents.scout, state.agents.worker, state.agents.approval_gate, objectiveId);
+    replaceObjectiveAgents(db, objectiveId, state.agents);
   }
 
   if (patch.checks !== undefined) {
