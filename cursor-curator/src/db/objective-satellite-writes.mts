@@ -104,15 +104,15 @@ export function replaceObjectiveRules(
 export function insertObjectiveSuccessCriteria(
   db: Database,
   objectiveId: number,
-  successCriteria: Record<string, unknown>,
+  successCriteria: StateV3["objective"]["success_criteria"],
 ): void {
   db.query(
     "INSERT INTO objective_success_criteria (objective_id, signal, cadence, final_proof) VALUES (?, ?, ?, ?)",
   ).run(
     objectiveId,
-    String(successCriteria.signal),
-    successCriteria.cadence == null ? null : String(successCriteria.cadence),
-    String(successCriteria.final_proof),
+    successCriteria.signal,
+    successCriteria.cadence ?? null,
+    successCriteria.final_proof,
   );
 }
 

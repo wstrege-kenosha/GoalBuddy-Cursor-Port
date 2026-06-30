@@ -241,6 +241,19 @@ export function decomposeRulesFromState(rules: StateV3["rules"]): Record<string,
   };
 }
 
+export type DecomposedState = {
+  objective: Omit<ObjectiveRow, "id" | "created_at" | "updated_at">;
+  intake: Record<string, unknown> | null;
+  successCriteria: StateV3["objective"]["success_criteria"];
+  rules: Record<string, unknown> | null;
+  agents: StateV3["agents"];
+  visualBoard: StateV3["visual_board"] | null;
+  checks: StateV3["checks"] | null;
+  tasks: Array<Omit<TaskRow, "objective_id">>;
+  listItems: Array<Omit<TaskListItemRow, "objective_id">>;
+  subobjectiveLinks: Array<Omit<SubobjectiveLinkRow, "parent_objective_id">>;
+};
+
 export function decomposeStateV3(
   state: StateV3,
   workspaceId: number,
@@ -248,18 +261,7 @@ export function decomposeStateV3(
   dirPath: string,
   parentObjectiveId: number | null = null,
   parentTaskId: string | null = null,
-): {
-  objective: Omit<ObjectiveRow, "id" | "created_at" | "updated_at">;
-  intake: Record<string, unknown> | null;
-  successCriteria: Record<string, unknown>;
-  rules: Record<string, unknown> | null;
-  agents: Record<string, string>;
-  visualBoard: Record<string, unknown> | null;
-  checks: Record<string, unknown> | null;
-  tasks: Array<Omit<TaskRow, "objective_id">>;
-  listItems: Array<Omit<TaskListItemRow, "objective_id">>;
-  subobjectiveLinks: Array<Omit<SubobjectiveLinkRow, "parent_objective_id">>;
-} {
+): DecomposedState {
   const intake = state.objective.intake ? { ...state.objective.intake } : null;
 
   const tasks = state.tasks.map((task, index) => ({
@@ -320,11 +322,7 @@ export function decomposeStateV3(
       first_milestone_complete: boolToInt(state.objective.first_milestone_complete),
     },
     intake,
-    successCriteria: {
-      signal: state.objective.success_criteria.signal,
-      cadence: state.objective.success_criteria.cadence ?? null,
-      final_proof: state.objective.success_criteria.final_proof,
-    },
+    successCriteria: { ...state.objective.success_criteria },
     rules: decomposeRulesFromState(state.rules),
     agents: { ...state.agents },
     visualBoard: state.visual_board ? { ...state.visual_board } : null,

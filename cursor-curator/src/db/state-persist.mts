@@ -3,21 +3,18 @@ import type { StateV3, StateV3Task } from "../schema/state-v3.js";
 import {
   decomposeStateV3,
   TASK_LIST_NAMES,
-  type ObjectiveRow,
+  type DecomposedState,
 } from "./state-mapper.mjs";
 import { normalizeStoredDirPath } from "./objective-lookup.mjs";
 import {
   clearObjectiveSatellites,
-  insertObjectiveAgents,
-  insertObjectiveChecks,
-  insertObjectiveIntake,
-  insertObjectiveRules,
+  replaceObjectiveAgents,
+  replaceObjectiveIntake,
+  replaceObjectiveRules,
   replaceObjectiveSuccessCriteria,
-  insertObjectiveVisualBoard,
+  replaceObjectiveVisualBoard,
   upsertObjectiveChecks,
 } from "./objective-satellite-writes.mjs";
-
-type DecomposedState = ReturnType<typeof decomposeStateV3>;
 
 export function clearTasksOnly(db: Database, objectiveId: number): void {
   db.query("DELETE FROM tasks WHERE objective_id = ?").run(objectiveId);
@@ -29,29 +26,12 @@ export function clearObjectiveDependents(db: Database, objectiveId: number): voi
 }
 
 export function insertObjectiveSatellites(db: Database, objectiveId: number, parts: DecomposedState): void {
-  if (parts.intake) {
-    insertObjectiveIntake(db, objectiveId, parts.intake);
-  }
-
-  replaceObjectiveSuccessCriteria(
-    db,
-    objectiveId,
-    parts.successCriteria as StateV3["objective"]["success_criteria"],
-  );
-
-  if (parts.rules) {
-    insertObjectiveRules(db, objectiveId, parts.rules);
-  }
-
-  insertObjectiveAgents(db, objectiveId, parts.agents);
-
-  if (parts.visualBoard) {
-    insertObjectiveVisualBoard(db, objectiveId, parts.visualBoard);
-  }
-
-  if (parts.checks) {
-    insertObjectiveChecks(db, objectiveId, parts.checks);
-  }
+  replaceObjectiveIntake(db, objectiveId, parts.intake);
+  replaceObjectiveSuccessCriteria(db, objectiveId, parts.successCriteria);
+  replaceObjectiveRules(db, objectiveId, parts.rules);
+  replaceObjectiveAgents(db, objectiveId, parts.agents);
+  replaceObjectiveVisualBoard(db, objectiveId, parts.visualBoard ?? undefined);
+  upsertObjectiveChecks(db, objectiveId, parts.checks ?? undefined);
 }
 
 export function insertTasksAndListItems(db: Database, objectiveId: number, parts: DecomposedState): void {
